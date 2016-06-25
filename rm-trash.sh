@@ -6,13 +6,14 @@
 
 readonly Zone=$(imiscsvrinfo | sed -n 's/^rodsZone=//p')
 
-for user in $(iadmin lu | sort)
+
+while IFS= read 
 do
-  user=${user%#$Zone}   
+  user="${REPLY%#$Zone}"   
 
   if [ "$user" != "anonymous" -a "$user" != "rodsBoot" ]
   then        
-    printf 'removing trash for %s\n' "$user"
-    irmtrash -M -u "$user"
+    printf 'removing trash for "%s"\n' "$user"
+#    irmtrash -M -u "$user"
   fi
-done
+done < <(iadmin lu | sort)
