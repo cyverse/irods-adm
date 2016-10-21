@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# Usage: dump-logs.sh [YEAR [MONTH]]
+# Usage: dump-logs.sh [YEAR [MONTH [START_DAY]]]
 #
-# YEAR is a the four digit year to restrict the dump to. MONTH is the number of the the month to
-# restrict the dump to.
+# YEAR is a the four digit year to restrict the dump to. MONTH is the number of the month to
+# restrict the dump to. START_DAY is the start day of the log to dump. It is the day number relative
+# to the month.
 #
 # This script dumps all of the errors from rodsLog files on the IES and all of the local resource
 # servers. It groups the log by session, and it dumps each session that logs an error message. See
@@ -24,23 +25,18 @@
 
 readonly LogBase=/var/lib/irods/iRODS/server/log/rodsLog
 
-readonly Year=$(if [ $# -ge 1 ]; then printf "$1"; fi)
-readonly Month=$(if [ $# -ge 2 ]; then printf "%02d" $2; fi)
+declare year=*
+declare month=*
+declare startDay=*
+
+if [ $# -ge 1 ]; then printf -v year '%04d' "$1"; fi
+if [ $# -ge 2 ]; then printf -v month '%02d' "$2"; fi
+if [ $# -ge 3 ]; then printf -v startDay '%02d' "$3"; fi
+
+readonly LogExt="$year"."$month"."$startDay"
 
 declare -i cnt
 declare -i tot
-
-declare logExt
-
-if [ -n "$Month" ]
-then
-  logExt="$Year"."$Month".*
-elif [ -n "$Year" ]
-then
-  logExt="$Year".*
-else
-  logExt=*
-fi
 
 mkdir --parents logs
 
@@ -58,7 +54,7 @@ do
     out=logs/"$svr".err
     rm -f "$out"
 
-    for log in $(ssh -p 1657 -q root@"$svr" ls "$LogBase"."$logExt")
+    for log in $(ssh -p 1657 -q root@"$svr" ls "$LogBase"."$LogExt")
     do
       if [[ "$log" =~ $LogBase ]]
       then
