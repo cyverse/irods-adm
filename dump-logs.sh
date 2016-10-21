@@ -24,28 +24,29 @@
 
 readonly LogBase=/var/lib/irods/iRODS/server/log/rodsLog
 
-readonly year=$(if [ $# -ge 1 ]; then printf "$1"; fi)
-readonly month=$(if [ $# -ge 2 ]; then printf "%02d" $2; fi)
+readonly Year=$(if [ $# -ge 1 ]; then printf "$1"; fi)
+readonly Month=$(if [ $# -ge 2 ]; then printf "%02d" $2; fi)
 
 declare -i cnt
 declare -i tot
 
 declare logExt
 
-if [ -n "$month" ]
+if [ -n "$Month" ]
 then
-  logExt="$year"."$month".*
-elif [ -n "$year" ]
+  logExt="$Year"."$Month".*
+elif [ -n "$Year" ]
 then
-  logExt="$year".*
+  logExt="$Year".*
 else
   logExt=*
 fi
 
 mkdir --parents logs
 
-readonly rs=$(iquest '%s' "SELECT ORDER(RESC_LOC) WHERE RESC_CLASS_NAME = 'archive'")
-for svr in data.iplantcollaborative.org $rs
+readonly RS=$(iquest '%s' "SELECT ORDER(RESC_LOC) WHERE RESC_CLASS_NAME = 'archive'")
+
+for svr in data.iplantcollaborative.org $RS
 do
   if [ "$svr" != aegis.a2c2.asu.edu ] && \
      [ "$svr" != aegis.cefns.nau.edu ] && \
