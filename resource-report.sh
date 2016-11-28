@@ -17,14 +17,16 @@ query()
 
 
 query <<SQL
-  CREATE TEMPORARY TABLE resc_summary (resc_hier, volume) AS 
-    SELECT resc_hier, SUM(data_size) FROM r_data_main GROUP BY resc_hier;
+  CREATE TEMPORARY TABLE resc_summary (resc_hier, count, volume) AS 
+  SELECT resc_hier, COUNT(*), SUM(data_size) FROM r_data_main GROUP BY resc_hier;
 
   SELECT resc_hier                                       AS "Resource", 
+         count                                           AS "Count",
          CAST(volume / 1000000000000.0 AS NUMERIC(8, 3)) AS "Data Volume (TB)" 
     FROM resc_summary 
     ORDER BY resc_hier;
 
-  SELECT CAST(SUM(volume) / 1000000000000.0 AS NUMERIC(8, 3)) AS "Total Data Volume (TB)" 
+  SELECT SUM(count)                                           AS "Total Count",
+         CAST(SUM(volume) / 1000000000000.0 AS NUMERIC(8, 3)) AS "Total Data Volume (TB)" 
     FROM resc_summary;
 SQL
