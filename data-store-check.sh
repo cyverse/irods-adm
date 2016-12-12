@@ -92,7 +92,6 @@ display_problems()
   psql --host "$HOST" --port "$PORT" ICAT "$USER" <<EOF
 $(inject_debug_stmt '\timing on')
 $(inject_debug_newline)
-
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 $(inject_debug_msg owned_by_rodsadmin)
@@ -191,7 +190,7 @@ EOF
 }
 
 
-format_results()
+strip_noise()
 {
   while IFS= read -r
   do
@@ -200,7 +199,7 @@ format_results()
       printf '%s\n' "$REPLY"
     else
       case "$REPLY" in
-        Timing*|Time:*|BEGIN|SELECT*|ROLLBACK)
+        BEGIN|SELECT*|ROLLBACK)
           ;;
         *)
           printf '%s\n' "$REPLY"
@@ -211,4 +210,4 @@ format_results()
 }
 
 
-display_problems | format_results
+display_problems | strip_noise
