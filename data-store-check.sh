@@ -5,7 +5,8 @@
 # This script generates two reports, one for collections and one for data 
 # objects. Each report lists all collections or data objects, respectively, that
 # where created before the cutoff data and are missing the own permission for 
-# the rodsadmin group or don't have one and only one UUID assigned to it.
+# the rodsadmin group or don't have one and only one UUID assigned to it. The
+# data object report includes information on missing checksums.
 # 
 # HOST is the domain name or IP address of the server where the PostgreSQL DBMS
 # containing the ICAT DB runs. The default value is 'localhost'.
@@ -142,6 +143,10 @@ AS
   GROUP BY d.data_id, d.data_repl_num
   HAVING COUNT(u.object_id) != 1;
 
+$(inject_debug_msg data_checksum_probs)
+CREATE TEMPORARY TABLE data_chksum_probs 
+AS SELECT DISTINCT data_id FROM r_data_main WHERE data_checksum IS NULL OR data_checksum = '';
+
 $(inject_debug_newline)
 \echo '1. Problem Collections Created Before $CUTOFF_TIME:'
 \echo ''
@@ -164,17 +169,20 @@ ORDER BY create_ts;
 \echo ''
 SELECT 
   d.data_id = ANY(ARRAY(SELECT * FROM data_perm_probs))  AS "Permission Issue",
+  d.data_checksum IS NULL OR d.data_checksum = ''        AS "Missing Checksum",
   COALESCE((SELECT du.uuid_count FROM data_uuid_probs AS du WHERE du.data_id = d.data_id), 1) 
     AS "UUID Count",
   d.data_owner_name || '#' || d.data_owner_zone          AS "Owner",
+  d.resc_hier                                            AS "Resource",
   TO_TIMESTAMP(CAST(d.create_ts AS INTEGER))             AS "Create Time",
   c.coll_name || '/' || d.data_name                      AS "Data Object"
 FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id 
 WHERE c.coll_name LIKE '/iplant/%'
-  AND d.data_id
-    = ANY(ARRAY(SELECT * FROM data_perm_probs UNION SELECT data_id FROM data_uuid_probs))
-  AND d.data_repl_num = 0
   AND d.create_ts < '$cutoffTS'
+  AND d.data_id = ANY(ARRAY(
+    SELECT * FROM data_perm_probs 
+    UNION SELECT data_id FROM data_uuid_probs 
+    UNION SELECT data_id FROM data_chksum_probs))
 ORDER BY d.create_ts;
 
 $(inject_debug_newline)
