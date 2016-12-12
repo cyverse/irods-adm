@@ -58,15 +58,43 @@ then
 fi
 
 
+inject_debug_stmt() 
+{
+  local stmt="$*"
+
+  if [ -n "$DEBUG" ]
+  then 
+    printf '%s\n' "$stmt"
+  fi
+}
+
+
+inject_debug_newline()
+{
+  inject_debug_stmt "\\echo ''"
+}
+
+
+inject_debug_msg() 
+{
+  local msg="$*"
+
+  inject_debug_newline
+  inject_debug_stmt "\\echo '$msg'"
+}
+
+
 display_problems() 
 {
   local cutoffTS=$(date --date="$CUTOFF_TIME" '+0%s')
 
   psql --host "$HOST" --port "$PORT" ICAT "$USER" <<EOF
-\timing on
+$(inject_debug_stmt '\timing on')
+$(inject_debug_newline)
 
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
+$(inject_debug_msg owned_by_rodsadmin)
 CREATE TEMPORARY TABLE owned_by_rodsadmin
 AS 
   SELECT a.object_id
@@ -77,25 +105,28 @@ AS
        FROM r_tokn_main 
        WHERE token_namespace = 'access_type' AND token_name = 'own');
 
+$(inject_debug_msg coll_perm_probs)
 CREATE TEMPORARY TABLE coll_perm_probs
 AS 
   SELECT coll_id
   FROM r_coll_main AS c
   WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id);
 
+$(inject_debug_msg data_perm_probs)
 CREATE TEMPORARY TABLE data_perm_probs
 AS 
-  SELECT data_id
+  SELECT DISTINCT data_id
   FROM r_data_main AS d
-  WHERE data_repl_num = 0
-    AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id);
+  WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id);
 
+$(inject_debug_msg uuid_attrs)
 CREATE TEMPORARY TABLE uuid_attrs
 AS 
   SELECT o.object_id
   FROM r_objt_metamap AS o JOIN r_meta_main AS m ON m.meta_id = o.meta_id 
   WHERE m.meta_attr_name = 'ipc_UUID';
 
+$(inject_debug_msg coll_uuid_probs)
 CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count)
 AS 
   SELECT c.coll_id, COUNT(u.object_id)
@@ -103,14 +134,15 @@ AS
   GROUP BY c.coll_id
   HAVING COUNT(u.object_id) != 1;
 
+$(inject_debug_msg data_uuid_probs)
 CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count)
 AS 
-  SELECT d.data_id, COUNT(u.object_id)
+  SELECT DISTINCT d.data_id, COUNT(u.object_id)
   FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
-  WHERE d.data_repl_num = 0 
-  GROUP BY d.data_id
+  GROUP BY d.data_id, d.data_repl_num
   HAVING COUNT(u.object_id) != 1;
 
+$(inject_debug_newline)
 \echo '1. Problem Collections Created Before $CUTOFF_TIME:'
 \echo ''
 SELECT
@@ -145,6 +177,7 @@ WHERE c.coll_name LIKE '/iplant/%'
   AND d.create_ts < '$cutoffTS'
 ORDER BY d.create_ts;
 
+$(inject_debug_newline)
 ROLLBACK;
 EOF
 }
