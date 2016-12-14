@@ -190,6 +190,102 @@ EOF
 }
 
 
+pass_hdr_thru()
+{
+  for i in {1..3}
+  do
+    read -r
+    printf '%s\n' "$REPLY"
+  done
+}
+
+
+annotate_bool_issue()
+{
+  local fieldVal="$1"
+
+  if [ $fieldVal == t ]
+  then
+    printf '%s' "${fieldVal/%  /✗ }"
+  else
+    printf '%s' "$fieldVal"
+  fi
+}
+
+
+annotate_uuid_count()
+{
+  local uuidCnt="$1"
+
+  uuidCnt=${uuidCnt#  }
+
+  if [ $uuidCnt -eq 1 ]
+  then
+    printf '%s  ' "$uuidCnt"
+  else
+    printf '%s✗ ' "$uuidCnt"
+  fi
+}
+
+
+annotate_collection_problems()
+{
+  pass_hdr_thru
+
+  while IFS='|' read -r permIssue uuidCnt owner createTime coll
+  do
+    if [ -z "$coll" ]
+    then
+      break
+    fi
+
+    permIssue=$(annotate_bool_issue "$permIssue")
+    uuidCnt=$(annotate_uuid_count "$uuidCnt")
+    printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$coll"
+  done
+}
+
+
+annotate_object_problems()
+{
+  pass_hdr_thru
+
+  while IFS='|' read -r permIssue missingChksum uuidCnt owner resc createTime obj
+  do
+    if [ -z "$obj" ]
+    then
+      break
+    fi
+
+    permIssue=$(annotate_bool_issue "$permIssue")
+    missingChksum=$(annotate_bool_issue "$missingChksum")
+    uuidCnt=$(annotate_uuid_count "$uuidCnt")
+
+    printf '%s|%s|%s|%s|%s|%s|%s\n' \
+           "$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$resc" "$createTime" "$obj"
+  done
+}
+
+
+annotate_problems() 
+{
+  while IFS= read -r
+  do
+    case "$REPLY" in
+      1.*)
+        annotate_collection_problems
+        ;;
+      2.*)
+        annotate_object_problems
+        ;;
+      *)
+        printf '%s\n' "$REPLY"
+        ;;
+    esac
+  done
+}
+
+
 strip_noise()
 {
   while IFS= read -r
@@ -210,4 +306,4 @@ strip_noise()
 }
 
 
-display_problems | strip_noise
+display_problems | strip_noise | annotate_problems
