@@ -23,8 +23,6 @@
 # DEBUG is any value that, if present, will cause the script to generate
 # describing what it is doing. It is not present by default.
 
-set -e
-
 if [ "$#" -ge 1 ]
 then
   readonly HOST="$1"
@@ -200,15 +198,42 @@ pass_hdr_thru()
 }
 
 
-annotate_bool_issue()
+fix_perm_issue()
 {
-  local fieldVal="$1"
+  local entity="$*"
 
-  if [ $fieldVal == t ]
+  ichmod -M own rodsadmin "$entity"
+}
+
+
+process_perm_issue()
+{
+  local issue="$1"
+  local entity="$2"
+
+  if [ $issue == t ]
   then
-    printf '%s' "${fieldVal/%  /✗ }"
+    if ichmod -M own rodsadmin "${entity# }"
+    then
+      printf '%s' "${issue/%  /✓ }"
+    else
+      printf '%s' "${issue/%  /✗ }"
+    fi
   else
-    printf '%s' "$fieldVal"
+    printf '%s' "$issue"
+  fi
+}
+
+
+annotate_chksum_issue()
+{
+  local issue="$1"
+
+  if [ $issue == t ]
+  then
+    printf '%s' "${issue/%  /✗ }"
+  else
+    printf '%s' "$issue"
   fi
 }
 
@@ -239,7 +264,7 @@ annotate_collection_problems()
       break
     fi
 
-    permIssue=$(annotate_bool_issue "$permIssue")
+    permIssue=$(process_perm_issue "$permIssue" "$coll")
     uuidCnt=$(annotate_uuid_count "$uuidCnt")
     printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$coll"
   done
@@ -257,8 +282,8 @@ annotate_object_problems()
       break
     fi
 
-    permIssue=$(annotate_bool_issue "$permIssue")
-    missingChksum=$(annotate_bool_issue "$missingChksum")
+    permIssue=$(process_perm_issue "$permIssue" "$obj")
+    missingChksum=$(annotate_chksum_issue "$missingChksum")
     uuidCnt=$(annotate_uuid_count "$uuidCnt")
 
     printf '%s|%s|%s|%s|%s|%s|%s\n' \
@@ -306,4 +331,15 @@ strip_noise()
 }
 
 
-display_problems | strip_noise | annotate_problems
+readonly ErrorLog=$(mktemp data-store-check-errors.XXX)
+
+display_problems | strip_noise | annotate_problems 2>"$ErrorLog"
+
+if [ -s "$ErrorLog" ]
+then
+  printf '\n\nErrors Occuring While Attempting to Fix Problems\n\n'
+  cat "$ErrorLog"
+fi
+
+rm --force "$ErrorLog"
+
