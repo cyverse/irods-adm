@@ -210,6 +210,7 @@ process_perm_issue()
       printf '%s' "${issue/%  /✓ }"
     else
       printf '%s' "${issue/%  /✗ }"
+      printf 'FAILED TO ADD RODSADMIN OWN PERMISSION!! - %s\n' "$entity" >&2
     fi
   else
     printf '%s' "$issue"
@@ -240,6 +241,7 @@ process_uuid_issue()
         printf '%s✓ ' "$uuidCntField"
       else
         printf '%s✗ ' "$uuidCntField"
+        printf 'FAILED TO ADD UUID!! - %s\n' "$entity" >&2
       fi
       ;;
     1)
@@ -247,6 +249,7 @@ process_uuid_issue()
       ;;
     *)
       printf '%s✗ ' "$uuidCntField"
+      printf 'MULTIPLE UUIDS!! - %s\n' "$entity" >&2
       ;;
    esac
 }
@@ -265,6 +268,7 @@ process_chksum_issue()
       printf '%s' "${issue/%  /✓ }"
     else
       printf '%s' "${issue/%  /✗ }"
+      printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
     fi
   else
     printf '%s' "$issue"
