@@ -198,14 +198,6 @@ pass_hdr_thru()
 }
 
 
-fix_perm_issue()
-{
-  local entity="$*"
-
-  ichmod -M own rodsadmin "$entity"
-}
-
-
 process_perm_issue()
 {
   local issue="$1"
@@ -225,17 +217,25 @@ process_perm_issue()
 }
 
 
-process_coll_uuid_issue()
+process_uuid_issue()
 {
   local uuidCntField="$1"
-  local coll="$2"
+  local entityType="$2"
+  local entity="$3"
 
   uuidCntField=${uuidCnt#  }
   declare -i cnt=$uuidCntField
 
   case $cnt in
     0)
-      if imeta set -c "$coll" ipc_UUID $(uuidgen -t)
+      if [ "$entityType" == coll ]
+      then
+        local flag=-c
+      else
+        local flag=-d
+      fi
+
+      if imeta set "$flag" "$entity" ipc_UUID $(uuidgen -t)
       then
         printf '%s✓ ' "$uuidCntField"
       else
@@ -265,22 +265,7 @@ annotate_chksum_issue()
 }
 
 
-annotate_uuid_count()
-{
-  local uuidCnt="$1"
-
-  uuidCnt=${uuidCnt#  }
-
-  if [ $uuidCnt -eq 1 ]
-  then
-    printf '%s  ' "$uuidCnt"
-  else
-    printf '%s✗ ' "$uuidCnt"
-  fi
-}
-
-
-annotate_collection_problems()
+fix_collection_problems()
 {
   pass_hdr_thru
 
@@ -288,18 +273,19 @@ annotate_collection_problems()
   do
     if [ -z "$collField" ]
     then
+      printf '%s\n' "$permIssue"
       break
     fi
 
     local coll="${collField# }"
     permIssue=$(process_perm_issue "$permIssue" "$coll")
-    uuidCnt=$(process_coll_uuid_issue "$uuidCnt" "$coll")
+    uuidCnt=$(process_uuid_issue "$uuidCnt" coll "$coll")
     printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
   done
 }
 
 
-annotate_object_problems()
+fix_object_problems()
 {
   pass_hdr_thru
 
@@ -307,13 +293,15 @@ annotate_object_problems()
   do
     if [ -z "$objField" ]
     then
+      printf '%s\n' "$permIssue"
       break
     fi
 
     local obj="${objField# }"
+    printf '"%s"\n' "$obj"
     permIssue=$(process_perm_issue "$permIssue" "$obj")
     missingChksum=$(annotate_chksum_issue "$missingChksum")
-    uuidCnt=$(annotate_uuid_count "$uuidCnt")
+    uuidCnt=$(process_uuid_issue "$uuidCnt" obj "$obj")
 
     printf '%s|%s|%s|%s|%s|%s|%s\n' \
            "$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$resc" "$createTime" "$objField"
@@ -321,16 +309,16 @@ annotate_object_problems()
 }
 
 
-annotate_problems() 
+fix_problems() 
 {
   while IFS= read -r
   do
     case "$REPLY" in
       1.*)
-        annotate_collection_problems
+        fix_collection_problems
         ;;
       2.*)
-        annotate_object_problems
+        fix_object_problems
         ;;
       *)
         printf '%s\n' "$REPLY"
@@ -362,7 +350,7 @@ strip_noise()
 
 readonly ErrorLog=$(mktemp data-store-check-errors.XXX)
 
-display_problems | strip_noise | annotate_problems 2>"$ErrorLog"
+display_problems | strip_noise | fix_problems 2>"$ErrorLog"
 
 if [ -s "$ErrorLog" ]
 then
