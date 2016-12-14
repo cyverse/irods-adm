@@ -252,13 +252,20 @@ process_uuid_issue()
 }
 
 
-annotate_chksum_issue()
+process_chksum_issue()
 {
   local issue="$1"
+  local resc="$2"
+  local obj="$3"
 
   if [ $issue == t ]
   then
-    printf '%s' "${issue/%  /✗ }"
+    if ichksum -f --silent -R $resc "$obj" > /dev/null
+    then
+      printf '%s' "${issue/%  /✓ }"
+    else
+      printf '%s' "${issue/%  /✗ }"
+    fi
   else
     printf '%s' "$issue"
   fi
@@ -298,9 +305,9 @@ fix_object_problems()
     fi
 
     local obj="${objField# }"
-    printf '"%s"\n' "$obj"
+
     permIssue=$(process_perm_issue "$permIssue" "$obj")
-    missingChksum=$(annotate_chksum_issue "$missingChksum")
+    missingChksum=$(process_chksum_issue "$missingChksum" "$resc" "$obj")
     uuidCnt=$(process_uuid_issue "$uuidCnt" obj "$obj")
 
     printf '%s|%s|%s|%s|%s|%s|%s\n' \
