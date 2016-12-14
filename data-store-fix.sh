@@ -213,7 +213,7 @@ process_perm_issue()
 
   if [ $issue == t ]
   then
-    if ichmod -M own rodsadmin "${entity# }"
+    if ichmod -M own rodsadmin "$entity"
     then
       printf '%s' "${issue/%  /✓ }"
     else
@@ -222,6 +222,33 @@ process_perm_issue()
   else
     printf '%s' "$issue"
   fi
+}
+
+
+process_coll_uuid_issue()
+{
+  local uuidCntField="$1"
+  local coll="$2"
+
+  uuidCntField=${uuidCnt#  }
+  declare -i cnt=$uuidCntField
+
+  case $cnt in
+    0)
+      if imeta set -c "$coll" ipc_UUID $(uuidgen -t)
+      then
+        printf '%s✓ ' "$uuidCntField"
+      else
+        printf '%s✗ ' "$uuidCntField"
+      fi
+      ;;
+    1)
+      printf '%s  ' "$uuidCntField"
+      ;;
+    *)
+      printf '%s✗ ' "$uuidCntField"
+      ;;
+   esac
 }
 
 
@@ -257,16 +284,17 @@ annotate_collection_problems()
 {
   pass_hdr_thru
 
-  while IFS='|' read -r permIssue uuidCnt owner createTime coll
+  while IFS='|' read -r permIssue uuidCnt owner createTime collField
   do
-    if [ -z "$coll" ]
+    if [ -z "$collField" ]
     then
       break
     fi
 
+    local coll="${collField# }"
     permIssue=$(process_perm_issue "$permIssue" "$coll")
-    uuidCnt=$(annotate_uuid_count "$uuidCnt")
-    printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$coll"
+    uuidCnt=$(process_coll_uuid_issue "$uuidCnt" "$coll")
+    printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
   done
 }
 
@@ -275,19 +303,20 @@ annotate_object_problems()
 {
   pass_hdr_thru
 
-  while IFS='|' read -r permIssue missingChksum uuidCnt owner resc createTime obj
+  while IFS='|' read -r permIssue missingChksum uuidCnt owner resc createTime objField
   do
-    if [ -z "$obj" ]
+    if [ -z "$objField" ]
     then
       break
     fi
 
+    local obj="${objField# }"
     permIssue=$(process_perm_issue "$permIssue" "$obj")
     missingChksum=$(annotate_chksum_issue "$missingChksum")
     uuidCnt=$(annotate_uuid_count "$uuidCnt")
 
     printf '%s|%s|%s|%s|%s|%s|%s\n' \
-           "$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$resc" "$createTime" "$obj"
+           "$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$resc" "$createTime" "$objField"
   done
 }
 
