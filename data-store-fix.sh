@@ -361,7 +361,7 @@ strip_noise()
 }
 
 
-readonly ErrorLog=$(mktemp data-store-check-errors.XXX)
+readonly ErrorLog=$(mktemp)
 
 display_problems | strip_noise | fix_problems 2>"$ErrorLog"
 
