@@ -263,7 +263,7 @@ process_chksum_issue()
 
   if [ $issue == t ]
   then
-    if ichksum -f --silent -R $resc "$obj" > /dev/null
+    if ichksum -f --silent -R "$resc" "$obj" > /dev/null
     then
       printf '%s' "${issue/%  /✓ }"
     else
@@ -300,7 +300,7 @@ fix_object_problems()
 {
   pass_hdr_thru
 
-  while IFS='|' read -r permIssue missingChksum uuidCnt owner resc createTime objField
+  while IFS='|' read -r permIssue missingChksum uuidCnt owner rescField createTime objField
   do
     if [ -z "$objField" ]
     then
@@ -309,13 +309,15 @@ fix_object_problems()
     fi
 
     local obj="${objField# }"
+    local resc="${rescField# }"
+    resc="${resc%%;*}" 
 
     permIssue=$(process_perm_issue "$permIssue" "$obj")
     missingChksum=$(process_chksum_issue "$missingChksum" "$resc" "$obj")
     uuidCnt=$(process_uuid_issue "$uuidCnt" obj "$obj")
 
     printf '%s|%s|%s|%s|%s|%s|%s\n' \
-           "$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$resc" "$createTime" "$objField"
+           "$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$rescField" "$createTime" "$objField"
   done
 }
 
