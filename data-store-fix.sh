@@ -92,7 +92,7 @@ $(inject_debug_stmt '\timing on')
 $(inject_debug_newline)
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
-$(inject_debug_msg owned_by_rodsadmin)
+$(inject_debug_msg creating owned_by_rodsadmin)
 CREATE TEMPORARY TABLE owned_by_rodsadmin
 AS 
   SELECT a.object_id
@@ -103,28 +103,28 @@ AS
        FROM r_tokn_main 
        WHERE token_namespace = 'access_type' AND token_name = 'own');
 
-$(inject_debug_msg coll_perm_probs)
+$(inject_debug_msg creating coll_perm_probs)
 CREATE TEMPORARY TABLE coll_perm_probs
 AS 
   SELECT coll_id
   FROM r_coll_main AS c
   WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id);
 
-$(inject_debug_msg data_perm_probs)
+$(inject_debug_msg creating data_perm_probs)
 CREATE TEMPORARY TABLE data_perm_probs
 AS 
   SELECT DISTINCT data_id
   FROM r_data_main AS d
   WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id);
 
-$(inject_debug_msg uuid_attrs)
+$(inject_debug_msg creating uuid_attrs)
 CREATE TEMPORARY TABLE uuid_attrs
 AS 
   SELECT o.object_id
   FROM r_objt_metamap AS o JOIN r_meta_main AS m ON m.meta_id = o.meta_id 
   WHERE m.meta_attr_name = 'ipc_UUID';
 
-$(inject_debug_msg coll_uuid_probs)
+$(inject_debug_msg creating coll_uuid_probs)
 CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count)
 AS 
   SELECT c.coll_id, COUNT(u.object_id)
@@ -132,7 +132,7 @@ AS
   GROUP BY c.coll_id
   HAVING COUNT(u.object_id) != 1;
 
-$(inject_debug_msg data_uuid_probs)
+$(inject_debug_msg creating data_uuid_probs)
 CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count)
 AS 
   SELECT DISTINCT d.data_id, COUNT(u.object_id)
@@ -140,7 +140,7 @@ AS
   GROUP BY d.data_id, d.data_repl_num
   HAVING COUNT(u.object_id) != 1;
 
-$(inject_debug_msg data_checksum_probs)
+$(inject_debug_msg creatingdata_checksum_probs)
 CREATE TEMPORARY TABLE data_chksum_probs 
 AS SELECT DISTINCT data_id FROM r_data_main WHERE data_checksum IS NULL OR data_checksum = '';
 
