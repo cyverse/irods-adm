@@ -140,7 +140,7 @@ AS
   GROUP BY d.data_id, d.data_repl_num
   HAVING COUNT(u.object_id) != 1;
 
-$(inject_debug_msg creatingdata_checksum_probs)
+$(inject_debug_msg creating data_checksum_probs)
 CREATE TEMPORARY TABLE data_chksum_probs 
 AS SELECT DISTINCT data_id FROM r_data_main WHERE data_checksum IS NULL OR data_checksum = '';
 
