@@ -309,7 +309,9 @@ fix_object_problems()
     fi
 
     local obj="${objField# }"
+
     local resc="${rescField# }"
+    resc="${resc% }"
     resc="${resc%%;*}" 
 
     permIssue=$(process_perm_issue "$permIssue" "$obj")
