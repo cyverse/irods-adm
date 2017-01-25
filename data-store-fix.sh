@@ -148,12 +148,12 @@ $(inject_debug_newline)
 \echo '1. Problem Collections Created Before $CUTOFF_TIME:'
 \echo ''
 SELECT
-  coll_id = ANY(ARRAY(SELECT * FROM coll_perm_probs))  AS "Permission Issue",
+  coll_id = ANY(ARRAY(SELECT * FROM coll_perm_probs))                  AS "Permission Issue",
   COALESCE((SELECT cu.uuid_count FROM coll_uuid_probs AS cu WHERE cu.coll_id = c.coll_id), 1) 
     AS "UUID Count",
-  coll_owner_name || '#' || coll_owner_zone            AS "Owner",
-  TO_TIMESTAMP(CAST(create_ts AS INTEGER))             AS "Create Time",
-  coll_name                                            AS "Collection"
+  coll_owner_name || '#' || coll_owner_zone                            AS "Owner",
+  TO_TIMESTAMP(CAST(create_ts AS INTEGER))                             AS "Create Time",
+  REPLACE(REPLACE(coll_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')  AS "Collection"
 FROM r_coll_main AS c
 WHERE coll_id = ANY(ARRAY(SELECT * FROM coll_perm_probs UNION SELECT coll_id FROM coll_uuid_probs))
   AND coll_name LIKE '/iplant/%'
@@ -172,7 +172,8 @@ SELECT
   d.data_owner_name || '#' || d.data_owner_zone          AS "Owner",
   d.resc_hier                                            AS "Resource",
   TO_TIMESTAMP(CAST(d.create_ts AS INTEGER))             AS "Create Time",
-  c.coll_name || '/' || d.data_name                      AS "Data Object"
+  REPLACE(REPLACE(c.coll_name || '/' || d.data_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')
+    AS "Data Object"
 FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id 
 WHERE c.coll_name LIKE '/iplant/%'
   AND d.create_ts < '$cutoffTS'
@@ -195,6 +196,41 @@ pass_hdr_thru()
     read -r
     printf '%s\n' "$REPLY"
   done
+}
+
+
+unescape()
+{
+  local escEntity="$1"
+    
+  local entity=
+  local escaped=0
+
+  for i in $(seq 0 $((${#escEntity} - 1)))
+  do
+    local curChar="${escEntity:$i:1}"
+
+    if [ $escaped -eq 1 ]
+    then 
+      if [ "$curChar" = n ]
+      then
+        printf -v entity '%s\n' "$entity"
+      else
+        entity="$entity$curChar"
+      fi
+
+      escaped=0
+    else 
+      if [ "$curChar" = '\' ]
+      then
+        escaped=1
+      else
+        entity="$entity$curChar"
+      fi
+    fi
+  done
+
+  printf '%s' "$entity"
 }
 
 
@@ -289,6 +325,8 @@ fix_collection_problems()
     fi
 
     local coll="${collField# }"
+    coll=$(unescape "${coll% }")
+
     permIssue=$(process_perm_issue "$permIssue" "$coll")
     uuidCnt=$(process_uuid_issue "$uuidCnt" coll "$coll")
     printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
@@ -309,6 +347,7 @@ fix_object_problems()
     fi
 
     local obj="${objField# }"
+    obj=$(unescape "${obj% }")
 
     local resc="${rescField# }"
     resc="${resc% }"
