@@ -199,6 +199,15 @@ pass_hdr_thru()
 }
 
 
+trim()
+{
+  local str="$*"
+  str="${str#"${str%%[![:space:]]*}"}"
+  str="${str%"${str##*[![:space:]]}"}"  
+  printf '%s' "$str"
+}
+
+
 unescape()
 {
   local escEntity="$1"
@@ -324,8 +333,7 @@ fix_collection_problems()
       break
     fi
 
-    local coll="${collField# }"
-    coll=$(unescape "${coll% }")
+    local coll=$(unescape $(trim "$collField"))
 
     permIssue=$(process_perm_issue "$permIssue" "$coll")
     uuidCnt=$(process_uuid_issue "$uuidCnt" coll "$coll")
@@ -346,12 +354,8 @@ fix_object_problems()
       break
     fi
 
-    local obj="${objField# }"
-    obj=$(unescape "${obj% }")
-
-    local resc="${rescField# }"
-    resc="${resc% }"
-    resc="${resc%%;*}" 
+    local obj=$(unescape $(trim "$objField"))
+    local resc=$(trim "$rescField")
 
     permIssue=$(process_perm_issue "$permIssue" "$obj")
     missingChksum=$(process_chksum_issue "$missingChksum" "$resc" "$obj")
