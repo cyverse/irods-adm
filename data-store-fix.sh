@@ -210,7 +210,7 @@ trim()
 
 unescape()
 {
-  local escEntity="$1"
+  local escEntity="$*"
     
   local entity=
   local escaped=0
