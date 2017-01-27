@@ -306,6 +306,8 @@ process_chksum_issue()
   local resc="$2"
   local obj="$3"
 
+  resc="${resc%%;*}"
+
   if [ $issue == t ]
   then
     if ichksum -f --silent -R "$resc" "$obj" > /dev/null
