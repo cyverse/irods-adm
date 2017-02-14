@@ -1,20 +1,27 @@
 #!/bin/bash
 #
-# Usage: dump-logs.sh [YEAR [MONTH [START_DAY]]]
+# Usage: dump-logs.sh [YEAR [MONTH [DAY]]]
 #
-# YEAR is a the four digit year to restrict the dump to. MONTH is the number of the month to
-# restrict the dump to. START_DAY is the start day of the log to dump. It is the day number relative
-# to the month.
+# YEAR is a the four digit year to restrict the dump to. MONTH is the number of
+# the month to restrict the dump to. January is 1, February is 2, etc. DAY is 
+# the number of the day of the month to restrict the dump to. 1 is the first of
+# the month, 2 is the second, etc.
 #
-# This script dumps all of the errors from rodsLog files on the IES and all of the local resource
-# servers. It groups the log by session, and it dumps each session that logs an error message. See
-# group-log-by-pid.awk for the details on how a session is logged.
+# This script dumps all of the errors from rodsLog files on the IES and all of 
+# the local resource servers. It groups the log by session, and it dumps each 
+# session that logs an error message. See group-log-by-pid.awk for the details 
+# on how a session is logged.
 #
-# The session error logs are written into the directory $CWD/logs. The session errors are written
-# into one file for each server. The file has the name <server>.err. 
+# The session error logs are written into the directory $CWD/logs. The session 
+# errors are written into one file for each server. The file has the name 
+# <server>.err. 
 # 
-# By default, it will process all of the logs. By specifying a year or a year and month number, the
-# only the logs for that year or year and month will be processed.
+# By default, it will process all of the logs. By specifying a year, year and 
+# month number, or year, month number, and day number, only the logs for that 
+# year, month, or day will be processed. It will restrict its search by the date
+# forming the log file name not the message times from inside the logs. This 
+# means that messages with times that don't match the log name won't be 
+# considered.
 #
 # The script shows its progress in the following form:
 #
@@ -31,9 +38,32 @@ declare startDay=*
 
 if [ $# -ge 1 ]; then printf -v year '%04d' "$1"; fi
 if [ $# -ge 2 ]; then printf -v month '%02d' "$2"; fi
-if [ $# -ge 3 ]; then printf -v startDay '%02d' "$3"; fi
+
+if [ $# -ge 3 ]
+then 
+  declare -i day="$3"
+  startDay=$((1 + $((5 * $(($day / 5))))))
+  printf -v startDay '%02d' "$startDay"
+fi
 
 readonly LogExt="$year"."$month"."$startDay"
+
+
+grab_messages()
+{
+  local svr="$1"      
+  local log="$2"
+
+  if [ -z $day ]
+  then
+    local dayFilter='print $0'
+  else
+    local dayFilter="if (\$2 == $day) { print \$0 }"
+  fi
+
+  ssh -q -p 1657 root@"$svr" "awk '!/ERROR:  /{ $dayFilter }' '$log'"
+}
+
 
 declare -i cnt
 declare -i tot
@@ -76,7 +106,7 @@ do
           (( tot++ ))
           printf '\r    %d/%d' "$cnt" "$tot" >&2
         done \
-          < <(ssh -q -p 1657 root@"$svr" "cat '$log' | grep -v 'ERROR:  '" | ./group-log-by-pid.awk) \
+          < <(grab_messages "$svr" "$log" | ./group-log-by-pid.awk) \
           >> "$out"
 
         printf '\r' >&2
