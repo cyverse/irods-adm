@@ -72,7 +72,7 @@ mkdir --parents logs
 
 readonly RS=$(iquest '%s' "SELECT ORDER(RESC_LOC) WHERE RESC_CLASS_NAME = 'archive'")
 
-for svr in data.iplantcollaborative.org $RS
+for svr in data.cyverse.org $RS
 do
   if [ "$svr" != aegis.a2c2.asu.edu ] && \
      [ "$svr" != aegis.cefns.nau.edu ] && \
