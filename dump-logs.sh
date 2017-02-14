@@ -56,12 +56,12 @@ grab_messages()
 
   if [ -z $day ]
   then
-    local dayFilter='print $0'
+    local dayFilter=.*
   else
-    local dayFilter="if (\$2 == $day) { print \$0 }"
+    local dayFilter="^$day\$"
   fi
 
-  ssh -q -p 1657 root@"$svr" "awk '!/ERROR:  /{ $dayFilter }' '$log'"
+  ssh -q -p 1657 root@"$svr" "awk '\$2 ~ /$dayFilter/{ print \$0 }' '$log'"
 }
 
 
