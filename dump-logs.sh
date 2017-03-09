@@ -42,7 +42,7 @@ if [ $# -ge 2 ]; then printf -v month '%02d' "$2"; fi
 if [ $# -ge 3 ]
 then 
   declare -i day="$3"
-  startDay=$((1 + $((5 * $(($day / 5))))))
+  startDay=$((1 + ((5 * ((((day - 1)) / 5))))))
   printf -v startDay '%02d' "$startDay"
 fi
 
