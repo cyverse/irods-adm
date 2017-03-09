@@ -61,7 +61,7 @@ grab_messages()
     local dayFilter="^$day\$"
   fi
 
-  ssh -q -p 1657 root@"$svr" "awk '\$2 ~ /$dayFilter/{ print \$0 }' '$log'"
+  ssh -q "$svr" "awk '\$2 ~ /$dayFilter/{ print \$0 }' '$log'"
 }
 
 
@@ -77,14 +77,13 @@ do
   if [ "$svr" != aegis.a2c2.asu.edu ] && \
      [ "$svr" != aegis.cefns.nau.edu ] && \
      [ "$svr" != aegis-ua-1.arl.arizona.edu ] && \
-     [ "$svr" != cyverse.corral.tacc.utexas.edu ] && \
      [ "$svr" != wildcat.cshl.edu ]
   then 
     printf '\rdumping logs from %s\n' "$svr"
     out=logs/"$svr".err
     rm -f "$out"
 
-    for log in $(ssh -p 1657 -q root@"$svr" ls "$LogBase"."$LogExt")
+    for log in $(ssh -q "$svr" ls "$LogBase"."$LogExt")
     do
       if [[ "$log" =~ $LogBase ]]
       then
