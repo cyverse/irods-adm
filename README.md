@@ -14,6 +14,10 @@ The awk script `filter-session-by-cuser.awk` can be combined with `group-log-by-
 
 The awk script `session-intervals.awk` can be combined with `group-log-by-pid.awk` to find all of the time intervals for each session from a log file.
 
+## Generating a report on the number of concurrent sesions over time
+
+The bash script `count-sessions.sh` can be combined with `sessions-intervals.awk` to generate a report on the number of concurrent sessions during each second for the time period covered by a log file.
+
 ## Dumping all of the errors on the IES and CyVerse resource servers
 
 The bash script `dump-logs.sh` can be used to dump all of the errors from the CyVerse portion of
