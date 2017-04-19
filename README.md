@@ -18,3 +18,7 @@ The awk script `session-intervals.awk` can be combined with `group-log-by-pid.aw
 
 The bash script `dump-logs.sh` can be used to dump all of the errors from the CyVerse portion of
 the CyVerse grid.
+
+## Generating a report on data objects that need to be replicated
+
+The bash script `repl-report.sh` can be used to generate a report on the number and volume of data objects that need to be replicated.
