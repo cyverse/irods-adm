@@ -26,3 +26,7 @@ the CyVerse grid.
 ## Generating a report on data objects that need to be replicated
 
 The bash script `repl-report.sh` can be used to generate a report on the number and volume of data objects that need to be replicated.
+
+## Synchronizing data object and file sizes
+
+The bash script `fix-file-size.sh` can be used to set the sizes of a group of data objects with the sizes of their respective files.
