@@ -31,7 +31,7 @@ EOF
 if ! opts=$(getopt --name "$ExecName" --options hH:p: --longoptions help,host:,port: -- "$@")
 then
   printf '\n' >&2
-  print_help
+  print_help >&2
   exit 1
 fi
 
