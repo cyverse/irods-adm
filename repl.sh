@@ -1,14 +1,31 @@
 #! /bin/bash
 
+readonly ExecName=$(basename "$0")
+
+readonly DefaultMultiplier=1
+
 
 show_help()
 {
-  printf 'Usage: repl.sh [OPTIONS...] LOG_FILE\n'
-  printf '  -h             show help and exit\n'
-  printf '  -c COLLECTION  only replicate the data objects in this collection\n'
-  printf '  -r RESOURCE    only replicate the data objects with a file on this resource\n'
-  printf '  -x MULTIPLIER  a multiplier on the number of processes to run at once\n'
-}
+  cat << EOF
+Usage: 
+ $ExecName [options] LOG_FILE
+
+Replicates data objects to taccCorralRes. It only replicates objects that only 
+have one replica. The replica cannot be in the /iplant/home/shared/aegis 
+collection or be on cshlWildcatRes.
+
+Options:
+ -c, --collection <collection>  only replicate the data objects in this 
+                                collection
+ -m, --multiplier <multiplier>  a multiplier on the number of processes to run 
+                                at once, default: 1
+ -r, --resource <resource>      only replicate the data objects with a file on 
+                                this resource
+
+ -h, --help  show help and exit
+EOF
+} 
 
 
 count()
@@ -78,8 +95,8 @@ track_prog()
 
   while read -r
   do
-    ((subCnt++))
-    ((cnt++))
+    ((++subCnt))
+    ((++cnt))
     printf 'cohort: %d/%d, all: %d/%d\r' "$subCnt" "$subTot" "$cnt" "$tot" >&2 
   done
 
@@ -93,12 +110,13 @@ select_cohort()
   local cnt="$1"
   local tot="$2"
   local log="$3"
-  local maxProcs="$4"
-  local minThreads="$5"
+  local multiplier="$4"
+  local maxProcs="$5"
+  local minThreads="$6"
 
-  if [ "$#" -ge 6 ]
+  if [ "$#" -ge 7 ]
   then
-    local maxThreads="$6"
+    local maxThreads="$7"
   fi
 
   local minSizeMiB=$((minThreads * 32))
@@ -125,54 +143,72 @@ select_cohort()
   else
     printf 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
   fi
-  
+ 
   if [ "$subTotal" -gt 0 ]
   then
-    xargs --null --max-args $((2 * ((maxProcs ** 2)))) --max-procs $((maxProcs * mult)) \
-        irepl -B -M -v -R taccCorralRes \
-      <"$cohortList" \
-      2>>"$log" \
+    local maxArgs=$((2 * ((maxProcs ** 2))))
+    maxProcs=$((maxProcs * multiplier))
+
+    xargs --null --max-args "$maxArgs" --max-procs "$maxProcs" irepl -B -M -v -R taccCorralRes \
+      < "$cohortList" \
+      2>> "$log" \
       | tee --append "$log" \
       | track_prog "$cnt" "$tot" "$subTotal"
   else
     printf '%s\n' "$cnt"
   fi
 
-  rm "$cohortList"  
+  rm --force "$cohortList"  
 }
 
-mult=1
 
-while getopts 'c:hr:x:' opt
+readonly Opts=$(getopt --name "$ExecName" \
+                       --options c:hm:r: \
+                       --longoptions collection:,help,multiplier:,resource: \
+                       -- \
+                       "$@")
+
+if [ "$?" -ne 0 ]
+then
+  printf '\n' >&2
+  show_help >&2
+  exit 1
+fi
+
+eval set -- "$Opts"
+
+multiplier="$DefaultMultiplier"
+
+while true
 do
-  case "$opt" in
-    c)
-      readonly BaseColl="$OPTARG"
+  case "$1" in
+    -c|--collection)
+      readonly BaseColl="$2"
+      shift 2
       ;;
-    h)
+    -h|--help)
       show_help
       exit 0
       ;;
-    r)
-      readonly SrcRes="$OPTARG"
+    -m|--multiplier)
+      multiplier="$2"
+      shift 2
       ;;
-    x)
-      readonly mult="$OPTARG"
+    -r|--resource)
+      readonly SrcRes="$2"
+      shift 2
       ;;
-    \?)
-      printf 'Invalid option: -%s\n' "$OPTARG"
-      printf '\n'
-      show_help
-      exit 1
+    --)
+      shift
+      break
       ;;
-    :)
-      printf 'Option -%s requires an argument.\n' "$OPTARG"
+    *)
+      printf '\n' >&2
+      show_help >&2
       exit 1
       ;;
   esac
 done
-
-shift $((OPTIND - 1))
 
 readonly Log="$1"
 
@@ -198,7 +234,7 @@ fi
 
 psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host irods-db3 \
      ICAT icat_reader \
-<<EOSQL > "$ObjectList"
+<< EOSQL > "$ObjectList"
 SELECT d.data_size, c.coll_name || '/' || d.data_name
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
@@ -209,20 +245,20 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
     AND ($srcCond)
 EOSQL
 
-tot=$(count <"$ObjectList")
-printf '%d data objects to replicate\n' "$tot"
+readonly Tot=$(count <"$ObjectList")
+printf '%d data objects to replicate\n' "$Tot"
 
-if [ "$tot" -gt 0 ]
+if [ "$Tot" -gt 0 ]
 then
   cnt=0
-  cnt=$(select_cohort "$cnt" "$tot" "$Log" 16   0  0 <"$ObjectList")  # 16 0 byte transfers 
-  cnt=$(select_cohort "$cnt" "$tot" "$Log" 16   0  1 <"$ObjectList")  # 16 1-threaded transfers 
-  cnt=$(select_cohort "$cnt" "$tot" "$Log"  8   1  2 <"$ObjectList")  # 8 2-threaded
-  cnt=$(select_cohort "$cnt" "$tot" "$Log"  6   2  3 <"$ObjectList")  # 6 3-threaded
-  cnt=$(select_cohort "$cnt" "$tot" "$Log"  4   3  5 <"$ObjectList")  # 4 4--5-threaded
-  cnt=$(select_cohort "$cnt" "$tot" "$Log"  3   5  7 <"$ObjectList")  # 3 6--7-threaded
-  cnt=$(select_cohort "$cnt" "$tot" "$Log"  2   7 15 <"$ObjectList")  # 2 8--15-threaded
-  cnt=$(select_cohort "$cnt" "$tot" "$Log"  1  15    <"$ObjectList")  # 1 16-threaded
+  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier" 16   0  0 <"$ObjectList")  # 16 0 byte transfers 
+  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier" 16   0  1 <"$ObjectList")  # 16 1-threaded transfers 
+  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  8   1  2 <"$ObjectList")  # 8 2-threaded
+  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  6   2  3 <"$ObjectList")  # 6 3-threaded
+  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  4   3  5 <"$ObjectList")  # 4 4--5-threaded
+  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  3   5  7 <"$ObjectList")  # 3 6--7-threaded
+  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  2   7 15 <"$ObjectList")  # 2 8--15-threaded
+  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  1  15    <"$ObjectList")  # 1 16-threaded
 fi 2>&1
 
-rm "$ObjectList"
+rm --force "$ObjectList"
