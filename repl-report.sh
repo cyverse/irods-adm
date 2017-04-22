@@ -1,10 +1,10 @@
 #! /bin/bash
 
+set -e
+
 readonly ExecName=$(basename $0)
 readonly DefaultHost=localhost
 readonly DefaultPort=5432
-
-set -e
 
 
 print_help()
@@ -31,7 +31,7 @@ EOF
 if ! opts=$(getopt --name "$ExecName" --options hH:p: --longoptions help,host:,port: -- "$@")
 then
   printf '\n' >&2
-  print_help
+  print_help >&2
   exit 1
 fi
 
@@ -67,8 +67,7 @@ do
   esac
 done
 
-
-psql --host "$host" --port "$port" ICAT icat_reader <<SQL
+psql --host "$host" --port "$port" ICAT icat_reader << EOSQL
 SELECT resc_name AS resource, COUNT(*) AS count, SUM(data_size) / 1024 ^ 4 AS "volume (TiB)"
   FROM r_data_main
   WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
@@ -77,4 +76,4 @@ SELECT resc_name AS resource, COUNT(*) AS count, SUM(data_size) / 1024 ^ 4 AS "v
         SELECT coll_id FROM r_coll_main WHERE coll_name NOT LIKE '/iplant/home/shared/aegis%')
   GROUP BY resc_name
   ORDER BY resc_name
-SQL
+EOSQL
