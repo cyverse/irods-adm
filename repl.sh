@@ -1,15 +1,15 @@
 #! /bin/bash
 
-readonly ExecName=$(basename "$0")
+set -e
 
-readonly DefaultMultiplier=1
+readonly EXEC_NAME=$(basename "$0")
 
 
 show_help()
 {
   cat << EOF
 Usage: 
- $ExecName [options] LOG_FILE
+ $EXEC_NAME [options] LOG_FILE
 
 Replicates data objects to taccCorralRes. It only replicates objects that only 
 have one replica. The replica cannot be in the /iplant/home/shared/aegis 
@@ -22,10 +22,114 @@ Options:
                                 at once, default: 1
  -r, --resource <resource>      only replicate the data objects with a file on 
                                 this resource
+ -u, --until <stop_time>        the time to stop replication in seconds since 
+                                the POSIX epoch
 
  -h, --help  show help and exit
 EOF
 } 
+
+
+exit_with_help()
+{
+  show_help >&2
+  exit 1
+}
+
+
+readonly Opts=$(getopt --name "$EXEC_NAME" \
+                       --options c:hm:r:u: \
+                       --longoptions collection:,help,multiplier:,resource:until: \
+                       -- \
+                       "$@")
+
+if [ "$?" -ne 0 ]
+then
+  printf '\n' >&2
+  exit_with_help
+fi
+
+eval set -- "$Opts"
+
+while true
+do
+  case "$1" in
+    -c|--collection)
+      readonly BASE_COLL="$2"
+      shift 2
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -m|--multiplier)
+      readonly PROC_MULT="$2"
+      shift 2
+      ;;
+    -r|--resource)
+      readonly SRC_RES="$2"
+      shift 2
+      ;;
+    -u|--until)
+      export UNTIL="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      exit_with_help
+      ;;
+  esac
+done
+
+if [ "$#" -lt 1 ]
+then
+  exit_with_help
+fi
+
+readonly LOG="$1"
+
+if [ -z "$PROC_MULT" ]
+then
+  readonly PROC_MULT=1
+fi
+
+
+check_time()
+{
+  if [ -n "$UNTIL" ] && [ $(date '+%s') -ge "$UNTIL" ]
+  then
+    return 1
+  fi
+}
+export -f check_time
+
+
+finish()
+{
+  local objList="$1"
+
+  if ! check_time
+  then
+    printf 'out of time\n'
+  fi
+
+  rm --force "$objList"
+}
+
+
+repl()
+{
+  if ! check_time
+  then
+    exit 1
+  fi
+
+  irepl -B -M -v -R taccCorralRes "$@"
+}
+export -f repl
 
 
 count()
@@ -92,15 +196,23 @@ track_prog()
   local subTot="$3"
 
   local subCnt=0
+  local msg=
 
   while read -r
   do
     ((++subCnt))
     ((++cnt))
-    printf 'cohort: %d/%d, all: %d/%d\r' "$subCnt" "$subTot" "$cnt" "$tot" >&2 
+    printf '\r%*s\r' "${#msg}" '' >&2
+    printf -v msg \
+           'cohort: %0*d/%d, all: %0*d/%d' \
+           "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot" 
+    printf '%s' "$msg" >&2
   done
 
-  printf 'cohort: %d/%d, all: %d/%d\n' "$subCnt" "$subTot" "$cnt" "$tot" >&2
+  printf '\r%*s\rcohort: %0*d/%d, all: %0*d/%d\n' \
+         "${#msg}" '' "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot" \
+      >&2
+
   printf '%s' "$cnt"
 }
 
@@ -109,14 +221,17 @@ select_cohort()
 {
   local cnt="$1"
   local tot="$2"
-  local log="$3"
-  local multiplier="$4"
-  local maxProcs="$5"
-  local minThreads="$6"
+  local maxProcs="$3"
+  local minThreads="$4"
 
-  if [ "$#" -ge 7 ]
+  if [ "$#" -ge 5 ]
   then
-    local maxThreads="$7"
+    local maxThreads="$5"
+  fi
+
+  if ! check_time
+  then
+    exit 0
   fi
 
   local minSizeMiB=$((minThreads * 32))
@@ -131,7 +246,7 @@ select_cohort()
     partition "$minSizeB" "$maxSizeB"
   else
     partition "$minSizeB"
-  fi >"$cohortList"
+  fi > "$cohortList"
 
   local subTotal=$(count <"$cohortList")
 
@@ -139,7 +254,7 @@ select_cohort()
   then
     printf 'Replicating %s files with size in [%s, %s) MiB\n' \
            "$subTotal" "$minSizeMiB" "$maxSizeMiB" \
-      >&2
+        >&2
   else
     printf 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
   fi
@@ -147,13 +262,13 @@ select_cohort()
   if [ "$subTotal" -gt 0 ]
   then
     local maxArgs=$((2 * ((maxProcs ** 2))))
-    maxProcs=$((maxProcs * multiplier))
+    maxProcs=$((maxProcs * PROC_MULT))
 
-    xargs --null --max-args "$maxArgs" --max-procs "$maxProcs" irepl -B -M -v -R taccCorralRes \
-      < "$cohortList" \
-      2>> "$log" \
-      | tee --append "$log" \
-      | track_prog "$cnt" "$tot" "$subTotal"
+    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" repl {} \
+        < "$cohortList" \
+        2>> "$LOG" \
+        | tee --append "$LOG" \
+        | track_prog "$cnt" "$tot" "$subTotal"
   else
     printf '%s\n' "$cnt"
   fi
@@ -162,74 +277,32 @@ select_cohort()
 }
 
 
-readonly Opts=$(getopt --name "$ExecName" \
-                       --options c:hm:r: \
-                       --longoptions collection:,help,multiplier:,resource: \
-                       -- \
-                       "$@")
-
-if [ "$?" -ne 0 ]
+if ! check_time
 then
-  printf '\n' >&2
-  show_help >&2
-  exit 1
+ printf 'Stop time is in the past\n' >&2
+ exit 1
 fi
-
-eval set -- "$Opts"
-
-multiplier="$DefaultMultiplier"
-
-while true
-do
-  case "$1" in
-    -c|--collection)
-      readonly BaseColl="$2"
-      shift 2
-      ;;
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -m|--multiplier)
-      multiplier="$2"
-      shift 2
-      ;;
-    -r|--resource)
-      readonly SrcRes="$2"
-      shift 2
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      printf '\n' >&2
-      show_help >&2
-      exit 1
-      ;;
-  esac
-done
-
-readonly Log="$1"
-
-truncate --size 0 "$Log"
 
 readonly ObjectList=$(tempfile)
 
+trap "finish $ObjectList" EXIT
+
+truncate --size 0 "$LOG"
+
 printf 'Retrieving data objects to replicate...\n'
 
-if [ -n "$SrcRes" ]
+if [ -n "$SRC_RES" ]
 then
-  srcCond="d.resc_name = '$SrcRes'"
+  readonly SrcCond="d.resc_name = '$SRC_RES'"
 else
-  srcCond=TRUE
+  readonly SrcCond=TRUE
 fi
 
-if [ -n "$BaseColl" ]
+if [ -n "$BASE_COLL" ]
 then
-  baseCond="c.coll_name = '$BaseColl' OR c.coll_name LIKE '$BaseColl/%'"
+  readonly BaseCond="c.coll_name = '$BASE_COLL' OR c.coll_name LIKE '$BASE_COLL/%'"
 else
-  baseCond=TRUE
+  readonly BaseCond=TRUE
 fi
 
 psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host irods-db3 \
@@ -241,8 +314,8 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
     AND NOT (d.data_repl_num = 0 AND d.resc_name = 'cshlWildcatRes')
     AND c.coll_name != '/iplant/home/shared/aegis' 
     AND c.coll_name NOT LIKE '/iplant/home/shared/aegis/%'
-    AND ($baseCond)
-    AND ($srcCond)
+    AND ($BaseCond)
+    AND ($SrcCond)
 EOSQL
 
 readonly Tot=$(count <"$ObjectList")
@@ -251,14 +324,13 @@ printf '%d data objects to replicate\n' "$Tot"
 if [ "$Tot" -gt 0 ]
 then
   cnt=0
-  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier" 16   0  0 <"$ObjectList")  # 16 0 byte transfers 
-  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier" 16   0  1 <"$ObjectList")  # 16 1-threaded transfers 
-  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  8   1  2 <"$ObjectList")  # 8 2-threaded
-  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  6   2  3 <"$ObjectList")  # 6 3-threaded
-  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  4   3  5 <"$ObjectList")  # 4 4--5-threaded
-  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  3   5  7 <"$ObjectList")  # 3 6--7-threaded
-  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  2   7 15 <"$ObjectList")  # 2 8--15-threaded
-  cnt=$(select_cohort "$cnt" "$Tot" "$Log" "$multiplier"  1  15    <"$ObjectList")  # 1 16-threaded
+  cnt=$(select_cohort "$cnt" "$Tot"  16   0  0 < "$ObjectList")  # 16 0 byte transfers 
+  cnt=$(select_cohort "$cnt" "$Tot"  16   0  1 < "$ObjectList")  # 16 1-threaded transfers 
+  cnt=$(select_cohort "$cnt" "$Tot"   8   1  2 < "$ObjectList")  # 8 2-threaded
+  cnt=$(select_cohort "$cnt" "$Tot"   6   2  3 < "$ObjectList")  # 6 3-threaded
+  cnt=$(select_cohort "$cnt" "$Tot"   4   3  5 < "$ObjectList")  # 4 4--5-threaded
+  cnt=$(select_cohort "$cnt" "$Tot"   3   5  7 < "$ObjectList")  # 3 6--7-threaded
+  cnt=$(select_cohort "$cnt" "$Tot"   2   7 15 < "$ObjectList")  # 2 8--15-threaded
+  cnt=$(select_cohort "$cnt" "$Tot"   1  15    < "$ObjectList")  # 1 16-threaded
 fi 2>&1
 
-rm --force "$ObjectList"
