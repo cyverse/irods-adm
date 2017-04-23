@@ -39,8 +39,7 @@ do
   coordRes=$(ils -L "$obj" | sed -n '/^  [^ ]/p' | awk '{print $3}' | cut -d\; -f 1)
   storeRes=$(ils -L "$obj" | sed -n '/^  [^ ]/p' | awk '{print $3}' | cut -d\; -f 2)
   storeHost=$(ilsresc -l "$storeRes" | sed -n 's/location: //p')
-  vault=$(ilsresc -l "$storeRes" | sed -n 's/vault: //p')
-  tmp="$vault"/tmp
+  tmp="$file".tmp
 
   ssh -q "$storeHost" \
       su --command \'mv --no-clobber \"$file\" \"$tmp\" \&\& \
