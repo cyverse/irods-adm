@@ -107,6 +107,19 @@ check_time()
 export -f check_time
 
 
+repl()
+{
+  if ! check_time
+  then
+    exit 1
+  fi
+
+  irepl -B -M -v -R taccCorralRes "$@"
+  exit 0
+}
+export -f repl
+
+
 finish()
 {
   local objList="$1"
@@ -118,18 +131,6 @@ finish()
 
   rm --force "$objList"
 }
-
-
-repl()
-{
-  if ! check_time
-  then
-    exit 1
-  fi
-
-  irepl -B -M -v -R taccCorralRes "$@"
-}
-export -f repl
 
 
 count()
