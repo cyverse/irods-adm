@@ -28,16 +28,20 @@ while IFS= read -r obj
 do
   printf '%s\n' "$obj"
 
-  file=$(ils -L "$obj" | sed -n '/^   /p' | awk '{$1=$2=""; print substr($0,3)}')
+  info=$(isysmeta ls -l "$obj")
 
-  if [ $(wc -l <<< "$file") -ne 1 ]
+  if grep --quiet '\-\-\-\-' <<< "$info"
   then
     printf "skipping: there isn't a unique file for this data object\n"
     continue
   fi
 
-  coordRes=$(ils -L "$obj" | sed -n '/^  [^ ]/p' | awk '{print $3}' | cut -d\; -f 1)
-  storeRes=$(ils -L "$obj" | sed -n '/^  [^ ]/p' | awk '{print $3}' | cut -d\; -f 2)
+  file=$(sed --quiet 's/data_path: //p' <<< "$info")
+  coordRes=$(sed --quiet 's/resc_name: //p' <<< "$info")
+  storeRes=$(ils -L "$obj" \
+             | sed --quiet '/^  [^ ]/p' \
+             | awk '{print $3}' \
+             | cut --delimiter \; --fields 2)
   storeHost=$(ilsresc -l "$storeRes" | sed -n 's/location: //p')
   tmp="$file".tmp
 
