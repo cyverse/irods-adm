@@ -68,6 +68,11 @@ printf '%*d replication errors\n' "$CntWid" "$RCnt"
 readonly ReplErrors=$(cat "$ReplErrorsFile")
 sed 's/replUtil: repl error for //' <<< "$ReplErrors" | sort > "$ReplErrorsFile"
 
+readonly SCLECnt=$(split_out_class "$ReplErrorsFile" \
+                                   ', status = -27000 status = -27000 SYS_COPY_LEN_ERR' \
+                                   "$Log".short_file)
+printf '%*d short files\n' "$CntWid" "$SCLECnt"
+
 readonly UFOECnt=$(split_out_class \
   "$ReplErrorsFile" \
   ', status = -510002 status = -510002 UNIX_FILE_OPEN_ERR, No such file or directory$' \
