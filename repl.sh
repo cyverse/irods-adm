@@ -115,6 +115,19 @@ repl()
   fi
 
   irepl -B -M -v -R taccCorralRes "$@"
+
+# XXX: Trying to figure out the irepl error code for when irepl logs a 
+# '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably 
+# down status = -305113 USER_SOCK_CONNECT_ERR, No route to host' error message.
+# It is probably at 113, but we should confirm.
+# TODO: Once this is confirmed, if this status is returned, this function should
+# wait for a bit and try again.
+  local replStatus="$?"
+  if [ "$replStatus" -ne 0 ]
+  then
+    printf 'repl: irepl exited with status %d\n' "$replStatus" >&2
+  fi
+
   exit 0
 }
 export -f repl
