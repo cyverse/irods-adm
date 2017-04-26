@@ -69,9 +69,15 @@ readonly ReplErrors=$(cat "$ReplErrorsFile")
 sed 's/replUtil: repl error for //' <<< "$ReplErrors" | sort > "$ReplErrorsFile"
 
 readonly SCLECnt=$(split_out_class "$ReplErrorsFile" \
-                                   ', status = -27000 status = -27000 SYS_COPY_LEN_ERR' \
+                                   ', status = -27000 status = -27000 SYS_COPY_LEN_ERR$' \
                                    "$Log".short_file)
 printf '%*d short files\n' "$CntWid" "$SCLECnt"
+
+readonly CRBPCnt=$(split_out_class \
+  "$ReplErrorsFile" \
+  ', status = -116104 status = -116104 SYS_SOCK_READ_ERR, Connection reset by peer$' \
+  "$Log".connection_reset)
+printf '%*d connections reset\n' "$CntWid" "$CRBPCnt"
 
 readonly UFOECnt=$(split_out_class \
   "$ReplErrorsFile" \
