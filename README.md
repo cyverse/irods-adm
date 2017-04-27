@@ -30,3 +30,7 @@ The bash script `repl-report.sh` can be used to generate a report on the number 
 ## Synchronizing data object and file sizes
 
 The bash script `fix-file-size.sh` can be used to set the sizes of a group of data objects with the sizes of their respective files.
+
+## Generating a histogram of an SQL query for files size
+
+The bash script `histgram.sh` can be used to generate a histogram of file sizes.
