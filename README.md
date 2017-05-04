@@ -26,6 +26,10 @@ The awk script `session-intervals.awk` can be combined with `group-log-by-pid.aw
 
 The bash script `count-sessions.sh` can be combined with `sessions-intervals.awk` to generate a report on the number of concurrent sessions during each second for the time period covered by a log file.
 
+## Check access to iRODS resources
+
+The program `check-irods` generates a report on the accessibility of the IES and resources from various locations.
+
 ## Synchronizing data object and file sizes
 
 The bash script `fix-file-size.sh` can be used to set the sizes of a group of data objects with the sizes of their respective files.
