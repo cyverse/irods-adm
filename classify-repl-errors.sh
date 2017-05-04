@@ -58,6 +58,7 @@ readonly ITCnt=$(split_out_class "$ErrorsFile" \
                                  'replUtil: invalid repl objType 0 for ' \
                                  "$Log".invalid_types)
 printf '%*d invalid object types\n' "$CntWid" "$ITCnt"
+sed --in-place 's/^replUtil: invalid repl objType 0 for //' "$Log".invalid_types
 
 readonly SPECnt=$(split_out_class "$ErrorsFile" 'replUtil: srcPath ' "$Log".src_path_errors)
 printf '%*d source path errors\n' "$CntWid" "$SPECnt"
