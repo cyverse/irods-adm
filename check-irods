@@ -1,150 +1,106 @@
 #! /bin/bash
-#
-# SUMMARY
-#
-# This script will check that an iRODS grid is reachable from various places on the Internet.
-#
-# Given a list of hosts, this script will check that the IES and each of the resources in the
-# corresponding zone can be accessed. The script assumes that the account on the remote host is 
-# configured to use the desired iRODS grid. 
-# It will make an `ilsresc` request to check that the IES is reachable. Then it will upload a 40 MB 
-# to each of the resources in the `ilsresc` response.
-#
-#
-# PREREQUISITES
-#
-# 1. The local host will need the following software installed.
-#
-#   - bash
-#   - ssh
-# 
-# 2. Each remote host will need the following software installed.
-#
-#   - bash
-#   - cat
-#   - dd
-#   - icommands
-#   - timeout
-#   - wc 
-#
-# 3. Each remote host will need to have an account configured to use the desired iRODS grid with
-#    icommands by default. Also the account must already be authenticated with iRODS. In other 
-#    words, calling an icommand will act on the desired grid without prompting for a password.
-# 
-# 4. `ssh` on the account on the local host must be configured to connect to each remote host as
-#    the correct user by default. Furthermore, it should be configured so that `ssh` can connect to
-#    each remote host without prompting for a password. 
 
-
-readonly Version=1
-readonly Name=check-irods
+readonly EXEC_NAME=$(basename $0)
+readonly VERSION=2
 
 
 show_help()
 {
-  printf 'Usage: %s [OPTIONS...] HOSTS...\n' "$Name"
-  printf '  -d DIRECTORY  the directory where the status logs are to be written\n'
-  printf '  -h            help should be shown and then exit\n'
-  printf '  -V            version should be shown and then exit\n'
+  cat << EOF
+Usage:
+  $EXEC_NAME [options] <client> ...
+
+This script will check that an iRODS grid is reachable from various places on 
+the Internet.
+
+Parameters:
+ <client>  the host name or IP address of a computer to use to connect to iRODS
+
+Options:
+ -l, --log-dir <directory>  the directory where the status logs are to be 
+                            written (default is current working directory)
+ 
+ -h, --help     display help text and exit
+ -v, --version  display version and exit
+
+Summary:
+
+Given a list of hosts, this script will check that the IES and each of the 
+resources in the corresponding zone can be accessed. The script assumes that the
+account on the remote host is configured to use the desired iRODS grid. It will 
+make an ilsresc request to check that the IES is reachable. Then it will upload 
+a 64 MiB to each of the resources in the ilsresc response.
+
+Prerequisites:
+
+ 1. The local host will need the following software installed.
+
+   - bash
+   - date
+   - sort
+   - ssh
+ 
+ 2. Each remote host will need the following software installed.
+
+   - bash
+   - cat
+   - date
+   - iCommands
+   - mktemp
+   - sed
+   - sort
+   - timeout
+   - wc 
+
+ 3. Each remote host will need to have an account configured to use the desired 
+    iRODS grid with iCommands by default. Also the account must already be 
+    authenticated with iRODS. In other words, calling an iCommand will act on 
+    the desired grid without prompting for a password.
+
+ 4. ssh on the account on the local host must be configured to connect to each 
+    remote host as the correct user by default. Furthermore, it should be 
+    configured so that ssh can connect to each remote host without prompting for
+    a password. 
+EOF
 }
 
 
 show_version()
 {
-  printf '%s - irods status checker\n' "$Name"
-  printf 'version: %s\n' "$Version"
+  printf '%s - irods status checker\n' "$EXEC_NAME"
+  printf 'version: %s\n' "$VERSION"
 }
 
 
-check_from_host()
-{
-  local host=$1
+if ! opts=$(getopt --name "$EXEC_NAME" --options d:hv --longoptions directory:,help,version -- "$@")
+then
+  printf '\n' >&2
+  show_help >&2
+  exit 1
+fi
 
-  ssh -q "$host" 'cat > check-irods.sh; bash check-irods.sh' <<'CHECK-IRODS.SH' 
-    #!/bin/bash
-
-    readonly TestFile=irods40MBFile
-    readonly ExpFileSize=40000000
-
-    log_status() {
-      local system=$1
-      local status=$2
-      printf '%s %s\n' "$system" "$status"
-    }
-
-    test_resource() {
-      local resource=$1
-      local file=$2
-      timeout 1m iput -R "$resource" -f "$file" >&2
-      if [ $? -ne 0 ]; then
-        log_status "$resource" fail
-      else
-        log_status "$resource" ok
-      fi
-    }
-
-    touch "$TestFile"
-    declare -i actFileSize=$(wc -c < "$TestFile")
-    if [ $? -ne 0 ] || [ "$actFileSize" -ne "$ExpFileSize" ]; then
-      dd if=/dev/urandom of="$TestFile" bs="$ExpFileSize" count=1
-    fi
-    resources=$(ilsresc)
-    if [ $? -ne 0 ]; then
-      log_status '*' fail
-      exit 0
-    fi
-    resources=$(sed '/resource group/d' <<< "$resources")
-    irm -f "$TestFile" >/dev/null 2>&1
-    for resource in $resources; do
-      test_resource "$resource" "$TestFile" &
-      sleep 1
-    done
-    wait
-    irm -f "$TestFile" >/dev/null 2>&1
-CHECK-IRODS.SH
-}
+eval set -- "$opts"
 
 
-display_errors()
-{
-  local host="$1"
-
-  while IFS= read -r
-  do
-    printf "%s: %s\n" "$host" "$REPLY" >&2
-  done
-}
-
-
-log_statuses()
-{
-  local host="$1"
-  local log="$2"
-
-  while read -r system status
-  do
-    printf '%s\t%s\t%s\t%s\n' "$(date --iso-8601=seconds)" "$host" "$system" "$status" >> "$log"
-  done
-}
-
-
-logDir=.
-
-while getopts 'd:hV' opt
+while true
 do
-  case $opt in
-    d)
-      logDir=$OPTARG
-      ;;
-    h)
+  case "$1" in
+    -h,--help)
       show_help
       exit 0
       ;;
-    V)
+    -l|--log-dir)
+      readonly LOG_DIR="$2"
+      ;;
+    -v,--version)
       show_version
       exit 0
       ;;
-    \?)
+    --)
+      shift
+      break
+      ;;
+    *)
       printf '\n' >&2
       show_help >&2
       exit 1
@@ -152,13 +108,147 @@ do
   esac
 done
 
-readonly Hosts=("${@:$OPTIND}")
-readonly Log=$logDir/irods-check-log-$(date --iso-8601).tsv
-
-if [ ! -e "$logDir" ]
+if [ -z "$LOG_DIR" ]
 then
-  mkdir -p "$logDir"
-  if [ $? -ne 0 ]
+  readonly LOG_DIR=.
+fi
+
+readonly CLIENTS=("$@")
+
+readonly TEST_TIME=$(date)
+
+
+check_from_client()
+{
+  local client="$1"
+
+  ssh -q "$client" bash << 'EOF' 
+readonly TEST_FILE_SIZE=$((64 * 1024 * 1024))
+
+
+display_errors()
+{
+  local resource="$1"
+
+  while IFS= read -r
+  do
+    if [ -n "$REPLY" ]
+    then 
+      printf '(%s) %s\n' "$resource" "$REPLY" >&2
+    fi
+  done
+}
+
+
+log_status() 
+{
+  local system="$1"
+  local status="$2"
+
+  printf '%s %s\n' "$system" "$status"
+}
+
+
+test_resource()
+{
+  local resource="$1"
+  local file="$2"
+
+  while true
+  do
+    obj=check-irods-$(date '+%s')."$RANDOM"
+
+    if ! resp=$(timeout 1m iput -R "$resource" "$file" "$obj" 2>&1)
+    then
+      if [[ "$resp" =~ OVERWRITE_WITHOUT_FORCE_FLAG ]]
+      then
+        continue
+      fi
+      
+      printf '%s\n' "$resp" >&2
+      log_status "$resource" fail
+    else
+      log_status "$resource" ok
+    fi
+
+    return 0
+  done
+}
+
+
+if ! testFile=$(mktemp)
+then
+  log_status '*' error
+  exit 1
+fi
+
+if ! trap "rm --force '$testFile'" EXIT
+then
+  log_status '*' error
+  exit 1
+fi  
+
+if ! truncate --size "$TEST_FILE_SIZE" "$testFile"
+then
+  log_status '*' error
+  exit 1
+fi
+
+if lsrescResp=$(ilsresc)
+then
+  log_status IES ok
+else
+  log_status IES fail
+  exit 0
+fi
+
+resources=()
+
+while IFS= read -r
+do
+  resources+=("$REPLY")
+done < <(sed --quiet 's/^\([A-Za-z][^:]*\).*/\1/p' <<< "$lsrescResp")
+
+for resource in "${resources[@]}" 
+do
+  test_resource "$resource" "$testFile" 2> >(display_errors "$resource") &
+done | sort --ignore-case --key 1
+EOF
+}
+
+
+display_errors()
+{
+  local client="$1"
+
+  while IFS= read -r
+  do
+    if [ -n "$REPLY" ]
+    then
+      printf '%s: %s\n' "$client" "$REPLY" >&2
+    fi
+  done
+}
+
+
+log_statuses()
+{
+  local client="$1"
+
+  local logTime=$(date --date="$TEST_TIME" --iso-8601=seconds)
+
+  while read -r system status
+  do
+    printf '%s\t%s\t%s\t%s\n' "$logTime" "$client" "$system" "$status"
+  done 
+}
+
+
+readonly Log=$LOG_DIR/irods-check-log-$(date --iso-8601 --date="$TEST_TIME").tsv
+
+if [ ! -e "$LOG_DIR" ]
+then
+  if ! mkdir --parents "$LOG_DIR"
   then
     exit 1
   fi
@@ -166,16 +256,13 @@ fi
 
 if [ ! -s "$Log" ]
 then
-  printf 'time\tclient\tresource\tstatus\n' > "$Log"
-  if [ $? -ne 0 ]
+  if ! printf 'time\tclient\tresource\tstatus\n' > "$Log"
   then
     exit 1
   fi
 fi
 
-for host in "${Hosts[@]}"
+for client in "${CLIENTS[@]}"
 do
-  check_from_host "$host" 1> >(log_statuses "$host" "$Log") 2> >(display_errors "$host") &
-done
-
-wait
+  check_from_client "$client" 1> >(log_statuses "$client") 2> >(display_errors "$client") &
+done | sort --ignore-case --stable --key 2,2 >> "$Log" 
