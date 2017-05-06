@@ -62,6 +62,7 @@ sed --in-place 's/^replUtil: invalid repl objType 0 for //' "$Log".invalid_types
 
 readonly SPECnt=$(split_out_class "$ErrorsFile" 'replUtil: srcPath ' "$Log".src_path_errors)
 printf '%*d source path errors\n' "$CntWid" "$SPECnt"
+sed --in-place 's/replUtil: srcPath \(.*\) does not exist$/\1/' "$Log".src_path_errors
 
 readonly RCnt=$(split_out_class "$ErrorsFile" 'replUtil: repl error for ' "$ReplErrorsFile")
 printf '%*d replication errors\n' "$CntWid" "$RCnt"
