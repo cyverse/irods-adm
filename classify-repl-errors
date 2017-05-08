@@ -26,7 +26,7 @@ split_out_class()
   local classFile="$3"
 
   local errors=$(cat "$errorsFile")
-  local classifiedErrors=$(sed --quiet "s${classifierSubstituion}p" <<< "$errors")
+  local classifiedErrors=$(sed --quiet "$classifierSubstituion" <<< "$errors")
 
   if [ -n "$classifiedErrors" ]
   then
@@ -55,40 +55,40 @@ readonly CntWid=${#ErrCnt}
 printf '%*d errors\n' "$CntWid" "$ErrCnt"
 
 readonly ITCnt=$(split_out_class "$ErrorsFile" \
-                                 '/replUtil: invalid repl objType 0 for //' \
+                                 's/^replUtil: invalid repl objType 0 for //p' \
                                  "$Log".invalid_types)
 printf '%*d invalid object types\n' "$CntWid" "$ITCnt"
 
 readonly SPECnt=$(split_out_class "$ErrorsFile" \
-                                  '/replUtil: srcPath \(.*\) does not exist$/\1/' \
+                                  's/^replUtil: srcPath \(.*\) does not exist$/\1/p' \
                                   "$Log".src_path_errors)
 printf '%*d source path errors\n' "$CntWid" "$SPECnt"
 
-readonly RCnt=$(split_out_class "$ErrorsFile" '/replUtil: repl error for //' "$ReplErrorsFile")
+readonly RCnt=$(split_out_class "$ErrorsFile" 's/^replUtil: repl error for //p' "$ReplErrorsFile")
 printf '%*d replication errors\n' "$CntWid" "$RCnt"
 
 readonly ReplErrors=$(cat "$ReplErrorsFile")
 sort <<< "$ReplErrors" > "$ReplErrorsFile"
 
 readonly SCLECnt=$(split_out_class "$ReplErrorsFile" \
-                                   '/, status = -27000 status = -27000 SYS_COPY_LEN_ERR$//' \
+                                   's/, status = -27000 status = -27000 SYS_COPY_LEN_ERR$//p' \
                                    "$Log".short_file)
 printf '%*d short files\n' "$CntWid" "$SCLECnt"
 
 readonly CRBPCnt=$(split_out_class \
   "$ReplErrorsFile" \
-  's/, status = -116104 status = -116104 SYS_SOCK_READ_ERR, Connection reset by peer$//' \
+  's/, status = -116104 status = -116104 SYS_SOCK_READ_ERR, Connection reset by peer$//p' \
   "$Log".connection_reset)
 printf '%*d connections reset\n' "$CntWid" "$CRBPCnt"
 
 readonly UFOECnt=$(split_out_class \
   "$ReplErrorsFile" \
-  ', status = -510002 status = -510002 UNIX_FILE_OPEN_ERR, No such file or directory$//' \
+  's/, status = -510002 status = -510002 UNIX_FILE_OPEN_ERR, No such file or directory$//p' \
   "$Log".missing_file)
 printf '%*d file open errors\n' "$CntWid" "$UFOECnt"
 
 readonly UCMCnt=$(split_out_class "$ReplErrorsFile" \
-                                  '/, status = -314000 status = -314000 USER_CHKSUM_MISMATCH$//' \
+                                  's/, status = -314000 status = -314000 USER_CHKSUM_MISMATCH$//p' \
                                   "$ChksumMismatchesFile")
 printf '%*d checksum mismatches\n' "$CntWid" "$UCMCnt"
 
