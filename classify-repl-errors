@@ -44,9 +44,8 @@ rm --force "$Log".*
 
 readonly ErrorsFile=$(mktemp)
 readonly ReplErrorsFile=$(mktemp)
-readonly ChksumMismatchesFile=$(mktemp)
 
-touch "$ErrorsFile" "$ReplErrorsFile" "$ChksumMismatchesFile"
+touch "$ErrorsFile" "$ReplErrorsFile"
 
 sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' "$Log" | sort > "$ErrorsFile"
 
@@ -96,36 +95,8 @@ printf '%*d file open errors\n' "$CntWid" "$UFOECnt"
 readonly UCMCnt=$(split_out_class "$ReplErrorsFile" \
                                   ', status = -314000 status = -314000 USER_CHKSUM_MISMATCH$' \
                                   '' \
-                                  "$ChksumMismatchesFile")
+                                  "$Log".chksum_mismatches)
 printf '%*d checksum mismatches\n' "$CntWid" "$UCMCnt"
-
-ecmCnt=0
-ncmCnt=0
-cnt=0
-msg=
-
-while read -r size obj
-do
-  ((++cnt))
-  printf '\r%*s\r' ${#msg} '' 
-  printf -v msg 'checking size: %0*d/%d ...' ${#UCMCnt} "$cnt" "$UCMCnt"
-  printf '%s' "$msg"
-
-  if [ "$size" -eq 0 ]
-  then
-    ((++ecmCnt))
-    echo "$obj" >> "$Log".empty_chksum_mismatches
-  else
-    ((++ncmCnt))
-    echo "$obj" >> "$Log".nonempty_chksum_mismatches
-  fi
-done < <(parallel --no-notice --delimiter '\n' --max-args 1 --max-procs 7 lsl {} \
-           < "$ChksumMismatchesFile")
-
-printf '\r%*s\r' ${#msg} '' 
-
-printf '%*d empty checksum mismatches\n' "$CntWid" "$ecmCnt"
-printf '%*d nonempty checksum mismatches\n' "$CntWid" "$ncmCnt"
 
 printf '%*d unclassified replication errors\n' "$CntWid" $(cat "$ReplErrorsFile" | wc --lines)
 
@@ -141,4 +112,4 @@ then
   mv "$ErrorsFile" "$Log".unclassified_errors
 fi
 
-rm --force "$ErrorsFile" "$ReplErrorsFile" "$ChksumMismatchesFile"
+rm --force "$ErrorsFile" "$ReplErrorsFile" 
