@@ -1,13 +1,15 @@
 #! /bin/bash
 
 readonly EXEC_NAME=($basename "$0")
-
+readonly VERSION=1
 
 show_help()
 {
   cat << EOF
+$EXEC_NAME - version $VERSION
+
 Usage:
- $EXEC_NAME <bad size log> <bad checksum log>
+ $EXEC_NAME [options] <bad size log> <bad checksum log>
 
 checks data object replicas for correct sizes and checksums
 
@@ -15,6 +17,13 @@ Parameters:
  <bad size log>      a file where the replicas with incorrect sizes are appended
  <bad checksum log>  a file where the replicas with incorrect checksums are 
                      appended
+
+Options:
+ -j, --jobs <n>  perform <n> checks simultaneously, default is the number of 
+                 CPUs
+
+ -h, --help     display help text and exit
+ -v, --version  display version and exit
 
 Summary:
 The script reads a list of iRODS data object paths from standard in, one per 
@@ -30,10 +39,56 @@ EOF
 }
 
 
-if [ "$#" -lt 2 ]
-then
+show_version()
+{
+  printf '%s\n' "$VERSION"
+}
+
+
+exit_with_help()
+{
   show_help >&2
   exit 1
+}
+
+
+if ! opts=$(getopt --name "$EXEC_NAME" --options hj:v --longoptions help,jobs:,version -- "$@")
+then
+  printf '\n' >&2
+  exit_with_help
+fi
+
+eval set -- "$opts"
+
+while true
+do
+  echo "$@"
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -j|--jobs)
+      readonly JOBS="$2"
+      shift 2
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      exit_with_help
+      ;;
+  esac
+done
+
+if [ "$#" -lt 2 ]
+then
+  exit_with_help
 fi
 
 readonly BAD_SIZE_LOG="$1"
@@ -100,4 +155,9 @@ log()
 }
 
 
-parallel --eta --no-notice --delimiter '\n' --max-args 1 check_obj | log
+if [ -n "$JOBS" ]
+then
+  readonly JobsOpt="--jobs $JOBS"
+fi
+
+parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" check_obj | log
