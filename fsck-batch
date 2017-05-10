@@ -62,7 +62,6 @@ eval set -- "$opts"
 
 while true
 do
-  echo "$@"
   case "$1" in
     -h|--help)
       show_help
@@ -157,7 +156,7 @@ log()
 
 if [ -n "$JOBS" ]
 then
-  readonly JobsOpt="--jobs $JOBS"
+  readonly JobsOpt="-j $JOBS"
 fi
 
 parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" check_obj | log
