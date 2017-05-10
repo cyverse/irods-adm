@@ -1,0 +1,103 @@
+#! /bin/bash
+
+readonly EXEC_NAME=($basename "$0")
+
+
+show_help()
+{
+  cat << EOF
+Usage:
+ $EXEC_NAME <bad size log> <bad checksum log>
+
+checks data object replicas for correct sizes and checksums
+
+Parameters:
+ <bad size log>      a file where the replicas with incorrect sizes are appended
+ <bad checksum log>  a file where the replicas with incorrect checksums are 
+                     appended
+
+Summary:
+The script reads a list of iRODS data object paths from standard in, one per 
+line, and checks to see if any of the replicas have an incorrect checksum or 
+size. The ones with incorrect sizes are appended to the file <bad size log>. The 
+ones with incorrect checksums are appended to the file <bad checksum log>. In
+either case, only one log entry will be logged per line.
+
+Each log entry has the following form.
+
+<rescource hierarchy> <data object path>
+EOF
+}
+
+
+if [ "$#" -lt 2 ]
+then
+  show_help >&2
+  exit 1
+fi
+
+readonly BAD_SIZE_LOG="$1"
+readonly BAD_CHECKSUM_LOG="$2"
+
+
+get_replicas()
+{
+  local collPath="$1"
+  local objName="$2"
+
+  iquest --no-page \
+    '%s %s %s' \
+    "SELECT DATA_ID, DATA_RESC_HIER, DATA_PATH 
+     WHERE COLL_NAME = '$collPath' AND DATA_NAME = '$objName'"
+}
+export -f get_replicas
+
+
+check_obj()
+{
+  local objPath="$1"
+  
+  local collPath=$(dirname "$objPath")
+  local objName=$(basename "$objPath")
+
+  while read -r id rescHier filePath
+  do
+    reason=
+    storeResc="${rescHier##*;}"
+    storeHost=$(iquest '%s' "SELECT RESC_LOC WHERE RESC_NAME = '$storeResc'")
+    resp=$(ssh -q "$storeHost" su --command \'ifsck -K \"$filePath\"\' --login irods)
+    
+    if [[ "$resp" =~ size\.$ ]]
+    then
+      reason=size
+    elif [[ "$resp" =~ checksum\.$ ]]
+    then
+      reason=checksum
+    fi
+
+    if [ -n "$reason" ]
+    then
+      printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
+    fi
+  done < <(get_replicas "$collPath" "$objName") 
+}
+export -f check_obj
+
+
+log()
+{
+  while read -r reason rescHier objPath
+  do
+    printf -v entry '%s %s\n' "$rescHier" "$objPath"
+
+    if [ "$reason" = size ]
+    then
+      printf '%s' "$entry" >> "$BAD_SIZE_LOG"
+    else
+      printf '%s' "$entry" >> "$BAD_CHECKSUM_LOG"
+    fi
+  done
+}
+
+
+parallel --eta --no-notice --delimiter '\n' --max-args 1 check_obj | log
