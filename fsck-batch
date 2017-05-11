@@ -93,32 +93,16 @@ fi
 readonly BAD_SIZE_LOG="$1"
 readonly BAD_CHECKSUM_LOG="$2"
 
-
-get_replicas()
-{
-  local collPath="$1"
-  local objName="$2"
-
-  iquest --no-page \
-    '%s %s %s' \
-    "SELECT DATA_ID, DATA_RESC_HIER, DATA_PATH 
-     WHERE COLL_NAME = '$collPath' AND DATA_NAME = '$objName'"
-}
-export -f get_replicas
+readonly EXEC_DIR=$(dirname "$0")
 
 
 check_obj()
 {
   local objPath="$1"
   
-  local collPath=$(dirname "$objPath")
-  local objName=$(basename "$objPath")
-
-  while read -r id rescHier filePath
+  while read -r rescHier storeHost filePath
   do
     reason=
-    storeResc="${rescHier##*;}"
-    storeHost=$(iquest '%s' "SELECT RESC_LOC WHERE RESC_NAME = '$storeResc'")
     resp=$(ssh -q "$storeHost" su --command \'ifsck -K \"$filePath\"\' --login irods)
     
     if [[ "$resp" =~ size\.$ ]]
@@ -133,7 +117,7 @@ check_obj()
     then
       printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
     fi
-  done < <(get_replicas "$collPath" "$objName") 
+  done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 }
 export -f check_obj
 

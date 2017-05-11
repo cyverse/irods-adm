@@ -1,55 +1,88 @@
 #! /bin/bash
 
-readonly ExecName=$(basename $0)
+readonly EXEC_NAME=$(basename "$0")
+readonly VERSION=1
 
-if [ "$#" -lt 1 ]
-then
+
+show_help()
+{
   cat <<EOF
+$EXEC_NAME version $VERSION
+  
 Usage:
- $ExecName <obj-paths-file>
+ $EXEC_NAME [options]
 
-Updates the ICAT size information for a data object, setting it to the size of 
-the corresponding file. No object name may have a carriage return in its path.
-Also, no object may have more than one replica. The user must be initialized 
-with iRODS as an admin user. Finally, the user must have passwordless access to
-the root account on the relavent storage resources.
+Updates the ICAT size information for the replicas of a set of data objects
 
-Parameters:
- obj-paths-file - A file containing the paths of the data objects to fix, one
-                  object per line.
+Options:
+ -h, --help  show help and exit
+
+Summary:
+It reads a list of data object paths, one per line, from standard in. For each
+replica, it updates the ICAT size information based on the size of the 
+corresponding file in storage.  No object name may have a carriage return in its
+path. The user must be initialized with iRODS as an admin user. Finally, the 
+user must have passwordless access to the root account on the relevant storage 
+resources. It writes the path of the data object currently being processed to
+standard out.
 EOF
+}
 
-  exit 0
+
+show_version()
+{
+  printf '%s\n' "$VERSION"
+}
+
+
+if ! opts=$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")
+then
+  printf '\n' >&2
+  show_help >&2
+  exit 1
 fi
 
-readonly ObjsToFix="$1"
+eval set -- "$opts"
 
-while IFS= read -r obj
+while true
 do
-  printf '%s\n' "$obj"
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      show_help >&2
+      exit 1
+      ;;
+  esac
+done
 
-  info=$(isysmeta ls -l "$obj")
+readonly EXEC_DIR=$(dirname "$0")
 
-  if grep --quiet '\-\-\-\-' <<< "$info"
-  then
-    printf "skipping: there isn't a unique file for this data object\n"
-    continue
-  fi
+while IFS= read -r objPath
+do
+  printf '%s\n' "$objPath"
 
-  file=$(sed --quiet 's/data_path: //p' <<< "$info")
-  coordRes=$(sed --quiet 's/resc_name: //p' <<< "$info")
-  storeRes=$(ils -L "$obj" \
-             | sed --quiet '/^  [^ ]/p' \
-             | awk '{print $3}' \
-             | cut --delimiter \; --fields 2)
-  storeHost=$(ilsresc -l "$storeRes" | sed -n 's/location: //p')
-  tmp="$file".tmp
+  while read -r rescHier storeHost filePath
+  do
+    coordResc="${rescHier%%;*}"
+    tmp="$filePath".tmp
 
-  ssh -q "$storeHost" \
-      su --command \'mv --no-clobber \"$file\" \"$tmp\" \&\& \
-                     touch \"$file\" \&\& \
-                     \(irsync -K -s -v -R \"$coordRes\" \"$tmp\" \"i:$obj\"\; \
-                       mv \"$tmp\" \"$file\"\)\' \
+    ssh -q "$storeHost" \
+        su --command \'mv --no-clobber \"$filePath\" \"$tmp\" \&\& \
+                       touch \"$file\" \&\& \
+                       \(irsync -K -s -v -R \"$coordResc\" \"$tmp\" \"i:$obj\"\; \
+                         mv \"$tmp\" \"$filePath\"\)\' \
          --login irods \
-    < /dev/null
-done < "$ObjsToFix"
+      < /dev/null
+  done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
+done
