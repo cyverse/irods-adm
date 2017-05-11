@@ -335,7 +335,7 @@ then
   exit 1
 fi
 
-if ! psql --host irods-db3 --command 'SELECT 0' ICAT irodsuser < /dev/null &> /dev/null
+if ! psql --host irods-db3 ICAT icat_reader <<< '' &> /dev/null
 then
   printf "aren't able to connect to the ICAT DB as the icat_reader without a password\n" >&2
   exit 1
