@@ -3,17 +3,18 @@
 set -e
 
 readonly EXEC_NAME=$(basename "$0")
+readonly VERSION=1
 
 
 show_help()
 {
   cat << EOF
-Usage: 
- $EXEC_NAME [options] LOG_FILE
+$EXEC_NAME version $VERSION
 
-Replicates data objects to taccCorralRes. It only replicates objects that only 
-have one replica. The replica cannot be in the /iplant/home/shared/aegis 
-collection or be on cshlWildcatRes.
+Usage: 
+ $EXEC_NAME [options] 
+
+replicates data objects to taccCorralRes
 
 Options:
  -c, --collection <collection>  only replicate the data objects in this 
@@ -26,8 +27,26 @@ Options:
                                 the POSIX epoch
 
  -h, --help  show help and exit
+
+Summary:
+This script replicates data objects to the taccCorralRes resource. It only 
+replicates objects that only have one replica that is not in the 
+/iplant/home/shared/aegis collection nor on the cshlWildcatRes resource. It
+writes progress to standard error and all messages, error or otherwise, to 
+standard out.
+
+Prerequisites:
+ 1) The user must be initialized with iRODS as an admin user.
+ 2) The user must be able to connect to the ICAT DB as the icat_reader user 
+    without providing a password.
 EOF
 } 
+
+
+show_version()
+{
+  printf '%s\n' "$VERSION"
+}
 
 
 exit_with_help()
@@ -38,8 +57,8 @@ exit_with_help()
 
 
 readonly Opts=$(getopt --name "$EXEC_NAME" \
-                       --options c:hm:r:u: \
-                       --longoptions collection:,help,multiplier:,resource:until: \
+                       --options c:hm:r:u:v \
+                       --longoptions collection:,help,multiplier:,resource:,until:,version \
                        -- \
                        "$@")
 
@@ -74,6 +93,10 @@ do
       export UNTIL="$2"
       shift 2
       ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
     --)
       shift
       break
@@ -84,17 +107,14 @@ do
   esac
 done
 
-if [ "$#" -lt 1 ]
-then
-  exit_with_help
-fi
-
-readonly LOG="$1"
-
 if [ -z "$PROC_MULT" ]
 then
   readonly PROC_MULT=1
 fi
+
+# Redirect stdout to FD 3 to use as a logging channel
+readonly LOG=3
+eval "exec $LOG>&1"
 
 
 check_time()
@@ -133,16 +153,32 @@ repl()
 export -f repl
 
 
+log()
+{
+  while read -r 
+  do
+    printf '%s\n' "$REPLY" >&"$LOG"
+  done
+}
+
+
+update_progress()
+{
+  printf "$@" >&2
+}
+
+
 finish()
 {
   local objList="$1"
 
   if ! check_time
   then
-    printf 'out of time\n'
+    update_progress 'out of time\n'
   fi
 
   rm --force "$objList"
+  eval "exec 1>&$LOG $LOG>&-"
 }
 
 
@@ -220,12 +256,11 @@ track_prog()
     printf -v msg \
            'cohort: %0*d/%d, all: %0*d/%d' \
            "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot" 
-    printf '%s' "$msg" >&2
+    update_progress "$msg"
   done
 
-  printf '\r%*s\rcohort: %0*d/%d, all: %0*d/%d\n' \
-         "${#msg}" '' "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot" \
-      >&2
+  update_progress '\r%*s\rcohort: %0*d/%d, all: %0*d/%d\n' \
+                  "${#msg}" '' "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot"
 
   printf '%s' "$cnt"
 }
@@ -266,11 +301,10 @@ select_cohort()
 
   if [ -n "$maxSizeMiB" ]
   then
-    printf 'Replicating %s files with size in [%s, %s) MiB\n' \
-           "$subTotal" "$minSizeMiB" "$maxSizeMiB" \
-        >&2
+    update_progress 'Replicating %s files with size in [%s, %s) MiB\n' \
+                    "$subTotal" "$minSizeMiB" "$maxSizeMiB"
   else
-    printf 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
+    update_progress 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB"
   fi
  
   if [ "$subTotal" -gt 0 ]
@@ -280,8 +314,8 @@ select_cohort()
 
     parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" repl {} \
         < "$cohortList" \
-        2>> "$LOG" \
-        | tee --append "$LOG" \
+        2> >(log) \
+        | tee >(log) \
         | track_prog "$cnt" "$tot" "$subTotal"
   else
     printf '%s\n' "$cnt"
@@ -291,19 +325,29 @@ select_cohort()
 }
 
 
+readonly ObjectList=$(tempfile)
+
+trap "finish $ObjectList" EXIT
+
+if ! iadmin lz &> /dev/null
+then
+  printf "aren't authenticated as a rodsadmin user\n" >&2
+  exit 1
+fi
+
+if ! psql --host irods-db3 --command 'SELECT 0' ICAT irodsuser < /dev/null &> /dev/null
+then
+  printf "aren't able to connect to the ICAT DB as the icat_reader without a password\n" >&2
+  exit 1
+fi
+
 if ! check_time
 then
  printf 'Stop time is in the past\n' >&2
  exit 1
 fi
 
-readonly ObjectList=$(tempfile)
-
-trap "finish $ObjectList" EXIT
-
-truncate --size 0 "$LOG"
-
-printf 'Retrieving data objects to replicate...\n'
+update_progress 'Retrieving data objects to replicate...\n'
 
 if [ -n "$SRC_RES" ]
 then
@@ -332,8 +376,8 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
     AND ($SrcCond)
 EOSQL
 
-readonly Tot=$(count <"$ObjectList")
-printf '%d data objects to replicate\n' "$Tot"
+readonly Tot=$(count < "$ObjectList")
+update_progress '%d data objects to replicate\n' "$Tot"
 
 if [ "$Tot" -gt 0 ]
 then
@@ -346,5 +390,5 @@ then
   cnt=$(select_cohort "$cnt" "$Tot"   3   5  7 < "$ObjectList")  # 3 6--7-threaded
   cnt=$(select_cohort "$cnt" "$Tot"   2   7 15 < "$ObjectList")  # 2 8--15-threaded
   cnt=$(select_cohort "$cnt" "$Tot"   1  15    < "$ObjectList")  # 1 16-threaded
-fi 2>&1
+fi
 
