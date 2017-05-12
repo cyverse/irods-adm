@@ -127,7 +127,7 @@ check_time()
 export -f check_time
 
 
-repl()
+repl_batch()
 {
   if ! check_time
   then
@@ -150,7 +150,7 @@ repl()
 
   exit 0
 }
-export -f repl
+export -f repl_batch
 
 
 log()
@@ -304,7 +304,7 @@ select_cohort()
     local maxArgs=$((2 * ((maxProcs ** 2))))
     maxProcs=$((maxProcs * PROC_MULT))
 
-    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" repl {} \
+    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" repl_batch \
         < "$cohortList" \
         2> >(log) \
         | tee >(log) \
