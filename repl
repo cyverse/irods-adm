@@ -153,15 +153,6 @@ repl_batch()
 export -f repl_batch
 
 
-log()
-{
-  while read -r 
-  do
-    printf '%s\n' "$REPLY" >&"$LOG"
-  done
-}
-
-
 update_progress()
 {
   printf "$@" >&2
@@ -306,8 +297,8 @@ select_cohort()
 
     parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" repl_batch \
         < "$cohortList" \
-        2> >(log) \
-        | tee >(log) \
+        2>&"$LOG" \
+        | tee >(cat >&"$LOG") \
         | track_prog "$cnt" "$tot" "$subTotal"
   else
     printf '%s\n' "$cnt"
