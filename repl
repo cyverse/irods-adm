@@ -202,14 +202,6 @@ partition()
   if [ "$#" -ge 2 ]
   then
     local maxSizeB="$2"
-
-    if [ "$maxSizeB" -eq 0 ]
-    then
-      maxSizeB=1
-    elif [ "$minSizeB" -eq 0 ]
-    then
-      minSizeB=1
-    fi
   fi
 
   if [ -n "$maxSizeB" ]
@@ -382,7 +374,6 @@ update_progress '%d data objects to replicate\n' "$Tot"
 if [ "$Tot" -gt 0 ]
 then
   cnt=0
-  cnt=$(select_cohort "$cnt" "$Tot"  16   0  0 < "$ObjectList")  # 16 0 byte transfers 
   cnt=$(select_cohort "$cnt" "$Tot"  16   0  1 < "$ObjectList")  # 16 1-threaded transfers 
   cnt=$(select_cohort "$cnt" "$Tot"   8   1  2 < "$ObjectList")  # 8 2-threaded
   cnt=$(select_cohort "$cnt" "$Tot"   6   2  3 < "$ObjectList")  # 6 3-threaded
