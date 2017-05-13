@@ -79,10 +79,10 @@ do
 
     ssh -q "$storeHost" \
         su --command \'mv --no-clobber \"$filePath\" \"$tmp\" \&\& \
-                       touch \"$file\" \&\& \
-                       \(irsync -K -s -v -R \"$coordResc\" \"$tmp\" \"i:$obj\"\; \
+                       touch \"$filePath\" \&\& \
+                       \(irsync -K -s -v -R \"$coordResc\" \"$tmp\" \"i:$objPath\"\; \
                          mv \"$tmp\" \"$filePath\"\)\' \
-         --login irods \
+           --login irods \
       < /dev/null
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 done
