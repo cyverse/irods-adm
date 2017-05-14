@@ -85,18 +85,18 @@ readonly CRBPCnt=$(split_out_class \
   "$Log".connection_reset)
 printf '%*d connections reset\n' "$CntWid" "$CRBPCnt"
 
+readonly UCMCnt=$(split_out_class "$ReplErrorsFile" \
+                                  ', status = -314000 status = -314000 USER_CHKSUM_MISMATCH$' \
+                                  '' \
+                                  "$Log".chksum_mismatches)
+printf '%*d checksum mismatches\n' "$CntWid" "$UCMCnt"
+
 readonly UFOECnt=$(split_out_class \
   "$ReplErrorsFile" \
   ', status = -510002 status = -510002 UNIX_FILE_OPEN_ERR, No such file or directory$' \
   '' \
   "$Log".missing_file)
 printf '%*d file open errors\n' "$CntWid" "$UFOECnt"
-
-readonly UCMCnt=$(split_out_class "$ReplErrorsFile" \
-                                  ', status = -314000 status = -314000 USER_CHKSUM_MISMATCH$' \
-                                  '' \
-                                  "$Log".chksum_mismatches)
-printf '%*d checksum mismatches\n' "$CntWid" "$UCMCnt"
 
 printf '%*d unclassified replication errors\n' "$CntWid" $(cat "$ReplErrorsFile" | wc --lines)
 
