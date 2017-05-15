@@ -11,36 +11,37 @@ show_help()
   cat << EOF
 $EXEC_NAME version $VERSION
 
-Usage: 
- $EXEC_NAME [options] 
+Usage:
+ $EXEC_NAME [options]
 
 replicates data objects to taccCorralRes
 
 Options:
- -c, --collection <collection>  only replicate the data objects in this 
+ -c, --collection <collection>  only replicate the data objects in this
                                 collection
- -m, --multiplier <multiplier>  a multiplier on the number of processes to run 
+ -m, --multiplier <multiplier>  a multiplier on the number of processes to run
                                 at once, default: 1
- -r, --resource <resource>      only replicate the data objects with a file on 
+ -r, --resource <resource>      only replicate the data objects with a file on
                                 this resource
- -u, --until <stop_time>        the time to stop replication in seconds since 
+ -u, --until <stop_time>        the time to stop replication in seconds since
                                 the POSIX epoch
 
- -h, --help  show help and exit
+ -h, --help     show help and exit
+ -v, --verison  show version and exit
 
 Summary:
-This script replicates data objects to the taccCorralRes resource. It only 
-replicates objects that only have one replica that is not in the 
+This script replicates data objects to the taccCorralRes resource. It only
+replicates objects that only have one replica that is not in the
 /iplant/home/shared/aegis collection nor on the cshlWildcatRes resource. It
-writes progress to standard error and all messages, error or otherwise, to 
+writes progress to standard error and all messages, error or otherwise, to
 standard out.
 
 Prerequisites:
  1) The user must be initialized with iRODS as an admin user.
- 2) The user must be able to connect to the ICAT DB as the icat_reader user 
+ 2) The user must be able to connect to the ICAT DB as the icat_reader user
     without providing a password.
 EOF
-} 
+}
 
 
 show_version()
@@ -136,8 +137,8 @@ repl_batch()
 
   irepl -B -M -v -R taccCorralRes "$@"
 
-# XXX: Trying to figure out the irepl error code for when irepl logs a 
-# '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably 
+# XXX: Trying to figure out the irepl error code for when irepl logs a
+# '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably
 # down status = -305113 USER_SOCK_CONNECT_ERR, No route to host' error message.
 # It is probably at 113, but we should confirm.
 # TODO: Once this is confirmed, if this status is returned, this function should
@@ -175,13 +176,13 @@ finish()
 
 count()
 {
-  awk 'BEGIN { 
+  awk 'BEGIN {
          RS = "\0"
          tot = 0
-       } 
-       
-       { tot = tot + 1 } 
-       
+       }
+
+       { tot = tot + 1 }
+
        END { print tot }'
 }
 
@@ -199,8 +200,8 @@ partition()
   then
     awk --assign min="$minSizeB" --assign max="$maxSizeB" \
         'BEGIN {
-           RS = "\0" 
-           FS = " " 
+           RS = "\0"
+           FS = " "
            ORS = "\0"
          }
 
@@ -210,22 +211,22 @@ partition()
   else
     awk --assign min="$minSizeB" \
         'BEGIN {
-           RS = "\0" 
-           FS = " " 
+           RS = "\0"
+           FS = " "
            ORS = "\0"
-         } 
-         
+         }
+
          {
            if ($1 >= min) { print substr($0, length($1) + 2) }
-         }' 
-  fi 
+         }'
+  fi
 }
 
 
-track_prog() 
+track_prog()
 {
   local cnt="$1"
-  local tot="$2"  
+  local tot="$2"
   local subTot="$3"
 
   local subCnt=0
@@ -238,7 +239,7 @@ track_prog()
     printf '\r%*s\r' "${#msg}" '' >&2
     printf -v msg \
            'cohort: %0*d/%d, all: %0*d/%d' \
-           "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot" 
+           "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot"
     update_progress "$msg"
   done
 
@@ -289,7 +290,7 @@ select_cohort()
   else
     update_progress 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB"
   fi
- 
+
   if [ "$subTotal" -gt 0 ]
   then
     local maxArgs=$((2 * ((maxProcs ** 2))))
@@ -304,7 +305,7 @@ select_cohort()
     printf '%s\n' "$cnt"
   fi
 
-  rm --force "$cohortList"  
+  rm --force "$cohortList"
 }
 
 
@@ -353,7 +354,7 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
     AND NOT (d.data_repl_num = 0 AND d.resc_name = 'cshlWildcatRes')
-    AND c.coll_name != '/iplant/home/shared/aegis' 
+    AND c.coll_name != '/iplant/home/shared/aegis'
     AND c.coll_name NOT LIKE '/iplant/home/shared/aegis/%'
     AND ($BaseCond)
     AND ($SrcCond)
@@ -365,7 +366,7 @@ update_progress '%d data objects to replicate\n' "$Tot"
 if [ "$Tot" -gt 0 ]
 then
   cnt=0
-  cnt=$(select_cohort "$cnt" "$Tot"  16   0  1 < "$ObjectList")  # 16 1-threaded transfers 
+  cnt=$(select_cohort "$cnt" "$Tot"  16   0  1 < "$ObjectList")  # 16 1-threaded transfers
   cnt=$(select_cohort "$cnt" "$Tot"   8   1  2 < "$ObjectList")  # 8 2-threaded
   cnt=$(select_cohort "$cnt" "$Tot"   6   2  3 < "$ObjectList")  # 6 3-threaded
   cnt=$(select_cohort "$cnt" "$Tot"   4   3  5 < "$ObjectList")  # 4 4--5-threaded
@@ -373,4 +374,3 @@ then
   cnt=$(select_cohort "$cnt" "$Tot"   2   7 15 < "$ObjectList")  # 2 8--15-threaded
   cnt=$(select_cohort "$cnt" "$Tot"   1  15    < "$ObjectList")  # 1 16-threaded
 fi
-
