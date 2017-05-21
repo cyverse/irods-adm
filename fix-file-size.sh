@@ -78,11 +78,9 @@ do
     tmp="$filePath".tmp
 
     ssh -q "$storeHost" \
-        su --command \'mv --no-clobber \"$filePath\" \"$tmp\" \&\& \
-                       touch \"$filePath\" \&\& \
-                       \(irsync -K -s -v -R \"$coordResc\" \"$tmp\" \"i:$objPath\"\; \
-                         mv \"$tmp\" \"$filePath\"\)\' \
-           --login irods \
+        mv --no-clobber \"$filePath\" \"$tmp\" \&\& \
+        touch \"$filePath\" \&\& \
+        \(irsync -K -s -v -R \"$coordResc\" \"$tmp\" \"i:$objPath\"\; mv \"$tmp\" \"$filePath\"\) \
       < /dev/null
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 done
