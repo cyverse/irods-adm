@@ -103,7 +103,7 @@ check_obj()
   while read -r rescHier storeHost filePath
   do
     reason=
-    resp=$(ssh -q "$storeHost" su --command \'ifsck -K \"$filePath\"\' --login irods)
+    resp=$(ssh -q "$storeHost" ifsck -K \"$filePath\")
     
     if [[ "$resp" =~ size\.$ ]]
     then
