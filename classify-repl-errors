@@ -1,6 +1,9 @@
 #! /bin/bash
 
-readonly Log="$1"
+readonly EXEC_NAME=$(basename $0)
+readonly VERSION=1
+
+readonly LOG_BASE="$1"
 
 set -e
 
@@ -8,13 +11,13 @@ set -e
 lsl()
 {
   local obj="$1"
-  
+
   while ! size=$(ils -l "$obj" | awk '{ print $4 }')
   do
     sleep 1
   done
 
-  printf '%d %s\n' "$size" "$obj" 
+  printf '%d %s\n' "$size" "$obj"
 }
 export -f lsl
 
@@ -40,14 +43,14 @@ split_out_class()
 }
 
 
-rm --force "$Log".*
+rm --force "$LOG_BASE".*
 
 readonly ErrorsFile=$(mktemp)
 readonly ReplErrorsFile=$(mktemp)
 
 touch "$ErrorsFile" "$ReplErrorsFile"
 
-sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' "$Log" | sort > "$ErrorsFile"
+sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' | sort > "$ErrorsFile"
 
 readonly ErrCnt=$(cat "$ErrorsFile" | wc --lines)
 readonly CntWid=${#ErrCnt}
@@ -57,13 +60,13 @@ printf '%*d errors\n' "$CntWid" "$ErrCnt"
 readonly ITCnt=$(split_out_class "$ErrorsFile" \
                                  '^replUtil: invalid repl objType 0 for ' \
                                  '' \
-                                 "$Log".invalid_types)
+                                 "$LOG_BASE".invalid_types)
 printf '%*d invalid object types\n' "$CntWid" "$ITCnt"
 
 readonly SPECnt=$(split_out_class "$ErrorsFile" \
                                   '^replUtil: srcPath \(.*\) does not exist$' \
                                   '\1' \
-                                  "$Log".src_path_errors)
+                                  "$LOG_BASE".src_path_errors)
 printf '%*d source path errors\n' "$CntWid" "$SPECnt"
 
 readonly RCnt=$(split_out_class "$ErrorsFile" '^replUtil: repl error for ' '' "$ReplErrorsFile")
@@ -75,41 +78,41 @@ sort <<< "$ReplErrors" > "$ReplErrorsFile"
 readonly SCLECnt=$(split_out_class "$ReplErrorsFile" \
                                    ', status = -27000 status = -27000 SYS_COPY_LEN_ERR$' \
                                    '' \
-                                   "$Log".short_file)
+                                   "$LOG_BASE".short_file)
 printf '%*d short files\n' "$CntWid" "$SCLECnt"
 
 readonly CRBPCnt=$(split_out_class \
   "$ReplErrorsFile" \
   ', status = -116104 status = -116104 SYS_SOCK_READ_ERR, Connection reset by peer$' \
   '' \
-  "$Log".connection_reset)
+  "$LOG_BASE".connection_reset)
 printf '%*d connections reset\n' "$CntWid" "$CRBPCnt"
 
 readonly UCMCnt=$(split_out_class "$ReplErrorsFile" \
                                   ', status = -314000 status = -314000 USER_CHKSUM_MISMATCH$' \
                                   '' \
-                                  "$Log".chksum_mismatches)
+                                  "$LOG_BASE".chksum_mismatches)
 printf '%*d checksum mismatches\n' "$CntWid" "$UCMCnt"
 
 readonly UFOECnt=$(split_out_class \
   "$ReplErrorsFile" \
   ', status = -510002 status = -510002 UNIX_FILE_OPEN_ERR, No such file or directory$' \
   '' \
-  "$Log".missing_file)
+  "$LOG_BASE".missing_file)
 printf '%*d file open errors\n' "$CntWid" "$UFOECnt"
 
 printf '%*d unclassified replication errors\n' "$CntWid" $(cat "$ReplErrorsFile" | wc --lines)
 
 if [ -s "$ReplErrorsFile" ]
 then
-  mv "$ReplErrorsFile" "$Log".unclassified_repl_errors
+  mv "$ReplErrorsFile" "$LOG_BASE".unclassified_repl_errors
 fi
 
 printf '%*d unclassified errors\n' "$CntWid" $(cat "$ErrorsFile" | wc --lines)
 
 if [ -s "$ErrorsFile" ]
 then
-  mv "$ErrorsFile" "$Log".unclassified_errors
+  mv "$ErrorsFile" "$LOG_BASE".unclassified_errors
 fi
 
-rm --force "$ErrorsFile" "$ReplErrorsFile" 
+rm --force "$ErrorsFile" "$ReplErrorsFile"
