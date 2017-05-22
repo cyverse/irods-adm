@@ -43,8 +43,6 @@ split_out_class()
 }
 
 
-rm --force "$LOG_BASE".*
-
 readonly ErrorsFile=$(mktemp)
 readonly ReplErrorsFile=$(mktemp)
 
