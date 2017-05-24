@@ -2,14 +2,14 @@
 
 set -e
 
-readonly ExecName=$(basename $0)
+readonly EXEC_NAME=$(basename $0)
 
 
 print_help()
 {
 cat <<EOF
 Usage:
- $ExecName [options]
+ $EXEC_NAME [options]
 
 Generates a report on the data objects that need to be replicated. It lists the
 number of unreplicated data objects and their volume broken down by the storage
@@ -26,7 +26,7 @@ EOF
 }
 
 
-if ! opts=$(getopt --name "$ExecName" --options hH:p: --longoptions help,host:,port: -- "$@")
+if ! opts=$(getopt --name "$EXEC_NAME" --options hH:p: --longoptions help,host:,port: -- "$@")
 then
   printf '\n' >&2
   print_help >&2
