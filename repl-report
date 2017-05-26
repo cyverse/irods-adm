@@ -3,11 +3,14 @@
 set -e
 
 readonly EXEC_NAME=$(basename $0)
+readonly VERSION=1
 
 
 print_help()
 {
 cat <<EOF
+$EXEC_NAME version $VERSION
+
 Usage:
  $EXEC_NAME [options]
 
@@ -21,19 +24,32 @@ Options:
  -p, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
                     instead of the PostgreSQL default
 
- -h, --help  display help text and exit
+ -h, --help     display help text and exit
+ -v, --version  display version and exit
 EOF
 }
 
 
-if ! opts=$(getopt --name "$EXEC_NAME" --options hH:p: --longoptions help,host:,port: -- "$@")
+print_version()
+{
+  printf '%s\n' "$VERSION"
+}
+
+
+readonly Opts=$(getopt --name "$EXEC_NAME" \
+                       --options hH:p:v \
+                       --longoptions help,host:,port:,version \
+                       -- \
+                       "$@")
+
+if [ "$?" -ne 0 ]
 then
   printf '\n' >&2
   print_help >&2
   exit 1
 fi
 
-eval set -- "$opts"
+eval set -- "$Opts"
 
 while true
 do
@@ -49,6 +65,10 @@ do
     -p|--port)
       readonly PortArg="--port $2"
       shift 2
+      ;;
+    -v|--version)
+      print_version
+      exit 0
       ;;
     --)
       shift
