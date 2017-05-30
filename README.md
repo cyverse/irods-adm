@@ -7,7 +7,7 @@ A session is a group of log messages that occured during a single connection.
 
 ### Grouping a log by session
 
-The awk script `group-log-by-pid.awk` can be used to group a sequence of log messages by the 
+The awk script `group-log-by-pid.awk` can be used to group a sequence of log messages by the
 connection that generated them.
 
 ### Dumping all of the errors on the IES and CyVerse resource servers
@@ -40,5 +40,4 @@ The bash script `histgram.sh` can be used to generate a histogram of file sizes.
 
 ## Generating a report on data objects that need to be replicated
 
-The bash script `repl-report.sh` can be used to generate a report on the number and volume of data objects that need to be replicated.
-
+The bash script `repl-report` can be used to generate a report on the number and volume of data objects that need to be replicated.
