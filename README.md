@@ -41,3 +41,7 @@ The bash script `histgram.sh` can be used to generate a histogram of file sizes.
 ## Generating a report on data objects that need to be replicated
 
 The bash script `repl-report` can be used to generate a report on the number and volume of data objects that need to be replicated.
+
+## Listing all root resources
+
+The bash script `resc-create-times` lists all of the root resources sorted by creation time.
