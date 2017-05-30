@@ -8,7 +8,7 @@ readonly VERSION=1
 
 print_help()
 {
-cat <<EOF
+cat << EOF
 $EXEC_NAME version $VERSION
 
 Usage:
