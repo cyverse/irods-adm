@@ -41,3 +41,5 @@ The bash script `fix-file-size.sh` can be used to set the sizes of a group of da
 The program `repl-report` can be used to generate a report on the number and volume of data objects that need to be replicated.
 
 The program `repl` can be used to replicate data objects to the taccCorralRes resource.
+
+The program `classify-repl-errors` take the output of `repl` and group the errors by type.
