@@ -122,10 +122,6 @@ then
   fi
 fi
 
-# Redirect stdout to FD 3 to use as a logging channel
-readonly LOG=3
-eval "exec $LOG>&1"
-
 
 check_time()
 {
@@ -144,7 +140,7 @@ repl_batch()
     exit 1
   fi
 
-  irepl -B -M -v -R taccCorralRes "$@"
+  irepl -B -M -v -R taccCorralRes "$@" 2>&1
 
 # XXX: Trying to figure out the irepl error code for when irepl logs a
 # '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably
@@ -155,7 +151,7 @@ repl_batch()
   local replStatus="$?"
   if [ "$replStatus" -ne 0 ]
   then
-    printf 'repl: irepl exited with status %d\n' "$replStatus" >&2
+    printf 'ERROR: irepl exited with status %d\n' "$replStatus"
   fi
 
   exit 0
@@ -179,7 +175,6 @@ finish()
   fi
 
   rm --force "$objList"
-  eval "exec 1>&$LOG $LOG>&-"
 }
 
 
@@ -232,43 +227,14 @@ partition()
 }
 
 
-track_prog()
-{
-  local cnt="$1"
-  local tot="$2"
-  local subTot="$3"
-
-  local subCnt=0
-  local msg=
-
-  while read -r
-  do
-    ((++subCnt))
-    ((++cnt))
-    printf '\r%*s\r' "${#msg}" '' >&2
-    printf -v msg \
-           'cohort: %0*d/%d, all: %0*d/%d' \
-           "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot"
-    update_progress "$msg"
-  done
-
-  update_progress '\r%*s\rcohort: %0*d/%d, all: %0*d/%d\n' \
-                  "${#msg}" '' "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot"
-
-  printf '%s' "$cnt"
-}
-
-
 select_cohort()
 {
-  local cnt="$1"
-  local tot="$2"
-  local maxProcs="$3"
-  local minThreads="$4"
+  local maxProcs="$1"
+  local minThreads="$2"
 
-  if [ "$#" -ge 5 ]
+  if [ "$#" -ge 3 ]
   then
-    local maxThreads="$5"
+    local maxThreads="$3"
   fi
 
   if ! check_time
@@ -276,6 +242,7 @@ select_cohort()
     exit 0
   fi
 
+  local maxArgs=$((2 * ((maxProcs ** 2))))
   local minSizeMiB=$((minThreads * 32))
   local minSizeB=$((minSizeMiB * ((1024 ** 2))))
   local cohortList=$(tempfile)
@@ -290,28 +257,30 @@ select_cohort()
     partition "$minSizeB"
   fi > "$cohortList"
 
-  local subTotal=$(count <"$cohortList")
+  local subTotal=$(count < "$cohortList")
+
+  local numBatches=$((subTotal / maxArgs))
+  if [ $((subTotal % maxArgs)) -ne 0 ]
+  then
+    ((numBatches++))
+  fi
 
   if [ -n "$maxSizeMiB" ]
   then
-    update_progress 'Replicating %s files with size in [%s, %s) MiB\n' \
-                    "$subTotal" "$minSizeMiB" "$maxSizeMiB"
+    update_progress 'Replicating %s files (%s batches) with size in [%s, %s) MiB\n' \
+                    "$subTotal" "$numBatches" "$minSizeMiB" "$maxSizeMiB"
   else
-    update_progress 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB"
+    update_progress 'Replicating %s files (%s batches) with size >= %s MiB\n' \
+                    "$subTotal" "$numBatches" "$minSizeMiB"
   fi
 
   if [ "$subTotal" -gt 0 ]
   then
-    local maxArgs=$((2 * ((maxProcs ** 2))))
     maxProcs=$((maxProcs * PROC_MULT))
 
-    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" repl_batch \
-        < "$cohortList" \
-        2>&"$LOG" \
-        | tee >(cat >&"$LOG") \
-        | track_prog "$cnt" "$tot" "$subTotal"
-  else
-    printf '%s\n' "$cnt"
+    parallel --eta --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+        repl_batch \
+      < "$cohortList"
   fi
 
   rm --force "$cohortList"
@@ -374,12 +343,11 @@ update_progress '%d data objects to replicate\n' "$Tot"
 
 if [ "$Tot" -gt 0 ]
 then
-  cnt=0
-  cnt=$(select_cohort "$cnt" "$Tot"  16   0  1 < "$ObjectList")  # 16 1-threaded transfers
-  cnt=$(select_cohort "$cnt" "$Tot"   8   1  2 < "$ObjectList")  # 8 2-threaded
-  cnt=$(select_cohort "$cnt" "$Tot"   6   2  3 < "$ObjectList")  # 6 3-threaded
-  cnt=$(select_cohort "$cnt" "$Tot"   4   3  5 < "$ObjectList")  # 4 4--5-threaded
-  cnt=$(select_cohort "$cnt" "$Tot"   3   5  7 < "$ObjectList")  # 3 6--7-threaded
-  cnt=$(select_cohort "$cnt" "$Tot"   2   7 15 < "$ObjectList")  # 2 8--15-threaded
-  cnt=$(select_cohort "$cnt" "$Tot"   1  15    < "$ObjectList")  # 1 16-threaded
+  select_cohort 16  0  1 < "$ObjectList"  # 16 1 threaded transfers
+  select_cohort  8  1  2 < "$ObjectList"  # 8 2 threaded
+  select_cohort  6  2  3 < "$ObjectList"  # 6 3 threaded
+  select_cohort  4  3  5 < "$ObjectList"  # 4 4-5 threaded
+  select_cohort  3  5  7 < "$ObjectList"  # 3 6-7 threaded
+  select_cohort  2  7 15 < "$ObjectList"  # 2 8-15 threaded
+  select_cohort  1 15    < "$ObjectList"  # 1 16 threaded
 fi
