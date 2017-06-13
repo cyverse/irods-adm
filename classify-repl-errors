@@ -1,11 +1,66 @@
 #! /bin/bash
 
+set -e
+
 readonly EXEC_NAME=$(basename $0)
 readonly VERSION=1
 
-readonly LOG_BASE="$1"
 
-set -e
+show_help()
+{
+  cat << EOF
+$EXEC_NAME version $VERSION
+
+Usage:
+ $EXEC_NAME <class_base>
+
+Reads the output of the \`repl\` command and groups the data objects that failed
+to replicate into different files based on the error that occurred.
+
+Parameters:
+ <class_base>  the common basename of the files that hold the groups of data
+               objects
+
+Summary:
+
+The program reads the output of the \`repl\` command from standard in. It groups
+the data objects that failed to replicate into different files based on the
+error that occurred. Here's a breakdown of what each output file holds.
+
+ <class_base>.invalid_types  holds the paths to data objects that caused \`irepl\`
+ to generate "invalid repl objType 0" errors.
+
+ <class_base>.src_path_errors holds the paths to data objects that have paths
+ that cause \`irepl\` problems.
+
+ <class_base>.short_file holds the paths to data objects having sizes larger
+ than their respective physical files' sizes.
+
+ <class_base>.connection_reset holds the paths to data objects where the
+ connections were reset during the replication.
+
+ <class_base>.chksum_mismatches holds the paths to data objects with checksums
+ that differ from the checksums of their respective physical files.
+
+ <class_base>.missing_file holds the paths to data objects that are missing
+ their physical files.
+
+<class_base>.unclassified_repl_errors holds the log messages for replication
+related errors that couldn't be classified.
+
+<class_base>.unclassified_errors holds the full log messages for errors that
+couldn't be classified at all.
+EOF
+}
+
+
+if [ "$#" -lt 1 ]
+then
+  show_help >&2
+  exit 1
+fi
+
+readonly LOG_BASE="$1"
 
 
 lsl()
