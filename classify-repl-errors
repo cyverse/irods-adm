@@ -9,10 +9,11 @@ readonly VERSION=1
 show_help()
 {
   cat << EOF
+
 $EXEC_NAME version $VERSION
 
 Usage:
- $EXEC_NAME <class_base>
+ $EXEC_NAME [options] <class_base>
 
 Reads the output of the \`repl\` command and groups the data objects that failed
 to replicate into different files based on the error that occurred.
@@ -20,6 +21,10 @@ to replicate into different files based on the error that occurred.
 Parameters:
  <class_base>  the common basename of the files that hold the groups of data
                objects
+
+Options:
+ -h, --help     show help and exit
+ -v, --version  show verion and exit
 
 Summary:
 
@@ -54,10 +59,50 @@ EOF
 }
 
 
-if [ "$#" -lt 1 ]
-then
+show_version()
+{
+  printf '%s\n' "$VERSION"
+}
+
+
+exit_with_help()
+{
   show_help >&2
   exit 1
+}
+
+
+if ! readonly Opts=$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")
+then
+  exit_with_help
+fi
+
+eval set -- "$Opts"
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      exit_with_help
+      ;;
+  esac
+done
+
+if [ "$#" -lt 1 ]
+then
+  exit_with_help
 fi
 
 readonly LOG_BASE="$1"
