@@ -6,9 +6,10 @@ readonly EXEC_NAME=$(basename $0)
 readonly VERSION=1
 
 
-print_help()
+show_help()
 {
 cat << EOF
+
 $EXEC_NAME version $VERSION
 
 Usage:
@@ -30,7 +31,7 @@ EOF
 }
 
 
-print_version()
+show_version()
 {
   printf '%s\n' "$VERSION"
 }
@@ -44,8 +45,7 @@ readonly Opts=$(getopt --name "$EXEC_NAME" \
 
 if [ "$?" -ne 0 ]
 then
-  printf '\n' >&2
-  print_help >&2
+  show_help >&2
   exit 1
 fi
 
@@ -55,7 +55,7 @@ while true
 do
   case "$1" in
     -h|--help)
-      print_help
+      show_help
       exit 0
       ;;
     -H|--host)
@@ -67,7 +67,7 @@ do
       shift 2
       ;;
     -v|--version)
-      print_version
+      show_version
       exit 0
       ;;
     --)
@@ -75,8 +75,7 @@ do
       break
       ;;
     *)
-      printf '\n' >&2
-      print_help >&2
+      show_help >&2
       exit 1
       ;;
   esac

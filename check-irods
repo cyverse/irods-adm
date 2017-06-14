@@ -7,28 +7,31 @@ readonly VERSION=2
 show_help()
 {
   cat << EOF
+
+$EXEC_NAME version $VERSION
+
 Usage:
   $EXEC_NAME [options] <client> ...
 
-This script will check that an iRODS grid is reachable from various places on 
+This script will check that an iRODS grid is reachable from various places on
 the Internet.
 
 Parameters:
  <client>  the host name or IP address of a computer to use to connect to iRODS
 
 Options:
- -l, --log-dir <directory>  the directory where the status logs are to be 
+ -l, --log-dir <directory>  the directory where the status logs are to be
                             written (default is current working directory)
- 
+
  -h, --help     display help text and exit
  -v, --version  display version and exit
 
 Summary:
 
-Given a list of hosts, this script will check that the IES and each of the 
+Given a list of hosts, this script will check that the IES and each of the
 resources in the corresponding zone can be accessed. The script assumes that the
-account on the remote host is configured to use the desired iRODS grid. It will 
-make an ilsresc request to check that the IES is reachable. Then it will upload 
+account on the remote host is configured to use the desired iRODS grid. It will
+make an ilsresc request to check that the IES is reachable. Then it will upload
 a 64 MiB to each of the resources in the ilsresc response.
 
 Prerequisites:
@@ -39,7 +42,7 @@ Prerequisites:
    - date
    - sort
    - ssh
- 
+
  2. Each remote host will need the following software installed.
 
    - bash
@@ -50,17 +53,17 @@ Prerequisites:
    - sed
    - sort
    - timeout
-   - wc 
+   - wc
 
- 3. Each remote host will need to have an account configured to use the desired 
-    iRODS grid with iCommands by default. Also the account must already be 
-    authenticated with iRODS. In other words, calling an iCommand will act on 
+ 3. Each remote host will need to have an account configured to use the desired
+    iRODS grid with iCommands by default. Also the account must already be
+    authenticated with iRODS. In other words, calling an iCommand will act on
     the desired grid without prompting for a password.
 
- 4. ssh on the account on the local host must be configured to connect to each 
-    remote host as the correct user by default. Furthermore, it should be 
+ 4. ssh on the account on the local host must be configured to connect to each
+    remote host as the correct user by default. Furthermore, it should be
     configured so that ssh can connect to each remote host without prompting for
-    a password. 
+    a password.
 EOF
 }
 
@@ -72,15 +75,16 @@ show_version()
 }
 
 
-if ! opts=$(getopt --name "$EXEC_NAME" --options d:hv --longoptions directory:,help,version -- "$@")
+readonly Opts=$(getopt --name "$EXEC_NAME" --options d:hv --longoptions directory:,help,version -- \
+                       "$@")
+
+if [ "$?" -ne 0 ]
 then
-  printf '\n' >&2
   show_help >&2
   exit 1
 fi
 
-eval set -- "$opts"
-
+eval set -- "$Opts"
 
 while true
 do
@@ -101,7 +105,6 @@ do
       break
       ;;
     *)
-      printf '\n' >&2
       show_help >&2
       exit 1
       ;;
@@ -122,7 +125,7 @@ check_from_client()
 {
   local client="$1"
 
-  ssh -q "$client" bash << 'EOF' 
+  ssh -q "$client" bash << 'EOF'
 readonly TEST_FILE_SIZE=$((64 * 1024 * 1024))
 
 
@@ -133,14 +136,14 @@ display_errors()
   while IFS= read -r
   do
     if [ -n "$REPLY" ]
-    then 
+    then
       printf '(%s) %s\n' "$resource" "$REPLY" >&2
     fi
   done
 }
 
 
-log_status() 
+log_status()
 {
   local system="$1"
   local status="$2"
@@ -164,7 +167,7 @@ test_resource()
       then
         continue
       fi
-      
+
       printf '%s\n' "$resp" >&2
       log_status "$resource" fail
     else
@@ -186,7 +189,7 @@ if ! trap "rm --force '$testFile'" EXIT
 then
   log_status '*' error
   exit 1
-fi  
+fi
 
 if ! truncate --size "$TEST_FILE_SIZE" "$testFile"
 then
@@ -209,7 +212,7 @@ do
   resources+=("$REPLY")
 done < <(sed --quiet 's/^\([A-Za-z][^:]*\).*/\1/p' <<< "$lsrescResp")
 
-for resource in "${resources[@]}" 
+for resource in "${resources[@]}"
 do
   test_resource "$resource" "$testFile" 2> >(display_errors "$resource") &
 done | sort --ignore-case --key 1
@@ -240,7 +243,7 @@ log_statuses()
   while read -r system status
   do
     printf '%s\t%s\t%s\t%s\n' "$logTime" "$client" "$system" "$status"
-  done 
+  done
 }
 
 
@@ -265,4 +268,4 @@ fi
 for client in "${CLIENTS[@]}"
 do
   check_from_client "$client" 1> >(log_statuses "$client") 2> >(display_errors "$client") &
-done | sort --ignore-case --stable --key 2,2 >> "$Log" 
+done | sort --ignore-case --stable --key 2,2 >> "$Log"

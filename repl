@@ -9,6 +9,7 @@ readonly VERSION=2
 show_help()
 {
   cat << EOF
+
 $EXEC_NAME version $VERSION
 
 Usage:
@@ -65,7 +66,6 @@ readonly Opts=$(getopt --name "$EXEC_NAME" \
 
 if [ "$?" -ne 0 ]
 then
-  printf '\n' >&2
   exit_with_help
 fi
 
