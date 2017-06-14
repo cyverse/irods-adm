@@ -1,7 +1,7 @@
 #! /bin/bash
 
 readonly EXEC_NAME=($basename "$0")
-readonly VERSION=1
+readonly VERSION=2
 
 show_help()
 {
@@ -9,30 +9,31 @@ show_help()
 $EXEC_NAME - version $VERSION
 
 Usage:
- $EXEC_NAME [options] <bad size log> <bad checksum log>
+ $EXEC_NAME [options] <class_base>
 
 checks data object replicas for correct sizes and checksums
 
 Parameters:
- <bad size log>      a file where the replicas with incorrect sizes are appended
- <bad checksum log>  a file where the replicas with incorrect checksums are 
-                     appended
+ <class_base>  the common basename of the files that hold the data objects with
+               incorrect checksums or sizes
 
 Options:
- -j, --jobs <n>  perform <n> checks simultaneously, default is the number of 
+ -j, --jobs <n>  perform <n> checks simultaneously, default is the number of
                  CPUs
 
  -h, --help     display help text and exit
  -v, --version  display version and exit
 
 Summary:
-The script reads a list of iRODS data object paths from standard in, one per 
-line, and checks to see if any of the replicas have an incorrect checksum or 
-size. The ones with incorrect sizes are appended to the file <bad size log>. The 
-ones with incorrect checksums are appended to the file <bad checksum log>. In
-either case, only one log entry will be logged per line.
+The script reads a list of iRODS data object paths from standard in, one per
+line, and checks to see if any of the replicas have an incorrect checksum or
+size. The ones with incorrect sizes are appended to the file
+<class_base>.bad_size. The ones with incorrect checksums are appended to the
+file <class_base>.bad_chksum. In either case, only one log entry will be logged
+per line. If an error occurs while checking a replica, the error is written to
+<class_base>.errors.
 
-Each log entry has the following form.
+Non error log entries have the following form.
 
 <rescource hierarchy> <data object path>
 EOF
@@ -85,26 +86,26 @@ do
   esac
 done
 
-if [ "$#" -lt 2 ]
+if [ "$#" -lt 1 ]
 then
   exit_with_help
 fi
 
-readonly BAD_SIZE_LOG="$1"
-readonly BAD_CHECKSUM_LOG="$2"
-
+readonly CLASS_BASE="$1"
 readonly EXEC_DIR=$(dirname "$0")
+
+export ERR_LOG="$CLASS_BASE".errors
 
 
 check_obj()
 {
   local objPath="$1"
-  
+
   while read -r rescHier storeHost filePath
   do
     reason=
-    resp=$(ssh -q "$storeHost" ifsck -K \"$filePath\")
-    
+    resp=$(ssh -q "$storeHost" ifsck -K \"$filePath\" 2>> "$ERR_LOG")
+
     if [[ "$resp" =~ size\.$ ]]
     then
       reason=size
@@ -130,9 +131,10 @@ log()
 
     if [ "$reason" = size ]
     then
-      printf '%s' "$entry" >> "$BAD_SIZE_LOG"
-    else
-      printf '%s' "$entry" >> "$BAD_CHECKSUM_LOG"
+      printf '%s' "$entry" >> "$CLASS_BASE".bad_size
+    elif [ "$reason" = chksum ]
+    then
+      printf '%s' "$entry" >> "$CLASS_BASE".bad_chksum
     fi
   done
 }
