@@ -167,11 +167,8 @@ readonly SPECnt=$(split_out_class "$ErrorsFile" \
                                   "$LOG_BASE".src_path_errors)
 printf '%*d source path errors\n' "$CntWid" "$SPECnt"
 
-readonly RCnt=$(split_out_class "$ErrorsFile" '^replUtil: repl error for ' '' "$ReplErrorsFile")
-printf '%*d replication errors\n' "$CntWid" "$RCnt"
-
-readonly ReplErrors=$(cat "$ReplErrorsFile")
-sort <<< "$ReplErrors" > "$ReplErrorsFile"
+split_out_class "$ErrorsFile" '^replUtil: repl error for ' '' "$ReplErrorsFile" > /dev/null
+sort --output "$ReplErrorsFile" "$ReplErrorsFile"
 
 readonly SCLECnt=$(split_out_class "$ReplErrorsFile" \
                                    ', status = -27000 status = -27000 SYS_COPY_LEN_ERR$' \
