@@ -7,24 +7,27 @@ readonly VERSION=1
 show_help()
 {
   cat <<EOF
+
 $EXEC_NAME version $VERSION
-  
+
 Usage:
  $EXEC_NAME [options]
 
 Updates the ICAT size information for the replicas of a set of data objects
 
 Options:
- -h, --help  show help and exit
+ -j, --jobs  the number of fixes to perform simultaneously
+
+ -h, --help     show help and exit
+ -v, --version  show version and exit
 
 Summary:
 It reads a list of data object paths, one per line, from standard in. For each
-replica, it updates the ICAT size information based on the size of the 
+replica, it updates the ICAT size information based on the size of the
 corresponding file in storage.  No object name may have a carriage return in its
-path. The user must be initialized with iRODS as an admin user. Finally, the 
-user must have passwordless access to the root account on the relevant storage 
-resources. It writes the path of the data object currently being processed to
-standard out.
+path. The user must be initialized with iRODS as an admin user. Finally, the
+user must have passwordless access to the root account on the relevant storage
+resources.
 EOF
 }
 
@@ -35,7 +38,7 @@ show_version()
 }
 
 
-if ! opts=$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")
+if ! opts=$(getopt --name "$EXEC_NAME" --options hj:v --longoptions help,jobs:,version -- "$@")
 then
   printf '\n' >&2
   show_help >&2
@@ -50,6 +53,10 @@ do
     -h|--help)
       show_help
       exit 0
+      ;;
+    -j|--jobs)
+      readonly JOBS="$2"
+      shift 2
       ;;
     -v|--version)
       show_version
@@ -68,14 +75,17 @@ done
 
 readonly EXEC_DIR=$(dirname "$0")
 
-while IFS= read -r objPath
-do
+
+fix()
+{
+  local objPath="$1"
+
   printf '%s\n' "$objPath"
 
   while read -r rescHier storeHost filePath
   do
-    coordResc="${rescHier%%;*}"
-    tmp="$filePath".tmp
+    local coordResc="${rescHier%%;*}"
+    local tmp="$filePath".tmp
 
     ssh -q "$storeHost" \
         mv --no-clobber \"$filePath\" \"$tmp\" \&\& \
@@ -83,4 +93,16 @@ do
         \(irsync -K -s -v -R \"$coordResc\" \"$tmp\" \"i:$objPath\"\; mv \"$tmp\" \"$filePath\"\) \
       < /dev/null
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
-done
+}
+export -f fix
+
+
+if [ -n "$JOBS" ]
+then
+  readonly JobsOpt="-j$JOBS"
+else
+  readonly JobsOpt=
+fi
+
+
+parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" fix > /dev/null
