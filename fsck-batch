@@ -132,7 +132,7 @@ log()
     if [ "$reason" = size ]
     then
       printf '%s' "$entry" >> "$CLASS_BASE".bad_size
-    elif [ "$reason" = chksum ]
+    elif [ "$reason" = checksum ]
     then
       printf '%s' "$entry" >> "$CLASS_BASE".bad_chksum
     fi
