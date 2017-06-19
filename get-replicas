@@ -22,19 +22,19 @@ Parameters:
 Options:
  -h, --help     show help and exit
  -v, --version  show version and exit
-  
+
 Summary:
 For each replica of the data object, it returns the resource hierarchy path to
-the storage resource holding the file, the host name of the resource server 
-serving the storage resource, and the path to the file. For each replica, it 
+the storage resource holding the file, the host name of the resource server
+serving the storage resource, and the path to the file. For each replica, it
 writes this information to standard out with the following format with one line
 per replica.
 
-<resource hierarchy> <resource server> <file> 
+<resource hierarchy> <resource server> <file>
 
 Prerequisites:
- 1) The data object may not have a carriage return in its path. 
- 2) The user must be initialized with iRODS as an admin user. 
+ 1) The data object may not have a carriage return in its path.
+ 2) The user must be initialized with iRODS as an admin user.
 EOF
 }
 
@@ -98,10 +98,10 @@ ask_irods()
 
   local resp=$(iquest --no-page \
                  '%s %s %s' \
-                 "SELECT DATA_ID, DATA_RESC_HIER, DATA_PATH 
+                 "SELECT DATA_ID, DATA_RESC_HIER, DATA_PATH
                   WHERE COLL_NAME = '$collPath' AND DATA_NAME = '$objName'")
 
-  if [ "$resp" = 'CAT_NO_ROWS_FOUND: Nothing was found matching your query' ]
+  if [ "$?" -ne 0 ] || [ "$resp" = 'CAT_NO_ROWS_FOUND: Nothing was found matching your query' ]
   then
     printf 'invalid data object: %s\n' "$OBJ_PATH" >&2
   else
@@ -115,4 +115,4 @@ do
   storeResc="${rescHier##*;}"
   storeHost=$(iquest '%s' "SELECT RESC_LOC WHERE RESC_NAME = '$storeResc'")
   printf '%s %s %s\n' "$rescHier" "$storeHost" "$filePath"
-done < <(ask_irods) 
+done < <(ask_irods)
