@@ -7,8 +7,7 @@ A collection of scripts for administering an iRODS grid
 
 A session is a group of log messages that occured during a single connection.
 
-The awk script `group-log-by-pid.awk` can be used to group a sequence of log messages by the
-connection that generated them.
+The awk script `group-log-by-pid.awk` can be used to group a sequence of log messages by the connection that generated them.
 
 The bash script `dump-logs.sh` can be used to dump all of the sessions with errors from the CyVerse portion of the CyVerse grid.
 
@@ -33,7 +32,7 @@ The bash script `histgram.sh` can be used to generate a histogram of file sizes.
 
 ## Synchronizing data object and file sizes
 
-The bash script `fix-file-size.sh` can be used to set the sizes of a group of data objects with the sizes of their respective files.
+The program `fix-file-size` can be used to set the sizes of a group of data objects with the sizes of their respective files.
 
 
 ## Replication
