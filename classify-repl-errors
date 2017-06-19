@@ -133,7 +133,9 @@ readonly ErrorsFile=$(mktemp)
 readonly ReplErrorsFile=$(mktemp)
 trap "rm --force '$ErrorsFile' '$ReplErrorsFile'" EXIT
 
-sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' | sort > "$ErrorsFile"
+sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
+  | sed '/connectToRhost: readVersion to data.cyverse.org failed, msg=/d' \
+  | sort > "$ErrorsFile"
 
 readonly ErrCnt=$(cat "$ErrorsFile" | wc --lines)
 readonly CntWid=${#ErrCnt}
