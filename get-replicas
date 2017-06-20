@@ -113,6 +113,11 @@ ask_irods()
 while read -r rescHier filePath
 do
   storeResc="${rescHier##*;}"
-  storeHost=$(iquest '%s' "SELECT RESC_LOC WHERE RESC_NAME = '$storeResc'")
-  printf '%s %s %s\n' "$rescHier" "$storeHost" "$filePath"
+
+  if ! storeHost=$(iquest '%s' "SELECT RESC_LOC WHERE RESC_NAME = '$storeResc'")
+  then
+    printf 'Failed to retrieve location for resource %s\n' "$storeResc" >&2
+  else
+    printf '%s %s %s\n' "$rescHier" "$storeHost" "$filePath"
+  fi
 done < <(ask_irods)
