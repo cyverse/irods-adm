@@ -38,6 +38,8 @@ show_version()
 }
 
 
+set -e
+
 if ! opts=$(getopt --name "$EXEC_NAME" --options hj:v --longoptions help,jobs:,version -- "$@")
 then
   printf '\n' >&2
