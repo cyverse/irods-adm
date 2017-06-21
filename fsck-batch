@@ -104,7 +104,10 @@ check_obj()
   while read -r rescHier storeHost filePath
   do
     reason=
-    resp=$(ssh -q "$storeHost" ifsck -K \"$filePath\" 2>> "$ERR_LOG")
+
+    fileDir=$(dirname "$filePath")
+    fileName=$(basename "$filePath")
+    resp=$(ssh -q "$storeHost" cd \'$fileDir\' \&\& ifsck -K \'$fileName\' 2>> "$ERR_LOG")
 
     if [[ "$resp" =~ size\.$ ]]
     then
