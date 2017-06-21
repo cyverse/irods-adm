@@ -75,7 +75,7 @@ do
   esac
 done
 
-readonly EXEC_DIR=$(dirname $(readlink "$0"))
+export EXEC_DIR=$(dirname $(readlink -f "$0"))
 
 
 fix()
