@@ -75,7 +75,7 @@ do
   esac
 done
 
-readonly EXEC_DIR=$(dirname "$0")
+readonly EXEC_DIR=$(dirname $(readlink "$0"))
 
 
 fix()
