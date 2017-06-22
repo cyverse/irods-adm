@@ -1,19 +1,17 @@
 #! /bin/bash
 
-set -e
-
-readonly EXEC_NAME=$(basename $0)
-readonly VERSION=1
+readonly ExecName=$(basename $0)
+readonly Version=1
 
 
 show_help()
 {
-cat << EOF
+cat <<EOF
 
-$EXEC_NAME version $VERSION
+$ExecName version $Version
 
 Usage:
- $EXEC_NAME [options]
+ $ExecName [options]
 
 Generates a report on the data objects that need to be replicated. It lists the
 number of unreplicated data objects and their volume broken down by the storage
@@ -33,11 +31,13 @@ EOF
 
 show_version()
 {
-  printf '%s\n' "$VERSION"
+  printf '%s\n' "$Version"
 }
 
 
-readonly Opts=$(getopt --name "$EXEC_NAME" \
+set -e
+
+readonly Opts=$(getopt --name "$ExecName" \
                        --options hH:p:v \
                        --longoptions help,host:,port:,version \
                        -- \
@@ -81,7 +81,7 @@ do
   esac
 done
 
-psql $HostArg $PortArg ICAT icat_reader << EOSQL
+psql $HostArg $PortArg ICAT icat_reader <<EOSQL
 SELECT resc_name AS resource, COUNT(*) AS count, SUM(data_size) / 1024 ^ 4 AS "volume (TiB)"
   FROM r_data_main
   WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))

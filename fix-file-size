@@ -1,17 +1,17 @@
 #! /bin/bash
 
-readonly EXEC_NAME=$(basename "$0")
-readonly VERSION=1
+readonly ExecName=$(basename "$0")
+readonly Version=1
 
 
 show_help()
 {
   cat <<EOF
 
-$EXEC_NAME version $VERSION
+$ExecName version $Version
 
 Usage:
- $EXEC_NAME [options]
+ $ExecName [options]
 
 Updates the ICAT size information for the replicas of a set of data objects
 
@@ -34,13 +34,13 @@ EOF
 
 show_version()
 {
-  printf '%s\n' "$VERSION"
+  printf '%s\n' "$Version"
 }
 
 
 set -e
 
-if ! opts=$(getopt --name "$EXEC_NAME" --options hj:v --longoptions help,jobs:,version -- "$@")
+if ! opts=$(getopt --name "$ExecName" --options hj:v --longoptions help,jobs:,version -- "$@")
 then
   printf '\n' >&2
   show_help >&2
@@ -57,7 +57,7 @@ do
       exit 0
       ;;
     -j|--jobs)
-      readonly JOBS="$2"
+      readonly Jobs="$2"
       shift 2
       ;;
     -v|--version)
@@ -78,7 +78,7 @@ done
 export EXEC_DIR=$(dirname $(readlink -f "$0"))
 
 
-fix()
+FIX()
 {
   local objPath="$1"
 
@@ -96,15 +96,14 @@ fix()
       < /dev/null
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 }
-export -f fix
+export -f FIX
 
 
-if [ -n "$JOBS" ]
+if [ -n "$Jobs" ]
 then
-  readonly JobsOpt="-j$JOBS"
+  readonly JobsOpt="-j$Jobs"
 else
   readonly JobsOpt=
 fi
 
-
-parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" fix > /dev/null
+parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" FIX > /dev/null

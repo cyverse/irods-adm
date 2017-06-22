@@ -1,17 +1,17 @@
 #! /bin/bash
 
-readonly EXEC_NAME=$(basename $0)
-readonly VERSION=1
+readonly ExecName=$(basename $0)
+readonly Version=1
 
 
 show_help()
 {
   cat << EOF
 
-$EXEC_NAME version $VERSION
+$ExecName version $Version
 
 Usage:
- $EXEC_NAME [options] <class_base>
+ $ExecName [options] <class_base>
 
 Reads the output of the \`repl\` command and groups the data objects that failed
 to replicate into different files based on the error that occurred.
@@ -59,7 +59,7 @@ EOF
 
 show_version()
 {
-  printf '%s\n' "$VERSION"
+  printf '%s\n' "$Version"
 }
 
 
@@ -72,12 +72,12 @@ exit_with_help()
 
 set -e
 
-if ! readonly Opts=$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")
+if ! opts=$(getopt --name "$ExecName" --options hv --longoptions help,version -- "$@")
 then
   exit_with_help
 fi
 
-eval set -- "$Opts"
+eval set -- "$opts"
 
 while true
 do
@@ -105,7 +105,7 @@ then
   exit_with_help
 fi
 
-readonly LOG_BASE="$1"
+readonly LogBase="$1"
 
 
 split_out_class()
@@ -145,13 +145,13 @@ printf '%*d errors\n' "$CntWid" "$ErrCnt"
 readonly ITCnt=$(split_out_class "$ErrorsFile" \
                                  '^replUtil: invalid repl objType 0 for ' \
                                  '' \
-                                 "$LOG_BASE".invalid_types)
+                                 "$LogBase".invalid_types)
 printf '%*d invalid object types\n' "$CntWid" "$ITCnt"
 
 readonly SPECnt=$(split_out_class "$ErrorsFile" \
                                   '^replUtil: srcPath \(.*\) does not exist$' \
                                   '\1' \
-                                  "$LOG_BASE".src_path_errors)
+                                  "$LogBase".src_path_errors)
 printf '%*d source path errors\n' "$CntWid" "$SPECnt"
 
 split_out_class "$ErrorsFile" '^replUtil: repl error for ' '' "$ReplErrorsFile" > /dev/null
@@ -160,39 +160,39 @@ sort --output "$ReplErrorsFile" "$ReplErrorsFile"
 readonly SCLECnt=$(split_out_class "$ReplErrorsFile" \
                                    ', status = -27000 status = -27000 SYS_COPY_LEN_ERR$' \
                                    '' \
-                                   "$LOG_BASE".short_file)
+                                   "$LogBase".short_file)
 printf '%*d short files\n' "$CntWid" "$SCLECnt"
 
 readonly CRBPCnt=$(split_out_class \
   "$ReplErrorsFile" \
   ', status = -116104 status = -116104 SYS_SOCK_READ_ERR, Connection reset by peer$' \
   '' \
-  "$LOG_BASE".connection_reset)
+  "$LogBase".connection_reset)
 printf '%*d connections reset\n' "$CntWid" "$CRBPCnt"
 
 readonly UCMCnt=$(split_out_class "$ReplErrorsFile" \
                                   ', status = -314000 status = -314000 USER_CHKSUM_MISMATCH$' \
                                   '' \
-                                  "$LOG_BASE".chksum_mismatches)
+                                  "$LogBase".chksum_mismatches)
 printf '%*d checksum mismatches\n' "$CntWid" "$UCMCnt"
 
 readonly UFOECnt=$(split_out_class \
   "$ReplErrorsFile" \
   ', status = -510002 status = -510002 UNIX_FILE_OPEN_ERR, No such file or directory$' \
   '' \
-  "$LOG_BASE".missing_file)
+  "$LogBase".missing_file)
 printf '%*d file open errors\n' "$CntWid" "$UFOECnt"
 
 printf '%*d unclassified replication errors\n' "$CntWid" $(cat "$ReplErrorsFile" | wc --lines)
 
 if [ -s "$ReplErrorsFile" ]
 then
-  mv "$ReplErrorsFile" "$LOG_BASE".unclassified_repl_errors
+  mv "$ReplErrorsFile" "$LogBase".unclassified_repl_errors
 fi
 
 printf '%*d unclassified errors\n' "$CntWid" $(cat "$ErrorsFile" | wc --lines)
 
 if [ -s "$ErrorsFile" ]
 then
-  mv "$ErrorsFile" "$LOG_BASE".unclassified_errors
+  mv "$ErrorsFile" "$LogBase".unclassified_errors
 fi

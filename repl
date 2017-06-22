@@ -1,19 +1,17 @@
 #! /bin/bash
 
-set -e
-
-readonly EXEC_NAME=$(basename "$0")
-readonly VERSION=2
+readonly ExecName=$(basename "$0")
+readonly Version=2
 
 
 show_help()
 {
-  cat << EOF
+  cat <<EOF
 
-$EXEC_NAME version $VERSION
+$ExecName version $Version
 
 Usage:
- $EXEC_NAME [options]
+ $ExecName [options]
 
 replicates data objects to taccCorralRes
 
@@ -47,7 +45,7 @@ EOF
 
 show_version()
 {
-  printf '%s\n' "$VERSION"
+  printf '%s\n' "$Version"
 }
 
 
@@ -58,7 +56,9 @@ exit_with_help()
 }
 
 
-readonly Opts=$(getopt --name "$EXEC_NAME" \
+set -e
+
+readonly Opts=$(getopt --name "$ExecName" \
                        --options c:hm:r:u:v \
                        --longoptions collection:,help,multiplier:,resource:,until:,version \
                        -- \
@@ -75,7 +75,7 @@ while true
 do
   case "$1" in
     -c|--collection)
-      readonly BASE_COLL="$2"
+      readonly BaseColl="$2"
       shift 2
       ;;
     -h|--help)
@@ -83,15 +83,15 @@ do
       exit 0
       ;;
     -m|--multiplier)
-      readonly PROC_MULT="$2"
+      readonly ProcMult="$2"
       shift 2
       ;;
     -r|--resource)
-      readonly SRC_RES="$2"
+      readonly SrcRes="$2"
       shift 2
       ;;
     -u|--until)
-      readonly UNTIL="$2"
+      readonly Until="$2"
       shift 2
       ;;
     -v|--version)
@@ -108,38 +108,38 @@ do
   esac
 done
 
-if [ -z "$PROC_MULT" ]
+if [ -z "$ProcMult" ]
 then
-  readonly PROC_MULT=1
+  readonly ProcMult=1
 fi
 
-if [ -n "$UNTIL" ]
+if [ -n "$Until" ]
 then
-  if ! export UNTIL_TS=$(date --date="$UNTIL" '+%s')
+  if ! export UNTIL_TS=$(date --date="$Until" '+%s')
   then
-    printf '%s is not a valid date format\n' "$UNTIL"
+    printf '%s is not a valid date format\n' "$Until"
     exit 1
   fi
 fi
 
 # Redirect stdout to FD 3 to use as a logging channel
-readonly LOG=3
-eval "exec $LOG>&1"
+readonly Log=3
+eval "exec $Log>&1"
 
 
-check_time()
+CHECK_TIME()
 {
   if [ -n "$UNTIL_TS" ] && [ $(date '+%s') -ge "$UNTIL_TS" ]
   then
     return 1
   fi
 }
-export -f check_time
+export -f CHECK_TIME
 
 
-repl_batch()
+REPL_BATCH()
 {
-  if ! check_time
+  if ! CHECK_TIME
   then
     exit 1
   fi
@@ -160,7 +160,7 @@ repl_batch()
 
   exit 0
 }
-export -f repl_batch
+export -f REPL_BATCH
 
 
 update_progress()
@@ -173,13 +173,13 @@ finish()
 {
   local objList="$1"
 
-  if ! check_time
+  if ! CHECK_TIME
   then
     update_progress 'out of time\n'
   fi
 
   rm --force "$objList"
-  eval "exec 1>&$LOG $LOG>&-"
+  eval "exec 1>&$Log $Log>&-"
 }
 
 
@@ -271,7 +271,7 @@ select_cohort()
     local maxThreads="$5"
   fi
 
-  if ! check_time
+  if ! CHECK_TIME
   then
     exit 0
   fi
@@ -303,12 +303,12 @@ select_cohort()
   if [ "$subTotal" -gt 0 ]
   then
     local maxArgs=$((2 * ((maxProcs ** 2))))
-    maxProcs=$((maxProcs * PROC_MULT))
+    maxProcs=$((maxProcs * ProcMult))
 
-    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" repl_batch \
+    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" REPL_BATCH \
         < "$cohortList" \
-        2>&"$LOG" \
-        | tee >(cat >&"$LOG") \
+        2>&"$Log" \
+        | tee >(cat >&"$Log") \
         | track_prog "$cnt" "$tot" "$subTotal"
   else
     printf '%s\n' "$cnt"
@@ -334,7 +334,7 @@ then
   exit 1
 fi
 
-if ! check_time
+if ! CHECK_TIME
 then
  printf 'Stop time is in the past\n' >&2
  exit 1
@@ -342,23 +342,23 @@ fi
 
 update_progress 'Retrieving data objects to replicate...\n'
 
-if [ -n "$SRC_RES" ]
+if [ -n "$SrcRes" ]
 then
-  readonly SrcCond="d.resc_name = '$SRC_RES'"
+  readonly SrcCond="d.resc_name = '$SrcRes'"
 else
   readonly SrcCond=TRUE
 fi
 
-if [ -n "$BASE_COLL" ]
+if [ -n "$BaseColl" ]
 then
-  readonly BaseCond="c.coll_name = '$BASE_COLL' OR c.coll_name LIKE '$BASE_COLL/%'"
+  readonly BaseCond="c.coll_name = '$BaseColl' OR c.coll_name LIKE '$BaseColl/%'"
 else
   readonly BaseCond=TRUE
 fi
 
 psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host irods-db3 \
      ICAT icat_reader \
-<< EOSQL > "$ObjectList"
+<<EOSQL > "$ObjectList"
 SELECT d.data_size, c.coll_name || '/' || d.data_name
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
