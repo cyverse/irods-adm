@@ -1,15 +1,17 @@
 #! /bin/bash
 
-readonly EXEC_NAME=($basename "$0")
-readonly VERSION=2
+readonly ExecName=($basename "$0")
+readonly Version=2
+
 
 show_help()
 {
-  cat << EOF
-$EXEC_NAME - version $VERSION
+  cat <<EOF
+
+$ExecName - version $Version
 
 Usage:
- $EXEC_NAME [options] <class_base>
+ $ExecName [options] <class_base>
 
 checks data object replicas for correct sizes and checksums
 
@@ -42,7 +44,7 @@ EOF
 
 show_version()
 {
-  printf '%s\n' "$VERSION"
+  printf '%s\n' "$Version"
 }
 
 
@@ -53,7 +55,9 @@ exit_with_help()
 }
 
 
-if ! opts=$(getopt --name "$EXEC_NAME" --options hj:v --longoptions help,jobs:,version -- "$@")
+set -e
+
+if ! opts=$(getopt --name "$ExecName" --options hj:v --longoptions help,jobs:,version -- "$@")
 then
   printf '\n' >&2
   exit_with_help
@@ -69,7 +73,7 @@ do
       exit 0
       ;;
     -j|--jobs)
-      readonly JOBS="$2"
+      readonly Jobs="$2"
       shift 2
       ;;
     -v|--version)
@@ -91,20 +95,20 @@ then
   exit_with_help
 fi
 
-readonly CLASS_BASE="$1"
-readonly EXEC_DIR=$(dirname "$0")
+readonly ClassBase="$1"
 
-export ERR_LOG="$CLASS_BASE".errors
+export EXEC_DIR=$(dirname "$0")
+export ERR_LOG="$ClassBase".errors
 
 
-check_obj()
+CHECK_OBJ()
 {
   local objPath="$1"
 
   while read -r rescHier storeHost filePath
   do
-    reason=
-    resp=$(ssh -q "$storeHost" ifsck -K \'$filePath\' 2>> "$ERR_LOG")
+    local reason=
+    local resp=$(ssh -q "$storeHost" ifsck -K \'$filePath\' 2>> "$ERR_LOG")
 
     if [[ "$resp" =~ size\.$ ]]
     then
@@ -120,7 +124,7 @@ check_obj()
     fi
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 }
-export -f check_obj
+export -f CHECK_OBJ
 
 
 log()
@@ -131,18 +135,18 @@ log()
 
     if [ "$reason" = size ]
     then
-      printf '%s' "$entry" >> "$CLASS_BASE".bad_size
+      printf '%s' "$entry" >> "$ClassBase".bad_size
     elif [ "$reason" = checksum ]
     then
-      printf '%s' "$entry" >> "$CLASS_BASE".bad_chksum
+      printf '%s' "$entry" >> "$ClassBase".bad_chksum
     fi
   done
 }
 
 
-if [ -n "$JOBS" ]
+if [ -n "$Jobs" ]
 then
-  readonly JobsOpt="-j$JOBS"
+  readonly JobsOpt="-j$Jobs"
 fi
 
-parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" check_obj | log
+parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" CHECK_OBJ | log
