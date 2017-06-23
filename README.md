@@ -32,6 +32,8 @@ The bash script `histgram.sh` can be used to generate a histogram of file sizes.
 
 ## Synchronizing data object and file sizes
 
+The program `fsck-batch` can be used to find data objects that are out of sync with their files.
+
 The program `fix-file-size` can be used to set the sizes of a group of data objects with the sizes of their respective files.
 
 
