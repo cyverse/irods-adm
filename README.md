@@ -43,4 +43,4 @@ The program `repl-report` can be used to generate a report on the number and vol
 
 The program `repl` can be used to replicate data objects to the taccCorralRes resource.
 
-The program `classify-repl-errors` take the output of `repl` and group the errors by type.
+The program `classify-repl-errors` takes the output of `repl` and group the errors by type.
