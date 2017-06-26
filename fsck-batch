@@ -97,7 +97,7 @@ fi
 
 readonly ClassBase="$1"
 
-export EXEC_DIR=$(dirname "$0")
+export EXEC_DIR=$(dirname $(readlink -f "$0"))
 export ERR_LOG="$ClassBase".errors
 
 
