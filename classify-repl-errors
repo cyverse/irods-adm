@@ -36,6 +36,9 @@ error that occurred. Here's a breakdown of what each output file holds.
  <class_base>.src_path_errors holds the paths to data objects that have paths
  that cause \`irepl\` problems.
 
+<class_base>.broken_conn holds the paths to data object where the connection to
+the IES was broken.
+
  <class_base>.short_file holds the paths to data objects having sizes larger
  than their respective physical files' sizes.
 
@@ -156,6 +159,12 @@ printf '%*d source path errors\n' "$CntWid" "$SPECnt"
 
 split_out_class "$ErrorsFile" '^replUtil: repl error for ' '' "$ReplErrorsFile" > /dev/null
 sort --output "$ReplErrorsFile" "$ReplErrorsFile"
+
+readonly SHRLCnt=$(split_out_class "$ReplErrorsFile" \
+                                   ', status = -4000 status = -4000 SYS_HEADER_READ_LEN_ERR$' \
+                                   '' \
+                                   "$LogBase".broken_conn)
+printf '%*d broken connections\n' "$CntWid" "$SHRLCnt"
 
 readonly SCLECnt=$(split_out_class "$ReplErrorsFile" \
                                    ', status = -27000 status = -27000 SYS_COPY_LEN_ERR$' \
