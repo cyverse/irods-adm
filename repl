@@ -144,7 +144,7 @@ REPL_BATCH()
     exit 1
   fi
 
-  irepl -B -M -v -R taccCorralRes "$@"
+  irepl -B -M -T -v -R taccCorralRes "$@"
 
 # XXX: Trying to figure out the irepl error code for when irepl logs a
 # '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably
