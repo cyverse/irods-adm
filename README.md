@@ -37,6 +37,11 @@ The program `fsck-batch` can be used to find data objects that are out of sync w
 The program `fix-file-size` can be used to set the sizes of a group of data objects with the sizes of their respective files.
 
 
+## Moving files to another resource
+
+The program `phymv` can be used to move groups of files from one resource to another more efficiently that `iphymv`.
+
+
 ## Replication
 
 The program `repl-report` can be used to generate a report on the number and volume of data objects that need to be replicated.
