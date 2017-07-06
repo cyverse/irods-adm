@@ -1,15 +1,13 @@
 #! /bin/bash
 
-set -e
-
-readonly EXEC_NAME=$(basename "$0")
+readonly ExecName=$(basename "$0")
 
 
 show_help()
 {
-  cat << EOF
-Usage: 
- $EXEC_NAME [options] <src_resc> <dest_resc> <log_file>
+  cat <<EOF
+Usage:
+ $ExecName [options] <src_resc> <dest_resc> <log_file>
 
 Moves the files from one resource to another. It will not move any file
 associated with a data object that has a replica on the destination resource.
@@ -37,7 +35,10 @@ exit_with_help()
 }
 
 
-readonly Opts=$(getopt --name "$EXEC_NAME" \
+set -e
+
+
+readonly Opts=$(getopt --name "$ExecName" \
                        --options c:hm: \
                        --longoptions collection:,help,multiplier: \
                        -- "$@")
@@ -54,7 +55,7 @@ while true
 do
   case "$1" in
     -c|--collection)
-      readonly BASE_COLL="$2"
+      readonly BaseColl="$2"
       shift 2
       ;;
     -h|--help)
@@ -62,7 +63,7 @@ do
       exit 0
       ;;
     -m|--multiplier)
-      readonly PROC_MULT="$2"
+      readonly ProcMult="$2"
       shift 2
       ;;
     --)
@@ -80,25 +81,25 @@ then
   exit_with_help
 fi
 
-readonly SRC_RESC="$1"
-readonly DEST_RESC="$2"
-readonly LOG="$3"
+readonly SrcResc="$1"
+readonly DestResc="$2"
+readonly Log="$3"
 
-if [ -z "$PROC_MULT" ]
+if [ -z "$ProcMult" ]
 then
-  readonly PROC_MULT=1
+  readonly ProcMult=1
 fi
 
 
 count_list()
 {
-  awk 'BEGIN { 
+  awk 'BEGIN {
          RS = "\0"
          tot = 0
-       } 
-       
-       { tot = tot + 1 } 
-       
+       }
+
+       { tot = tot + 1 }
+
        END { print tot }'
 }
 
@@ -107,13 +108,13 @@ count_unmovable()
 {
   local baseCond="$1"
 
-  psql --no-align --tuples-only --host irods-db3 ICAT icat_reader << EOSQL
+  psql --no-align --tuples-only --host irods-db3 ICAT icat_reader <<EOSQL
 SELECT COUNT(data_id)
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id = ANY(ARRAY(
-      SELECT data_id FROM r_data_main WHERE resc_name = '$SRC_RESC'
-      INTERSECT SELECT data_id FROM r_data_main WHERE resc_name = '$DEST_RESC'))
-    AND d.resc_name = '$SRC_RESC'
+      SELECT data_id FROM r_data_main WHERE resc_name = '$SrcResc'
+      INTERSECT SELECT data_id FROM r_data_main WHERE resc_name = '$DestResc'))
+    AND d.resc_name = '$SrcResc'
     AND ($baseCond)
 EOSQL
 }
@@ -140,8 +141,8 @@ partition()
   then
     awk --assign min="$minSizeB" --assign max="$maxSizeB" \
         'BEGIN {
-           RS = "\0" 
-           FS = " " 
+           RS = "\0"
+           FS = " "
            ORS = "\0"
          }
 
@@ -151,22 +152,22 @@ partition()
   else
     awk --assign min="$minSizeB" \
         'BEGIN {
-           RS = "\0" 
-           FS = " " 
+           RS = "\0"
+           FS = " "
            ORS = "\0"
-         } 
-         
+         }
+
          {
            if ($1 >= min) { print substr($0, length($1) + 2) }
-         }' 
-  fi 
+         }'
+  fi
 }
 
 
-track_prog() 
+track_prog()
 {
   local cnt="$1"
-  local tot="$2"  
+  local tot="$2"
   local subTot="$3"
 
   local subCnt=0
@@ -227,43 +228,43 @@ select_cohort()
   else
     printf 'Physically moving %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
   fi
-  
+
   if [ "$subTotal" -gt 0 ]
   then
     local maxArgs=$((2 * ((maxProcs ** 2))))
-    maxProcs=$((maxProcs * PROC_MULT))
+    maxProcs=$((maxProcs * ProcMult))
 
     xargs --null --max-args "$maxArgs" --max-procs "$maxProcs" \
-          iphymv -M -v -R "$DEST_RESC" -S "$SRC_RESC" \
+          iphymv -M -v -R "$DestResc" -S "$SrcResc" \
         < "$cohortList" \
-        2>> "$LOG" \
-        | tee --append "$LOG" \
+        2>> "$Log" \
+        | tee --append "$Log" \
         | track_prog "$cnt" "$tot" "$subTotal"
   else
     printf '%s\n' "$cnt"
   fi
 
-  rm --force "$cohortList"  
+  rm --force "$cohortList"
 }
 
 
 readonly ObjectList=$(tempfile)
 trap "rm --force '$ObjectList'" EXIT
 
-truncate --size 0 "$LOG"
+truncate --size 0 "$Log"
 
-if [ -n "$BASE_COLL" ]
+if [ -n "$BaseColl" ]
 then
-  readonly BaseCond="c.coll_name = '$BASE_COLL' OR c.coll_name LIKE '$BASE_COLL/%'"
+  readonly BaseCond="c.coll_name = '$BaseColl' OR c.coll_name LIKE '$BaseColl/%'"
 else
   readonly BaseCond=TRUE
 fi
 
 printf 'Checking to see if all data objects can be physically moved...\n'
 
-if [ $(count_unmovable "$BaseCond") -gt 0 ] 
+if [ $(count_unmovable "$BaseCond") -gt 0 ]
 then
-  cat << EOF
+  cat <<EOF
 WARNING: NOT ALL DATA OBJECTS COULD BE MOVED BECAUSE REPLICAS ARE ALREADY ON THE
 DESTINATION RESOURCE
 EOF
@@ -273,13 +274,13 @@ printf 'Retrieving data objects to physically move...\n'
 
 psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host irods-db3 \
      ICAT icat_reader \
-<< EOSQL > "$ObjectList"
+<<EOSQL > "$ObjectList"
 SELECT d.data_size, c.coll_name || '/' || d.data_name
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id = ANY(ARRAY(
-      SELECT data_id FROM r_data_main WHERE resc_name = '$SRC_RESC'
-      EXCEPT SELECT data_id FROM r_data_main WHERE resc_name = '$DEST_RESC'))
-    AND d.resc_name = '$SRC_RESC'
+      SELECT data_id FROM r_data_main WHERE resc_name = '$SrcResc'
+      EXCEPT SELECT data_id FROM r_data_main WHERE resc_name = '$DestResc'))
+    AND d.resc_name = '$SrcResc'
     AND ($BaseCond)
 EOSQL
 
@@ -289,8 +290,8 @@ printf '%d data objects to physically move\n' "$Tot"
 if [ "$Tot" -gt 0 ]
 then
   cnt=0
-  cnt=$(select_cohort "$cnt" "$Tot" 16   0  0 < "$ObjectList")  # 16 0 byte transfers 
-  cnt=$(select_cohort "$cnt" "$Tot" 16   0  1 < "$ObjectList")  # 16 1-threaded transfers 
+  cnt=$(select_cohort "$cnt" "$Tot" 16   0  0 < "$ObjectList")  # 16 0 byte transfers
+  cnt=$(select_cohort "$cnt" "$Tot" 16   0  1 < "$ObjectList")  # 16 1-threaded transfers
   cnt=$(select_cohort "$cnt" "$Tot"  8   1  2 < "$ObjectList")  # 8 2-threaded
   cnt=$(select_cohort "$cnt" "$Tot"  6   2  3 < "$ObjectList")  # 6 3-threaded
   cnt=$(select_cohort "$cnt" "$Tot"  4   3  5 < "$ObjectList")  # 4 4--5-threaded
