@@ -11,7 +11,7 @@ show_help()
 $ExecName version $Version
 
 Usage:
- $ExecName [options] <src_resc> <dest_resc> <log_file>
+ $ExecName [options] <src_resc> <dest_resc>
 
 Moves the files from one resource to another. It will not move any file
 associated with a data object that has a replica on the destination resource.
@@ -19,7 +19,6 @@ associated with a data object that has a replica on the destination resource.
 Parameters:
  <src_resc>   the resource where the files are moved from
  <dest_resc>  the resouce where the files are moved to
- <log_file>   a file where the move related messages are logged
 
 Options:
  -c, --collection <collection>  only move the files associated with data objects
@@ -90,19 +89,31 @@ do
   esac
 done
 
-if [ "$#" -lt 3 ]
+if [ "$#" -lt 2 ]
 then
   exit_with_help
 fi
 
 readonly SrcResc="$1"
 readonly DestResc="$2"
-readonly Log="$3"
 
 if [ -z "$ProcMult" ]
 then
   readonly ProcMult=1
 fi
+
+# Redirect stadout to FD 3 to use as a logging channel
+readonly Log=3
+eval "exec $Log>&1"
+
+
+finish()
+{
+  local objList="$1"
+
+  rm --force "$objList"
+  eval "exec 1>&$Log $Log>&-"
+}
 
 
 count_list()
@@ -251,8 +262,8 @@ select_cohort()
     xargs --null --max-args "$maxArgs" --max-procs "$maxProcs" \
           iphymv -M -v -R "$DestResc" -S "$SrcResc" \
         < "$cohortList" \
-        2>> "$Log" \
-        | tee --append "$Log" \
+        2>&"$Log" \
+        | tee >(cat >&"$Log") \
         | track_prog "$cnt" "$tot" "$subTotal"
   else
     printf '%s\n' "$cnt"
@@ -263,9 +274,8 @@ select_cohort()
 
 
 readonly ObjectList=$(tempfile)
-trap "rm --force '$ObjectList'" EXIT
 
-truncate --size 0 "$Log"
+trap "finish '$ObjectList'" EXIT
 
 if [ -n "$BaseColl" ]
 then
@@ -274,17 +284,17 @@ else
   readonly BaseCond=TRUE
 fi
 
-printf 'Checking to see if all data objects can be physically moved...\n'
+printf 'Checking to see if all data objects can be physically moved...\n' >&2
 
 if [ $(count_unmovable "$BaseCond") -gt 0 ]
 then
-  cat <<EOF
+  cat <<EOF >&2
 WARNING: NOT ALL DATA OBJECTS COULD BE MOVED BECAUSE REPLICAS ARE ALREADY ON THE
 DESTINATION RESOURCE
 EOF
 fi
 
-printf 'Retrieving data objects to physically move...\n'
+printf 'Retrieving data objects to physically move...\n' >&2
 
 psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host irods-db3 \
      ICAT icat_reader \
@@ -299,7 +309,7 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
 EOSQL
 
 readonly Tot=$(count_list < "$ObjectList")
-printf '%d data objects to physically move\n' "$Tot"
+printf '%d data objects to physically move\n' "$Tot" >&2
 
 if [ "$Tot" -gt 0 ]
 then
@@ -312,4 +322,4 @@ then
   cnt=$(select_cohort "$cnt" "$Tot"  3   5  7 < "$ObjectList")  # 3 6--7-threaded
   cnt=$(select_cohort "$cnt" "$Tot"  2   7 15 < "$ObjectList")  # 2 8--15-threaded
   cnt=$(select_cohort "$cnt" "$Tot"  1  15    < "$ObjectList")  # 1 16-threaded
-fi 2>&1
+fi
