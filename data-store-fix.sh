@@ -2,12 +2,12 @@
 #
 # Usage: data-store-check.sh [HOST [PORT [USER [CUTOFF_TIME [DEBUG]]]]]
 #
-# This script generates two reports, one for collections and one for data 
+# This script generates two reports, one for collections and one for data
 # objects. Each report lists all collections or data objects, respectively, that
-# where created before the cutoff data and are missing the own permission for 
+# where created before the cutoff data and are missing the own permission for
 # the rodsadmin group or don't have one and only one UUID assigned to it. The
 # data object report includes information on missing checksums.
-# 
+#
 # HOST is the domain name or IP address of the server where the PostgreSQL DBMS
 # containing the ICAT DB runs. The default value is 'localhost'.
 #
@@ -16,7 +16,7 @@
 # USER is the user used to authenticate the connection to the DB. The default
 # value is 'irods'.
 #
-# CUTOFF_TIME is the upper bound of the creation time for the collections and 
+# CUTOFF_TIME is the upper bound of the creation time for the collections and
 # data objects contained in the reports. The format should be the default format
 # used by `date`. The default value is today '00:00:00' in the local time zone.
 #
@@ -57,12 +57,12 @@ then
 fi
 
 
-inject_debug_stmt() 
+inject_debug_stmt()
 {
   local stmt="$*"
 
   if [ -n "$DEBUG" ]
-  then 
+  then
     printf '%s\n' "$stmt"
   fi
 }
@@ -74,7 +74,7 @@ inject_debug_newline()
 }
 
 
-inject_debug_msg() 
+inject_debug_msg()
 {
   local msg="$*"
 
@@ -83,7 +83,7 @@ inject_debug_msg()
 }
 
 
-display_problems() 
+display_problems()
 {
   local cutoffTS=$(date --date="$CUTOFF_TIME" '+0%s')
 
@@ -94,39 +94,39 @@ BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 $(inject_debug_msg creating owned_by_rodsadmin)
 CREATE TEMPORARY TABLE owned_by_rodsadmin
-AS 
+AS
   SELECT a.object_id
-  FROM r_objt_access AS a JOIN r_user_main AS u ON u.user_id = a.user_id 
+  FROM r_objt_access AS a JOIN r_user_main AS u ON u.user_id = a.user_id
   WHERE u.user_name = 'rodsadmin'
     AND a.access_type_id =
-      (SELECT token_id 
-       FROM r_tokn_main 
+      (SELECT token_id
+       FROM r_tokn_main
        WHERE token_namespace = 'access_type' AND token_name = 'own');
 
 $(inject_debug_msg creating coll_perm_probs)
 CREATE TEMPORARY TABLE coll_perm_probs
-AS 
+AS
   SELECT coll_id
   FROM r_coll_main AS c
   WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id);
 
 $(inject_debug_msg creating data_perm_probs)
 CREATE TEMPORARY TABLE data_perm_probs
-AS 
+AS
   SELECT DISTINCT data_id
   FROM r_data_main AS d
   WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id);
 
 $(inject_debug_msg creating uuid_attrs)
 CREATE TEMPORARY TABLE uuid_attrs
-AS 
+AS
   SELECT o.object_id
-  FROM r_objt_metamap AS o JOIN r_meta_main AS m ON m.meta_id = o.meta_id 
+  FROM r_objt_metamap AS o JOIN r_meta_main AS m ON m.meta_id = o.meta_id
   WHERE m.meta_attr_name = 'ipc_UUID';
 
 $(inject_debug_msg creating coll_uuid_probs)
 CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count)
-AS 
+AS
   SELECT c.coll_id, COUNT(u.object_id)
   FROM r_coll_main AS c LEFT JOIN uuid_attrs AS u ON u.object_id = c.coll_id
   GROUP BY c.coll_id
@@ -134,14 +134,14 @@ AS
 
 $(inject_debug_msg creating data_uuid_probs)
 CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count)
-AS 
+AS
   SELECT DISTINCT d.data_id, COUNT(u.object_id)
   FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
   GROUP BY d.data_id, d.data_repl_num
   HAVING COUNT(u.object_id) != 1;
 
 $(inject_debug_msg creating data_checksum_probs)
-CREATE TEMPORARY TABLE data_chksum_probs 
+CREATE TEMPORARY TABLE data_chksum_probs
 AS SELECT DISTINCT data_id FROM r_data_main WHERE data_checksum IS NULL OR data_checksum = '';
 
 $(inject_debug_newline)
@@ -149,7 +149,7 @@ $(inject_debug_newline)
 \echo ''
 SELECT
   coll_id = ANY(ARRAY(SELECT * FROM coll_perm_probs))                  AS "Permission Issue",
-  COALESCE((SELECT cu.uuid_count FROM coll_uuid_probs AS cu WHERE cu.coll_id = c.coll_id), 1) 
+  COALESCE((SELECT cu.uuid_count FROM coll_uuid_probs AS cu WHERE cu.coll_id = c.coll_id), 1)
     AS "UUID Count",
   coll_owner_name || '#' || coll_owner_zone                            AS "Owner",
   TO_TIMESTAMP(CAST(create_ts AS INTEGER))                             AS "Create Time",
@@ -164,22 +164,22 @@ ORDER BY create_ts;
 \echo ''
 \echo '2. Problem Data Objects Created Before $CUTOFF_TIME:'
 \echo ''
-SELECT 
+SELECT
   d.data_id = ANY(ARRAY(SELECT * FROM data_perm_probs))  AS "Permission Issue",
   d.data_checksum IS NULL OR d.data_checksum = ''        AS "Missing Checksum",
-  COALESCE((SELECT du.uuid_count FROM data_uuid_probs AS du WHERE du.data_id = d.data_id), 1) 
+  COALESCE((SELECT du.uuid_count FROM data_uuid_probs AS du WHERE du.data_id = d.data_id), 1)
     AS "UUID Count",
   d.data_owner_name || '#' || d.data_owner_zone          AS "Owner",
   d.resc_hier                                            AS "Resource",
   TO_TIMESTAMP(CAST(d.create_ts AS INTEGER))             AS "Create Time",
   REPLACE(REPLACE(c.coll_name || '/' || d.data_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')
     AS "Data Object"
-FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id 
+FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
 WHERE c.coll_name LIKE '/iplant/%'
   AND d.create_ts < '$cutoffTS'
   AND d.data_id = ANY(ARRAY(
-    SELECT * FROM data_perm_probs 
-    UNION SELECT data_id FROM data_uuid_probs 
+    SELECT * FROM data_perm_probs
+    UNION SELECT data_id FROM data_uuid_probs
     UNION SELECT data_id FROM data_chksum_probs))
 ORDER BY d.create_ts;
 
@@ -203,7 +203,7 @@ trim()
 {
   local str="$*"
   str="${str#"${str%%[![:space:]]*}"}"
-  str="${str%"${str##*[![:space:]]}"}"  
+  str="${str%"${str##*[![:space:]]}"}"
   printf '%s' "$str"
 }
 
@@ -211,7 +211,7 @@ trim()
 unescape()
 {
   local escEntity="$*"
-    
+
   local entity=
   local escaped=0
 
@@ -220,7 +220,7 @@ unescape()
     local curChar="${escEntity:$i:1}"
 
     if [ $escaped -eq 1 ]
-    then 
+    then
       if [ "$curChar" = n ]
       then
         printf -v entity '%s\n' "$entity"
@@ -229,7 +229,7 @@ unescape()
       fi
 
       escaped=0
-    else 
+    else
       if [ "$curChar" = '\' ]
       then
         escaped=1
@@ -335,7 +335,8 @@ fix_collection_problems()
       break
     fi
 
-    local coll=$(unescape $(trim "$collField"))
+    local escColl=$(trim "$collField")
+    local coll=$(unescape "$escColl")
 
     permIssue=$(process_perm_issue "$permIssue" "$coll")
     uuidCnt=$(process_uuid_issue "$uuidCnt" coll "$coll")
@@ -356,7 +357,8 @@ fix_object_problems()
       break
     fi
 
-    local obj=$(unescape $(trim "$objField"))
+    local escObj=$(trim "$objField")
+    local obj=$(unescape "$escObj")
     local resc=$(trim "$rescField")
 
     permIssue=$(process_perm_issue "$permIssue" "$obj")
@@ -369,7 +371,7 @@ fix_object_problems()
 }
 
 
-fix_problems() 
+fix_problems()
 {
   while IFS= read -r
   do
@@ -419,4 +421,3 @@ then
 fi
 
 rm --force "$ErrorLog"
-
