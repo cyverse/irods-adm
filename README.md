@@ -5,7 +5,7 @@ A collection of scripts for administering an iRODS grid
 
 ## iRODS Sessions
 
-A session is a group of log messages that occured during a single connection.
+A session is a group of log messages that occurred during a single connection.
 
 The awk script `group-log-by-pid.awk` can be used to group a sequence of log messages by the connection that generated them.
 
