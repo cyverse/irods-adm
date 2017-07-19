@@ -15,7 +15,7 @@ The awk script `filter-session-by-cuser.awk` can be combined with `group-log-by-
 
 The awk script `session-intervals.awk` can be combined with `group-log-by-pid.awk` to find all of the time intervals for each session from a log file.
 
-The bash script `count-sessions.sh` can be combined with `sessions-intervals.awk` to generate a report on the number of concurrent sessions during each second for the time period covered by a log file.
+The program `count-sessions` can be combined with `sessions-intervals.awk` to generate a report on the number of concurrent sessions during each second for the time period covered by a log file.
 
 
 ## Resources
