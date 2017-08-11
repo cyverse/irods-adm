@@ -29,11 +29,11 @@ Options:
  -v, --verison  show version and exit
 
 Summary:
-This script replicates data objects to the taccCorralRes resource. It only
-replicates objects that only have one replica that is not in the
-/iplant/home/shared/aegis collection nor on the cshlWildcatRes resource. It
-writes progress to standard error and all messages, error or otherwise, to
-standard out.
+This script replicates data objects that haven't been created in the last day to
+the taccCorralRes resource. It only replicates objects that only have one
+replica that is not in the /iplant/home/shared/aegis collection nor on the
+cshlWildcatRes resource. It writes progress to standard error and all messages,
+error or otherwise, to standard out.
 
 Prerequisites:
  1) The user must be initialized with iRODS as an admin user.
@@ -356,12 +356,15 @@ else
   readonly BaseCond=TRUE
 fi
 
+readonly MaxTime=$(date --date=yesterday '+%s')
+
 psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host irods-db3 \
      ICAT icat_reader \
 <<EOSQL > "$ObjectList"
 SELECT d.data_size, c.coll_name || '/' || d.data_name
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
+    AND d.create_ts < '0$MaxTime'
     AND NOT (d.data_repl_num = 0 AND d.resc_name = 'cshlWildcatRes')
     AND c.coll_name != '/iplant/home/shared/aegis'
     AND c.coll_name NOT LIKE '/iplant/home/shared/aegis/%'
