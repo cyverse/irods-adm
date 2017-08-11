@@ -89,6 +89,18 @@ do
   esac
 done
 
+if [ -n "$ProcMult" ]
+then
+  if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
+  then
+    printf 'The -m option value must be a positive number. The given value was %s.\n' "$ProcMult" \
+      >&2
+    exit 1
+  fi
+else
+  readonly ProcMult=1
+fi
+
 if [ "$#" -lt 2 ]
 then
   exit_with_help
@@ -97,10 +109,6 @@ fi
 readonly SrcResc="$1"
 readonly DestResc="$2"
 
-if [ -z "$ProcMult" ]
-then
-  readonly ProcMult=1
-fi
 
 # Redirect stadout to FD 3 to use as a logging channel
 readonly Log=3

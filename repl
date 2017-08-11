@@ -108,8 +108,15 @@ do
   esac
 done
 
-if [ -z "$ProcMult" ]
+if [ -n "$ProcMult" ]
 then
+  if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
+  then
+    printf 'The -m option value must be a positive number. The given value was %s.\n' "$ProcMult" \
+      >&2
+    exit 1
+  fi
+else
   readonly ProcMult=1
 fi
 
