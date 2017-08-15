@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Usage: data-store-check.sh [HOST [PORT [USER [CUTOFF_TIME [DEBUG]]]]]
+# Usage: data-store-check [HOST [PORT [USER [CUTOFF_TIME [DEBUG]]]]]
 #
 # This script generates two reports, one for collections and one for data
 # objects. Each report lists all collections or data objects, respectively, that
@@ -310,7 +310,7 @@ process_chksum_issue()
 
   if [ $issue == t ]
   then
-    if ichksum -f --silent -R "$resc" "$obj" > /dev/null
+    if ichksum --silent -R "$resc" "$obj" > /dev/null
     then
       printf '%s' "${issue/%  /✓ }"
     else
