@@ -102,6 +102,7 @@ AS
       (SELECT token_id
        FROM r_tokn_main
        WHERE token_namespace = 'access_type' AND token_name = 'own');
+CREATE INDEX idx_owned_by_rodsadmin ON owned_by_rodsadmin (object_id);
 
 $(inject_debug_msg creating coll_perm_probs)
 CREATE TEMPORARY TABLE coll_perm_probs
@@ -111,6 +112,7 @@ AS
   WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
     AND c.coll_name LIKE '/iplant/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS';
 
+-- This may overestimate the number of problems, since it may find objects not in the iplant zone.
 $(inject_debug_msg creating data_perm_probs)
 CREATE TEMPORARY TABLE data_perm_probs
 AS
@@ -125,6 +127,7 @@ AS
   SELECT o.object_id
   FROM r_objt_metamap AS o JOIN r_meta_main AS m ON m.meta_id = o.meta_id
   WHERE m.meta_attr_name = 'ipc_UUID';
+CREATE INDEX idx_uuid_attrs ON uuid_attrs (object_id);
 
 $(inject_debug_msg creating coll_uuid_probs)
 CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count)
@@ -135,6 +138,7 @@ AS
   GROUP BY c.coll_id
   HAVING COUNT(u.object_id) != 1;
 
+-- This may overestimate the number of problems, since it may find objects not in the iplant zone.
 $(inject_debug_msg creating data_uuid_probs)
 CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count)
 AS
@@ -145,6 +149,7 @@ AS
     -- data_repl_num prevents counting uuids for multiple repls in a single count
   HAVING COUNT(u.object_id) != 1;
 
+-- This may overestimate the number of problems, since it may find objects not in the iplant zone.
 $(inject_debug_msg creating data_checksum_probs)
 CREATE TEMPORARY TABLE data_chksum_probs
 AS
