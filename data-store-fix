@@ -111,6 +111,7 @@ AS
   FROM r_coll_main AS c
   WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
     AND c.coll_name LIKE '/iplant/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS';
+CREATE INDEX idx_coll_perm_probs ON coll_perm_probs(coll_id);
 
 -- This may overestimate the number of problems, since it may find objects not in the iplant zone.
 $(inject_debug_msg creating data_perm_probs)
@@ -120,6 +121,7 @@ AS
   FROM r_data_main AS d
   WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
     AND d.create_ts < '$cutoffTS';
+CREATE INDEX idx_data_perm_probs ON data_perm_probs(data_id);
 
 $(inject_debug_msg creating uuid_attrs)
 CREATE TEMPORARY TABLE uuid_attrs
@@ -137,6 +139,7 @@ AS
   WHERE c.coll_name LIKE '/iplant/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS'
   GROUP BY c.coll_id
   HAVING COUNT(u.object_id) != 1;
+CREATE INDEX idx_coll_uuid_probs ON coll_uuid_probs (coll_id);
 
 -- This may overestimate the number of problems, since it may find objects not in the iplant zone.
 $(inject_debug_msg creating data_uuid_probs)
@@ -148,6 +151,7 @@ AS
   GROUP BY d.data_id, d.data_repl_num
     -- data_repl_num prevents counting uuids for multiple repls in a single count
   HAVING COUNT(u.object_id) != 1;
+CREATE INDEX idx_data_uuid_probs ON data_uuid_probs(data_id);
 
 -- This may overestimate the number of problems, since it may find objects not in the iplant zone.
 $(inject_debug_msg creating data_checksum_probs)
@@ -412,7 +416,7 @@ strip_noise()
       printf '%s\n' "$REPLY"
     else
       case "$REPLY" in
-        BEGIN|SELECT*|ROLLBACK)
+        BEGIN|CREATE*|SELECT*|ROLLBACK)
           ;;
         *)
           printf '%s\n' "$REPLY"
