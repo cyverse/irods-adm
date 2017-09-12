@@ -70,49 +70,41 @@ declare -i tot
 
 mkdir --parents logs
 
-readonly RS=$(iquest '%s' "SELECT ORDER(RESC_LOC) WHERE RESC_CLASS_NAME = 'archive'")
+readonly RS=$(iquest '%s' "SELECT ORDER(RESC_LOC) WHERE RESC_LOC != 'EMPTY_RESC_HOST'")
 
 for svr in data.cyverse.org $RS
 do
-  if [ "$svr" != aegis.a2c2.asu.edu ] && \
-     [ "$svr" != aegis.cefns.nau.edu ] && \
-     [ "$svr" != aegis-ua-1.arl.arizona.edu ] && \
-     [ "$svr" != wildcat.cshl.edu ]
-  then 
-    printf '\rdumping logs from %s\n' "$svr"
-    out=logs/"$svr".err
-    rm -f "$out"
+  printf '\rdumping logs from %s\n' "$svr"
+  out=logs/"$svr".err
+  rm -f "$out"
 
-    for log in $(ssh -q "$svr" ls "$LogBase"."$LogExt")
-    do
-      if [[ "$log" =~ $LogBase ]]
-      then
-        printf '\r  dumping %s\n' "$log"
+  for log in $(ssh -q "$svr" ls "$LogBase"."$LogExt")
+  do
+    if [[ "$log" =~ $LogBase ]]
+    then
+      printf '\r  dumping %s\n' "$log"
 
-        cnt=0
-        tot=0
+      cnt=0
+      tot=0
+      printf '\r    %d/%d' "$cnt" "$tot" >&2
+
+      # The grep removes duplicate key SQL errors
+      while IFS= read -r -d§ session
+      do
+        if [[ "$session" =~ ERROR: ]]
+        then
+          printf '§%s' "${session:1}"
+          (( cnt++ ))
+        fi
+
+        (( tot++ ))
         printf '\r    %d/%d' "$cnt" "$tot" >&2
+      done \
+        < <(grab_messages "$svr" "$log" | ./group-log-by-pid.awk) \
+        >> "$out"
 
-        # The grep removes duplicate key SQL errors
-        while IFS= read -r -d§ session
-        do
-          if [[ "$session" =~ ERROR: ]]
-          then
-            printf '§%s' "${session:1}"
-            (( cnt++ ))
-          fi
-
-          (( tot++ ))
-          printf '\r    %d/%d' "$cnt" "$tot" >&2
-        done \
-          < <(grab_messages "$svr" "$log" | ./group-log-by-pid.awk) \
-          >> "$out"
-
-        printf '\r' >&2
-        printf '    %d/%d\n' "$cnt" "$tot"
-      fi
-    done
-  else
-    printf '\rskipping %s\n' "$svr"
-  fi
+      printf '\r' >&2
+      printf '    %d/%d\n' "$cnt" "$tot"
+    fi
+  done
 done
