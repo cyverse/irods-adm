@@ -322,7 +322,6 @@ printf '%d data objects to physically move\n' "$Tot" >&2
 if [ "$Tot" -gt 0 ]
 then
   cnt=0
-  cnt=$(select_cohort "$cnt" "$Tot" 16   0  0 < "$ObjectList")  # 16 0 byte transfers
   cnt=$(select_cohort "$cnt" "$Tot" 16   0  1 < "$ObjectList")  # 16 1-threaded transfers
   cnt=$(select_cohort "$cnt" "$Tot"  8   1  2 < "$ObjectList")  # 8 2-threaded
   cnt=$(select_cohort "$cnt" "$Tot"  6   2  3 < "$ObjectList")  # 6 3-threaded
