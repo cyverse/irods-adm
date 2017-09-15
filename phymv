@@ -281,6 +281,12 @@ select_cohort()
 }
 
 
+if ! iadmin lz &> /dev/null
+then
+  printf "aren't authenticated as a rodsadmin user\n" >&2
+  exit 1
+fi
+
 readonly ObjectList=$(tempfile)
 
 trap "finish '$ObjectList'" EXIT
