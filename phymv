@@ -160,14 +160,6 @@ partition()
   if [ "$#" -ge 2 ]
   then
     local maxSizeB="$2"
-
-    if [ "$maxSizeB" -eq 0 ]
-    then
-      maxSizeB=1
-    elif [ "$minSizeB" -eq 0 ]
-    then
-      minSizeB=1
-    fi
   fi
 
   if [ -n "$maxSizeB" ]
