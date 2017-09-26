@@ -279,6 +279,12 @@ then
   exit 1
 fi
 
+if ! psql --host irods-db3 ICAT icat_reader <<< '' &> /dev/null
+then
+  printf "aren't able to connect to the ICAT DB as the icat_reader without a password\n" >&2
+  exit 1
+fi
+
 readonly ObjectList=$(tempfile)
 
 trap "finish '$ObjectList'" EXIT
