@@ -83,11 +83,8 @@ done
 
 psql $HostArg $PortArg ICAT icat_reader <<EOSQL
 SELECT resc_name AS resource, COUNT(*) AS count, SUM(data_size) / 1024 ^ 4 AS "volume (TiB)"
-  FROM r_data_main
-  WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
-    AND NOT (data_repl_num = 0 AND resc_name = 'cshlWildcatRes')
-    AND coll_id IN (
-        SELECT coll_id FROM r_coll_main WHERE coll_name NOT LIKE '/iplant/home/shared/aegis%')
-  GROUP BY resc_name
-  ORDER BY resc_name
+FROM r_data_main
+WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
+GROUP BY resc_name
+ORDER BY resc_name
 EOSQL
