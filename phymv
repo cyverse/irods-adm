@@ -23,6 +23,8 @@ Parameters:
 Options:
  -c, --collection <collection>  only move the files associated with data objects
                                 in the collection <collection>
+ -d, --dbms <hostname>          The DBMS host to connect to. Defaults to 
+                                localhost.
  -m, --multiplier <multiplier>  a multiplier on the number of processes to run
                                 at once
 
@@ -48,8 +50,8 @@ exit_with_help()
 set -e
 
 readonly Opts=$(getopt --name "$ExecName" \
-                       --options c:hm:v \
-                       --longoptions collection:,help,multiplier:,version \
+                       --options c:d:hm:v \
+                       --longoptions collection:,dbms:help,multiplier:,version \
                        -- "$@")
 
 if [ "$?" -ne 0 ]
@@ -65,6 +67,10 @@ do
   case "$1" in
     -c|--collection)
       readonly BaseColl="$2"
+      shift 2
+      ;;
+    -d|--dbms)
+      readonly Dbms="$2"
       shift 2
       ;;
     -h|--help)
@@ -88,6 +94,11 @@ do
       ;;
   esac
 done
+
+if [ -z "$Dbms" ]
+then
+  readonly Dbms=localhost
+fi
 
 if [ -n "$ProcMult" ]
 then
@@ -279,7 +290,7 @@ then
   exit 1
 fi
 
-if ! psql --host irods-db3 ICAT icat_reader <<< '' &> /dev/null
+if ! psql --host "$Dbms" ICAT icat_reader <<< '' &> /dev/null
 then
   printf "aren't able to connect to the ICAT DB as the icat_reader without a password\n" >&2
   exit 1
@@ -308,7 +319,7 @@ fi
 
 printf 'Retrieving data objects to physically move...\n' >&2
 
-psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host irods-db3 \
+psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host "$Dbms" \
      ICAT icat_reader \
 <<EOSQL > "$ObjectList"
 SELECT d.data_size, c.coll_name || '/' || d.data_name
