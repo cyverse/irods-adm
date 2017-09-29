@@ -288,12 +288,15 @@ track_prog()
     then
       ((subCnt++))
       ((cnt++))
-      printf -v msg '\r%*s\r%s' ${#msg} '' $(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
+      update_progress '\r%*s\r' ${#msg} ''
+      msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
       update_progress "$msg"
     fi
   done
 
-  update_progress '\r%*s\r%s\n' ${#msg} '' $(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
+  update_progress '\r%*s\r' ${#msg} '' 
+  msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
+  update_progress "$msg"
   printf '%s' "$cnt"
 }
 
