@@ -259,6 +259,18 @@ partition()
 }
 
 
+mk_prog_msg()
+{
+  local count="$1"
+  local total="$2"
+  local subCount="$3"
+  local subTotal="$4"
+
+  printf 'cohort: %0*d/%d, all: %0*d/%d' \
+         ${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
+}
+
+
 track_prog()
 {
   local cnt="$1"
@@ -266,20 +278,22 @@ track_prog()
   local subTot="$3"
 
   local subCnt=0
-  local msg=
+  local msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
+
+  update_progress "$msg"
 
   while read -r
   do
-    printf '\r%*s\r' "${#msg}" '' >&2
-    printf -v msg \
-           'cohort: %0*d/%d, all: %0*d/%d' \
-           "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot"
-    update_progress "$msg"
+    if [[ "$REPLY" != 'cliReconnManager: '* ]]
+    then
+      ((subCnt++))
+      ((cnt++))
+      printf -v msg '\r%*s\r%s' ${#msg} '' $(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
+      update_progress "$msg"
+    fi
   done
 
-  update_progress '\r%*s\rcohort: %0*d/%d, all: %0*d/%d\n' \
-                  "${#msg}" '' "${#subTot}" "$subCnt" "$subTot" "${#tot}" "$cnt" "$tot"
-
+  update_progress '\r%*s\r%s\n' ${#msg} '' $(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
   printf '%s' "$cnt"
 }
 
@@ -410,6 +424,6 @@ then
     cnt=$(select_cohort "$cnt" "$Tot"  2   8  7 15 < "$ObjectList")  # 2 8--15-threaded
     cnt=$(select_cohort "$cnt" "$Tot"  1   2 15    < "$ObjectList")  # 1 16-threaded
   else
-    cnt=$(select_cohort 0 "$Tot" 16 2 0 < "$ObjectList")
+    select_cohort 0 "$Tot" 16 2 0 < "$ObjectList" > /dev/null
   fi
 fi
