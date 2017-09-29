@@ -11,9 +11,12 @@ show_help()
 $ExecName version $Version
 
 Usage:
- $ExecName [options]
+ $ExecName [options] <dest_resc>
 
-replicates data objects to taccCorralRes
+replicates data objects
+
+Parameters:
+ <dest_resc>  the resource where the files will be replicated
 
 Options:
  -c, --collection <collection>  only replicate the data objects in this
@@ -22,6 +25,7 @@ Options:
                                 at once, default: 1
  -r, --resource <resource>      only replicate the data objects with a file on
                                 this resource
+ -s, --serial                   disable parallel transport
  -u, --until <stop_time>        the time to stop replication in a format
                                 understandable by `date`
 
@@ -59,8 +63,8 @@ exit_with_help()
 set -e
 
 readonly Opts=$(getopt --name "$ExecName" \
-                       --options c:hm:r:u:v \
-                       --longoptions collection:,help,multiplier:,resource:,until:,version \
+                       --options c:hm:r:su:v \
+                       --longoptions collection:,help,multiplier:,resource:,serial,until:,version \
                        -- \
                        "$@")
 
@@ -90,6 +94,10 @@ do
       readonly SrcRes="$2"
       shift 2
       ;;
+    -s|--serial)
+      export SERIAL_OPT='-N 0'
+      shift
+      ;;
     -u|--until)
       readonly Until="$2"
       shift 2
@@ -107,6 +115,13 @@ do
       ;;
   esac
 done
+
+if [ "$#" -lt 1 ]
+then
+  exit_with_help
+fi
+
+export DEST_RESC="$1"
 
 if [ -n "$ProcMult" ]
 then
@@ -151,7 +166,7 @@ REPL_BATCH()
     exit 1
   fi
 
-  irepl -B -M -T -v -R taccCorralRes "$@"
+  irepl -B -M -T -v $SERIAL_OPT -R "$DEST_RESC" "$@"
 
 # XXX: Trying to figure out the irepl error code for when irepl logs a
 # '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably
@@ -351,9 +366,9 @@ update_progress 'Retrieving data objects to replicate...\n'
 
 if [ -n "$SrcRes" ]
 then
-  readonly SrcCond="d.resc_name = '$SrcRes'"
+  readonly ResCond="d.resc_name = '$SrcRes'"
 else
-  readonly SrcCond=TRUE
+  readonly ResCond="d.resc_name != '$DEST_RESC'"
 fi
 
 if [ -n "$BaseColl" ]
@@ -372,11 +387,8 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
     AND d.create_ts < '0$MaxTime'
-    AND NOT (d.data_repl_num = 0 AND d.resc_name = 'cshlWildcatRes')
-    AND c.coll_name != '/iplant/home/shared/aegis'
-    AND c.coll_name NOT LIKE '/iplant/home/shared/aegis/%'
     AND ($BaseCond)
-    AND ($SrcCond)
+    AND ($ResCond)
 EOSQL
 
 readonly Tot=$(count < "$ObjectList")
