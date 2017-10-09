@@ -296,7 +296,7 @@ track_prog()
 
   update_progress '\r%*s\r' ${#msg} '' 
   msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
-  update_progress "$msg"
+  update_progress '%s\n' "$msg"
   printf '%s' "$cnt"
 }
 
