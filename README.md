@@ -54,3 +54,8 @@ The program `classify-repl-errors` takes the output of `repl` and group the erro
 ## Repair
 
 The program `data-store-fix` can be used to detect and repair issues with the Data Store.
+
+
+## Trash
+
+The program `trash-report` can be used to generate a report on how much trash there is.

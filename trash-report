@@ -1,0 +1,107 @@
+#! /bin/bash
+
+readonly ExecName=$(basename $0)
+readonly Version=1
+
+
+show_help()
+{
+  cat \
+<<EOF
+
+$ExecName version $Version
+
+Usage:
+ $ExecName [options]
+
+Generates a report on the data objects in the trash that are older than 31 days
+and their volume broken down by the storage resource holding the corresponding 
+files.
+
+
+Options:
+ -H, --host <host>  connect to the ICAT's DBMS on the host <host> instead of
+                    the PostgreSQL default
+ -p, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
+                    instead of the PostgreSQL default
+
+ -h, --help     display help text and exit
+ -v, --version  display version and exit
+EOF
+}
+
+
+show_version()
+{
+  printf '%s\n' "$Version"
+}
+
+
+set -e
+
+readonly Opts=$(getopt --name "$ExecName" \
+                        --options hH:p:v \
+                        --longoptions help,host:,port:,version \
+                        -- \
+                        "$@")
+
+if [ "$?" -ne 0 ]
+then
+  show_help >&2
+  exit 1
+fi
+
+eval set -- "$Opts"
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -H|--host)
+      readonly HostArg="--host $2"
+      shift 2
+      ;;
+    -p|--port)
+      readonly PortArg="--port $2"
+      shift 2
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      show_help >&2
+      exit 1
+      ;;
+  esac
+done
+
+
+readonly Now_s=$(date '+%s')
+readonly CutOff_min=$((Now_s / 60 - 31 * 24 * 60))
+readonly CutOff_s=$((CutOff_min * 60))
+
+psql $HostArg $PortArg ICAT icat_reader <<SQL
+SELECT
+  r.resc_name AS "Storage Resource",
+  COUNT(NULLIF(d.modify_ts <= '0$CutOff_s', FALSE)) AS "To Delete Count",
+  SUM(CASE WHEN d.modify_ts <= '0$CutOff_s' THEN d.data_size ELSE 0 END) / 2 ^ 40 
+    AS "To Delete Volume (TiB)",
+  COUNT(d.data_id) AS "Trash Count",
+  SUM(COALESCE(d.data_size, 0)) / 2 ^ 40 AS "Trash Volume (TiB)"
+FROM r_resc_main AS r 
+  LEFT JOIN r_data_main AS d ON REGEXP_REPLACE(d.resc_hier, '^.*;', '') = r.resc_name
+WHERE r.resc_type_name = 'unix file system'
+  AND d.coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/iplant/trash/%')
+GROUP BY r.resc_name
+ORDER BY r.resc_name
+SQL
+
+
