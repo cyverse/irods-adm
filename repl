@@ -321,7 +321,7 @@ select_cohort()
 
   local minSizeMiB=$((minThreads * 32))
   local minSizeB=$((minSizeMiB * ((1024 ** 2))))
-  local cohortList=$(tempfile)
+  local cohortList=$(mktemp)
 
   if [ -n "$maxThreads" ]
   then
@@ -360,7 +360,7 @@ select_cohort()
 }
 
 
-readonly ObjectList=$(tempfile)
+readonly ObjectList=$(mktemp)
 
 trap "finish $ObjectList" EXIT
 
