@@ -1,19 +1,15 @@
 #! /bin/bash
 #
-# Since irmtrash fails often, this is a simple script that iterates over 
-# the users and deletes their trasn one user at a time.
+# This script deletes the trash older than one month for every user.
 #
 
-readonly Zone=$(imiscsvrinfo | sed -n 's/^rodsZone=//p')
+readonly AMonth=$((31 * 24 * 60))
 
-
-while IFS= read 
+while IFS=\# read -r user zone
 do
-  user="${REPLY%#$Zone}"   
-
   if [ "$user" != "anonymous" -a "$user" != "rodsBoot" ]
-  then        
-    printf 'removing trash for "%s"\n' "$user"
-#    irmtrash -M -u "$user"
+  then
+    printf 'removing trash for %s#%s\n' "$user" "$zone"
+    irmtrash -M -u "$user" -z "$zone" --age "$AMonth"
   fi
 done < <(iadmin lu | sort)
