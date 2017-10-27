@@ -89,10 +89,14 @@ FIX()
     local coordResc="${rescHier%%;*}"
     local tmp="$filePath".tmp
 
-    ssh -q "$storeHost" \
-        mv --no-clobber \"$filePath\" \"$tmp\" \&\& \
-        touch \"$filePath\" \&\& \
-        \(irsync -K -s -v -R \"$coordResc\" \"$tmp\" \"i:$objPath\"\; mv \"$tmp\" \"$filePath\"\) \
+    ssh -q -t -t "$storeHost" \
+        su --login \
+           --command \
+             \'mv --no-clobber \"$filePath\" \"$tmp\" \&\& \
+               touch \"$filePath\" \&\& \
+               \(irsync -K -s -v -R \"$coordResc\" \"$tmp\" \"i:$objPath\"\; \
+                 mv \"$tmp\" \"$filePath\"\)\' \
+           irods
       < /dev/null
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 }
