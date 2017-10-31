@@ -15,7 +15,7 @@ Usage:
  $ExecName [options]
 
 Generates a report on the data objects in the trash that are older than 31 days
-and their volume broken down by the storage resource holding the corresponding 
+and their volume broken down by the storage resource holding the corresponding
 files.
 
 
@@ -89,19 +89,100 @@ readonly CutOff_min=$((Now_s / 60 - 31 * 24 * 60))
 readonly CutOff_s=$((CutOff_min * 60))
 
 psql $HostArg $PortArg ICAT icat_reader <<SQL
+\\timing on
+
+BEGIN;
+
+\\echo
+\\echo Gathering trash collections
+CREATE TEMPORARY TABLE trash_collections (id, owner) AS
+WITH RECURSIVE
+  colls(id, name, owner) AS (
+    SELECT c.coll_id, c.coll_name, u.user_name
+    FROM r_coll_main AS c
+      JOIN r_user_main AS u ON c.coll_name = '/iplant/trash/home/' || u.user_name
+    UNION ALL
+    SELECT c1.coll_id, c1.coll_name, c2.owner
+    FROM r_coll_main AS c1 JOIN colls AS c2 ON c2.name = c1.parent_coll_name)
+SELECT id, owner FROM colls;
+CREATE INDEX idx_trash_collections ON trash_collections(id);
+
+\\echo
+\\echo Gathering trash
+CREATE TEMPORARY TABLE trash (id, size, resource, owner, delete) AS
 SELECT
-  r.resc_name AS "Storage Resource",
-  COUNT(NULLIF(d.modify_ts <= '0$CutOff_s', FALSE)) AS "To Delete Count",
-  SUM(CASE WHEN d.modify_ts <= '0$CutOff_s' THEN d.data_size ELSE 0 END) / 2 ^ 40 
-    AS "To Delete Volume (TiB)",
-  COUNT(d.data_id) AS "Trash Count",
-  SUM(COALESCE(d.data_size, 0)) / 2 ^ 40 AS "Trash Volume (TiB)"
-FROM r_resc_main AS r 
-  LEFT JOIN r_data_main AS d ON REGEXP_REPLACE(d.resc_hier, '^.*;', '') = r.resc_name
+  d.data_id,
+  d.data_size,
+  REGEXP_REPLACE(d.resc_hier, '^.*;', ''),
+  c.owner,
+  d.modify_ts <= '0$CutOff_s'
+FROM r_data_main AS d JOIN trash_collections AS c ON c.id = d.coll_id;
+CREATE INDEX idx_trash_owner ON trash(owner);
+CREATE INDEX idx_trash_resource ON trash(resource);
+
+\\echo
+\\echo Summarizing trash statistics by owner
+CREATE TEMPORARY TABLE trash_by_owner (owner, delete_count, delete_volume, count, volume) AS
+SELECT
+  owner,
+  COUNT(NULLIF(delete, FALSE)),
+  SUM(CASE WHEN delete THEN size ELSE 0 END),
+  COUNT(*),
+  SUM(size)
+FROM trash
+GROUP BY owner;
+CREATE INDEX idx_trash_by_owner_delete_count ON trash_by_owner(delete_count);
+CREATE INDEX idx_trash_by_owner_delete_volume ON trash_by_owner(delete_volume);
+
+\\echo
+\\echo Trash Summary
+\\echo =============
+SELECT
+  SUM(delete_count)            AS "To Delete Count",
+  SUM(delete_volume) / 2 ^ 40  AS "To Delete Volume (TiB)",
+  SUM(count)                   AS "Trash Count",
+  SUM(volume) / 2 ^ 40         AS "Trash Volume (TiB)"
+FROM trash_by_owner;
+
+\\echo
+\\echo Trash by Resource
+\\echo =================
+SELECT
+  r.resc_name                                              AS "Storage Resource",
+  COUNT(NULLIF(t.delete, FALSE))                           AS "To Delete Count",
+  SUM(CASE WHEN t.delete THEN t.size ELSE 0 END) / 2 ^ 40  AS "To Delete Volume (TiB)",
+  COUNT(t.id)                                              AS "Trash Count",
+  SUM(COALESCE(t.size, 0)) / 2 ^ 40                        AS "Trash Volume (TiB)"
+FROM r_resc_main AS r LEFT JOIN trash AS t ON t.resource = r.resc_name
 WHERE r.resc_type_name = 'unix file system'
-  AND d.coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/iplant/trash/%')
 GROUP BY r.resc_name
-ORDER BY r.resc_name
+ORDER BY r.resc_name;
+
+\\echo
+\\echo Top 10 Users by Delete Count
+\\echo ============================
+SELECT
+  owner                   AS "User",
+  delete_count            AS "To Delete Count",
+  delete_volume / 2 ^ 30  AS "To Delete Volume (GiB)",
+  count                   AS "Trash Count",
+  volume / 2 ^ 30         AS "Trash Volume (GiB)"
+FROM trash_by_owner
+ORDER BY delete_count DESC
+LIMIT 10;
+
+\\echo
+\\echo Top 10 Users by Delete Volume
+\\echo =============================
+SELECT
+  owner                   AS "User",
+  delete_count            AS "To Delete Count",
+  delete_volume / 2 ^ 30  AS "To Delete Volume (GiB)",
+  count                   AS "Trash Count",
+  volume / 2 ^ 30         AS "Trash Volume (GiB)"
+FROM trash_by_owner
+ORDER BY delete_volume DESC
+LIMIT 10;
+
+ROLLBACK;
 SQL
-
-
