@@ -5,8 +5,18 @@
 
 readonly AMonth=$((31 * 24 * 60))
 
-while IFS=\# read -r user
+while IFS=\# read -r user zone
 do
+  if [ "$zone" != iplant ]
+  then
+    user="$user"\#"$zone"
+  fi
+
+  if [ "$user" == anonymous -o "$user" == rodsBoot ]
+  then
+    continue
+  fi
+
   printf 'removing trash for %s\n' "$user"
   irmtrash -M -u "$user" --age "$AMonth"
 done < <(iadmin lu | sort)
