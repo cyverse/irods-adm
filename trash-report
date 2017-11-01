@@ -154,7 +154,7 @@ SELECT
   COUNT(t.id)                                              AS "Trash Count",
   SUM(COALESCE(t.size, 0)) / 2 ^ 40                        AS "Trash Volume (TiB)"
 FROM r_resc_main AS r LEFT JOIN trash AS t ON t.resource = r.resc_name
-WHERE r.resc_type_name = 'unix file system'
+WHERE r.resc_name != 'bundleResc' AND r.resc_type_name IN ('unixfilesystem', 'unix file system')
 GROUP BY r.resc_name
 ORDER BY r.resc_name;
 
