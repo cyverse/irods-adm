@@ -5,6 +5,12 @@
 
 readonly AMonth=$((31 * 24 * 60))
 
+if ! iadmin lz &> /dev/null
+then
+  printf "aren't authenticated as a rodsadmin user\n"
+  exit 1
+fi
+
 while IFS=\# read -r user zone
 do
   if [ "$zone" != iplant ]
