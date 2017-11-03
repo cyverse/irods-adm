@@ -3,6 +3,7 @@
 # This script deletes the trash older than one month. It deletes the oldest trash first.
 #
 
+set -e
 
 readonly UpperBound=$(date --date '1 month ago' '+%s')
 
