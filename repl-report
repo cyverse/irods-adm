@@ -1,7 +1,7 @@
 #! /bin/bash
 
 readonly ExecName=$(basename $0)
-readonly Version=1
+readonly Version=2
 
 
 show_help()
@@ -81,10 +81,14 @@ do
   esac
 done
 
+readonly MaxTime=$(date --date yesterday '+%s')
+
 psql $HostArg $PortArg ICAT icat_reader <<EOSQL
 SELECT resc_name AS resource, COUNT(*) AS count, SUM(data_size) / 1024 ^ 4 AS "volume (TiB)"
 FROM r_data_main
 WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
+  AND create_ts < '0$MaxTime'
+  AND resc_name NOT IN ('cyverseUKRes', 'haboobRes', 'unlRes')
 GROUP BY resc_name
 ORDER BY resc_name
 EOSQL

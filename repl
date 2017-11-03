@@ -294,7 +294,7 @@ track_prog()
     fi
   done
 
-  update_progress '\r%*s\r' ${#msg} '' 
+  update_progress '\r%*s\r' ${#msg} ''
   msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
   update_progress '%s\n' "$msg"
   printf '%s' "$cnt"
@@ -398,7 +398,7 @@ else
   readonly BaseCond=TRUE
 fi
 
-readonly MaxTime=$(date --date=yesterday '+%s')
+readonly MaxTime=$(date --date yesterday '+%s')
 
 psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host irods-db3 \
      ICAT icat_reader \
