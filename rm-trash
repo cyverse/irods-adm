@@ -5,42 +5,61 @@
 
 set -e
 
+
+truncate_by_time()
+{
+  local upperBound="$1"
+
+  while read -r modifyTs dataObj
+  do
+    if [ "$modifyTs" -ge "$upperBound" ]
+    then
+      break
+    fi
+
+    printf '%d %s\n' "$modifyTs" "$dataObj"
+  done
+}
+
+
+rm_empty_collections()
+{
+  while read -r coll
+  do
+    # don't delete collections with child collections
+    if [ 0 -lt $(iquest '%s' "SELECT count(COLL_ID) WHERE COLL_PARENT_NAME = '$coll'") ]
+    then
+      continue
+    fi
+
+    # don't delete collections with data objects in them
+    if [ 0 -lt $(iquest '%s' "SELECT count(DATA_ID) WHERE COLL_NAME = '$coll'") ]
+    then
+      continue
+    fi
+
+    irm -f -r -v "$coll"
+  done
+}
+
+
 readonly UpperBound=$(date --date '1 month ago' '+%s')
 
-# Gather the data to delete ordered by the time when they were put in the trash
+# Remove the data objects
 iquest --no-page \
     '%s %s/%s' \
-    "SELECT order(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
-     WHERE COLL_NAME LIKE '/iplant/trash/home/%' AND DATA_MODIFY_TIME < '0$UpperBound'" \
-   | sed '/^CAT_NO_ROWS_FOUND: Nothing was found matching your query$/d' \
-   | cut --delimiter ' ' --fields 2- \
-   | xargs --no-run-if-empty --delimiter '\n' irm -f -v
+    "SELECT max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
+     WHERE COLL_NAME LIKE '/iplant/trash/home/%'" \
+  | sed '/^CAT_NO_ROWS_FOUND: Nothing was found matching your query$/d' \
+  | sed 's/^0//' \
+  | sort --numeric --key 1,1 \
+  | truncate_by_time "$UpperBound" \
+  | cut --delimiter ' ' --fields 2- \
+  | xargs --no-run-if-empty --delimiter '\n' irm -f -v
 
 # Remove the empty trash collections
-
-readonly TrashCollections=$(mktemp)
-trap "rm --force '$TrashCollections'" EXIT
-
-# Gather the trash collections that may now be empty
-# They are returned in descending order to ensure that the empty child collections are removed
+# They are processed in descending order to ensure that the empty child collections are removed
 # before their parents are inspected.
 iquest --no-page '%s' "SELECT order_desc(COLL_NAME) WHERE COLL_NAME LIKE '/iplant/trash/home/%'" \
   | sed --quiet '/^\/iplant\/trash\/home\/[^\/]*\//p' \
-  > "$TrashCollections"
-
-while read -r coll
-do
-  # don't delete collections with child collections
-  if [ 0 -lt $(iquest '%s' "SELECT count(COLL_ID) WHERE COLL_PARENT_NAME = '$coll'") ]
-  then
-    continue
-  fi
-
-  # don't delete collections with data objects in them
-  if [ 0 -lt $(iquest '%s' "SELECT count(DATA_ID) WHERE COLL_NAME = '$coll'") ]
-  then
-    continue
-  fi
-
-  irm -f -r -v "$coll"
-done < "$TrashCollections"
+  | rm_empty_collections
