@@ -38,7 +38,10 @@ rm_empty_collections()
       continue
     fi
 
-    irm -f -r -v "$coll"
+    if irm -f -r "$coll"
+    then
+      printf 'Deleted collection %s\n' "$coll"
+    fi
   done
 }
 
