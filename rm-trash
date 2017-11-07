@@ -6,6 +6,16 @@
 set -e
 
 
+quest()
+{
+  local fmt="$1"
+  local query="$2"
+
+  iquest --no-page "$fmt" "$query" \
+    | sed '/^CAT_NO_ROWS_FOUND: Nothing was found matching your query$/d'
+}
+
+
 truncate_by_time()
 {
   local upperBound="$1"
@@ -22,38 +32,39 @@ truncate_by_time()
 }
 
 
-rm_empty_collections()
+prune_collection()
 {
-  while read -r coll
+  local collection="$1"
+
+  if [ 0 -eq $(quest '%s' "select count(DATA_ID) where COLL_NAME = '$collection'") ]
+  then
+    if irm -f -r -v "$collection"
+    then
+      printf 'Deleted collection %s\n' "$collection"
+    fi
+  else
+    prune_children "$collection"
+  fi
+}
+
+
+prune_children()
+{
+  local parent="$1"
+
+  while read -r collection
   do
-    # don't delete collections with child collections
-    if [ 0 -lt $(iquest '%s' "SELECT count(COLL_ID) WHERE COLL_PARENT_NAME = '$coll'") ]
-    then
-      continue
-    fi
-
-    # don't delete collections with data objects in them
-    if [ 0 -lt $(iquest '%s' "SELECT count(DATA_ID) WHERE COLL_NAME = '$coll'") ]
-    then
-      continue
-    fi
-
-    if irm -f -r "$coll"
-    then
-      printf 'Deleted collection %s\n' "$coll"
-    fi
-  done
+    prune_collection "$collection"
+  done < <(quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '$parent'")
 }
 
 
 readonly UpperBound=$(date --date '1 month ago' '+%s')
 
 # Remove the data objects
-iquest --no-page \
-    '%s %s/%s' \
-    "SELECT max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
-     WHERE COLL_NAME LIKE '/iplant/trash/home/%'" \
-  | sed '/^CAT_NO_ROWS_FOUND: Nothing was found matching your query$/d' \
+quest '%s %s/%s' \
+      "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
+       where COLL_NAME like '/iplant/trash/home/%'" \
   | sed 's/^0//' \
   | sort --numeric --key 1,1 \
   | truncate_by_time "$UpperBound" \
@@ -61,8 +72,7 @@ iquest --no-page \
   | xargs --no-run-if-empty --delimiter '\n' irm -f -v
 
 # Remove the empty trash collections
-# They are processed in descending order to ensure that the empty child collections are removed
-# before their parents are inspected.
-iquest --no-page '%s' "SELECT order_desc(COLL_NAME) WHERE COLL_NAME LIKE '/iplant/trash/home/%'" \
-  | sed --quiet '/^\/iplant\/trash\/home\/[^\/]*\//p' \
-  | rm_empty_collections
+while read -r parent
+do
+  prune_children "$parent"
+done < <(quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/home'")
