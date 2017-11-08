@@ -36,7 +36,8 @@ prune_collection()
 {
   local collection="$1"
 
-  if [ 0 -eq $(quest '%s' "select count(DATA_ID) where COLL_NAME = '$collection'") ]
+  if [ 0 -eq $(quest '%s' "select count(DATA_ID) where COLL_NAME = '$collection'") \
+       -a 0 -eq $(quest '%s' "select count(DATA_ID) where COLL_NAME like '$collection/%'") ]
   then
     if irm -f -r -v "$collection"
     then
