@@ -62,7 +62,10 @@ prune_children()
 
 readonly UpperBound=$(date --date '1 month ago' '+%s')
 
-# Remove the data objects
+readonly TrashList=$(mktemp)
+trap "rm --force '$TrashList'" EXIT
+
+# Build the list of data objects to delete, sorted by age
 quest '%s %s/%s' \
       "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
        where COLL_NAME like '/iplant/trash/home/%'" \
@@ -70,7 +73,9 @@ quest '%s %s/%s' \
   | sort --numeric --key 1,1 \
   | truncate_by_time "$UpperBound" \
   | cut --delimiter ' ' --fields 2- \
-  | xargs --no-run-if-empty --delimiter '\n' irm -f -v
+  > "$TrashList"
+
+xargs --no-run-if-empty --delimiter '\n' irm -f -v < "$TrashList"
 
 # Remove the empty trash collections
 while read -r parent
