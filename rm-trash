@@ -76,9 +76,12 @@ quest '%s %s/%s' \
   > "$TrashList"
 
 xargs --no-run-if-empty --delimiter '\n' irm -f -v < "$TrashList"
+truncate --size 0 "$TrashList"
 
 # Remove the empty trash collections
+quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/home'" > "$TrashList"
+
 while read -r parent
 do
   prune_children "$parent"
-done < <(quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/home'")
+done < "$TrashList"
