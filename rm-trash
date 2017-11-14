@@ -6,6 +6,23 @@
 set -e
 
 
+mk_temp()
+{
+  local trashTempFiles="$1"
+
+  mktemp | tee --append "$trashTempFiles"
+}
+
+
+rm_temps()
+{
+  local trashTempFiles="$1"
+
+  xargs --no-run-if-empty rm --force < "$trashTempFiles"
+  rm --force "$trashTempFiles"
+}
+
+
 quest()
 {
   local fmt="$1"
@@ -13,6 +30,41 @@ quest()
 
   iquest --no-page "$fmt" "$query" \
     | sed '/^CAT_NO_ROWS_FOUND: Nothing was found matching your query$/d'
+}
+
+
+prune_collection()
+{
+  local trashTempFiles="$1"
+  local collection="$2"
+
+  if [ 0 -eq $(quest '%s' "select count(DATA_ID) where COLL_NAME = '$collection'") \
+       -a 0 -eq $(quest '%s' "select count(DATA_ID) where COLL_NAME like '$collection/%'") ]
+  then
+    if irm -f -r -v "$collection"
+    then
+      printf 'Deleted collection %s\n' "$collection"
+    fi
+  else
+    prune_children "$trashTempFiles" "$collection"
+  fi
+}
+
+
+prune_children()
+{
+  local trashTempFiles="$1"
+  local parent="$2"
+
+  local childList=$(mk_temp "$trashTempFiles")
+  quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '$parent'" > "$childList"
+
+  while read -r collection
+  do
+    prune_collection "$trashTempFiles" "$collection"
+  done < "$childList"
+
+  rm --force "$childList"
 }
 
 
@@ -32,40 +84,15 @@ truncate_by_time()
 }
 
 
-prune_collection()
-{
-  local collection="$1"
-
-  if [ 0 -eq $(quest '%s' "select count(DATA_ID) where COLL_NAME = '$collection'") \
-       -a 0 -eq $(quest '%s' "select count(DATA_ID) where COLL_NAME like '$collection/%'") ]
-  then
-    if irm -f -r -v "$collection"
-    then
-      printf 'Deleted collection %s\n' "$collection"
-    fi
-  else
-    prune_children "$collection"
-  fi
-}
-
-
-prune_children()
-{
-  local parent="$1"
-
-  while read -r collection
-  do
-    prune_collection "$collection"
-  done < <(quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '$parent'")
-}
-
+readonly TrashTempFiles=$(mktemp)
+trap "rm_temps '$TrashTempFiles'" EXIT
 
 readonly UpperBound=$(date --date '1 month ago' '+%s')
-
-readonly TrashList=$(mktemp)
-trap "rm --force '$TrashList'" EXIT
+readonly TrashList=$(mk_temp "$TrashTempFiles")
 
 # Build the list of data objects to delete, sorted by age
+printf 'Gathering data objects to delete\n'
+
 quest '%s %s/%s' \
       "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
        where COLL_NAME like '/iplant/trash/home/%'" \
@@ -76,12 +103,15 @@ quest '%s %s/%s' \
   > "$TrashList"
 
 xargs --no-run-if-empty --delimiter '\n' irm -f -v < "$TrashList"
-truncate --size 0 "$TrashList"
 
 # Remove the empty trash collections
+printf 'Gathering home collections to prune\n'
 quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/home'" > "$TrashList"
 
 while read -r parent
 do
-  prune_children "$parent"
+  printf 'Pruning %s\n' "$parent"
+  prune_children "$TrashTempFiles" "$parent"
 done < "$TrashList"
+
+rm --force "$TrashList"
