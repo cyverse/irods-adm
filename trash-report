@@ -6,8 +6,7 @@ readonly Version=1
 
 show_help()
 {
-  cat \
-<<EOF
+  cat <<EOF
 
 $ExecName version $Version
 
@@ -31,64 +30,11 @@ EOF
 }
 
 
-show_version()
+mk_trash_report()
 {
-  printf '%s\n' "$Version"
-}
+  local cutOff_s="$1"
 
-
-set -e
-
-readonly Opts=$(getopt --name "$ExecName" \
-                        --options hH:p:v \
-                        --longoptions help,host:,port:,version \
-                        -- \
-                        "$@")
-
-if [ "$?" -ne 0 ]
-then
-  show_help >&2
-  exit 1
-fi
-
-eval set -- "$Opts"
-
-while true
-do
-  case "$1" in
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -H|--host)
-      readonly HostArg="--host $2"
-      shift 2
-      ;;
-    -p|--port)
-      readonly PortArg="--port $2"
-      shift 2
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      show_help >&2
-      exit 1
-      ;;
-  esac
-done
-
-
-readonly Now_s=$(date '+%s')
-readonly CutOff_min=$((Now_s / 60 - 31 * 24 * 60))
-readonly CutOff_s=$((CutOff_min * 60))
-
-psql $HostArg $PortArg ICAT icat_reader <<SQL
+  cat <<SQL
 \\timing on
 
 BEGIN;
@@ -115,7 +61,7 @@ SELECT
   d.data_size,
   REGEXP_REPLACE(d.resc_hier, '^.*;', ''),
   c.owner,
-  d.modify_ts <= '0$CutOff_s'
+  d.modify_ts <= '0$cutOff_s'
 FROM r_data_main AS d JOIN trash_collections AS c ON c.id = d.coll_id;
 CREATE INDEX idx_trash_owner ON trash(owner);
 CREATE INDEX idx_trash_resource ON trash(resource);
@@ -186,3 +132,63 @@ LIMIT 10;
 
 ROLLBACK;
 SQL
+}
+
+
+show_version()
+{
+  printf '%s\n' "$Version"
+}
+
+
+set -e
+
+readonly Opts=$(getopt --name "$ExecName" \
+                        --options hH:p:v \
+                        --longoptions help,host:,port:,version \
+                        -- \
+                        "$@")
+
+if [ "$?" -ne 0 ]
+then
+  show_help >&2
+  exit 1
+fi
+
+eval set -- "$Opts"
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -H|--host)
+      readonly HostArg="--host $2"
+      shift 2
+      ;;
+    -p|--port)
+      readonly PortArg="--port $2"
+      shift 2
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      show_help >&2
+      exit 1
+      ;;
+  esac
+done
+
+readonly Now_s=$(date '+%s')
+readonly CutOff_min=$((Now_s / 60 - 31 * 24 * 60))
+readonly CutOff_s=$((CutOff_min * 60))
+
+mk_trash_report "$CutOff_s" | psql $HostArg $PortArg ICAT icat_reader
