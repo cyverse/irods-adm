@@ -6,7 +6,7 @@ readonly Version=2
 
 show_help()
 {
-cat <<EOF
+  cat <<EOF
 
 $ExecName version $Version
 
@@ -29,6 +29,68 @@ EOF
 }
 
 
+main()
+{
+  local opts=
+
+  if ! opts=$(getopt --name "$ExecName" --longoptions help,host:,port:,version --options hH:p:v -- "$@")
+  then
+    show_help >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      -H|--host)
+        local hostArg="--host $2"
+        shift 2
+        ;;
+      -p|--port)
+        local portArg="--port $2"
+        shift 2
+        ;;
+      -v|--version)
+        show_version
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
+  mk_report_query $(date --date yesterday '+%s') | psql $hostArg $portArg ICAT icat_reader
+}
+
+
+mk_report_query()
+{
+  local maxTime="$1"
+
+  cat <<EOSQL
+SELECT resc_name AS resource, COUNT(*) AS count, SUM(data_size) / 1024 ^ 4 AS "volume (TiB)"
+FROM r_data_main
+WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
+  AND create_ts < '0$maxTime'
+  AND resc_name NOT IN ('cyverseUKRes', 'haboobRes', 'unlRes')
+GROUP BY resc_name
+ORDER BY resc_name
+EOSQL
+}
+
+
 show_version()
 {
   printf '%s\n' "$Version"
@@ -37,58 +99,4 @@ show_version()
 
 set -e
 
-readonly Opts=$(getopt --name "$ExecName" \
-                       --options hH:p:v \
-                       --longoptions help,host:,port:,version \
-                       -- \
-                       "$@")
-
-if [ "$?" -ne 0 ]
-then
-  show_help >&2
-  exit 1
-fi
-
-eval set -- "$Opts"
-
-while true
-do
-  case "$1" in
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -H|--host)
-      readonly HostArg="--host $2"
-      shift 2
-      ;;
-    -p|--port)
-      readonly PortArg="--port $2"
-      shift 2
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      show_help >&2
-      exit 1
-      ;;
-  esac
-done
-
-readonly MaxTime=$(date --date yesterday '+%s')
-
-psql $HostArg $PortArg ICAT icat_reader <<EOSQL
-SELECT resc_name AS resource, COUNT(*) AS count, SUM(data_size) / 1024 ^ 4 AS "volume (TiB)"
-FROM r_data_main
-WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
-  AND create_ts < '0$MaxTime'
-  AND resc_name NOT IN ('cyverseUKRes', 'haboobRes', 'unlRes')
-GROUP BY resc_name
-ORDER BY resc_name
-EOSQL
+main "$@"
