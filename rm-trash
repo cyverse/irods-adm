@@ -3,7 +3,41 @@
 # This script deletes the trash older than one month. It deletes the oldest trash first.
 #
 
-set -e
+
+main()
+{
+  local trashTempFiles=$(mktemp)
+  trap "rm_temps '$trashTempFiles'" EXIT
+
+  local upperBound=$(date --date '1 month ago' '+%s')
+  local trashList=$(mk_temp "$trashTempFiles")
+
+  # Build the list of data objects to delete, sorted by age
+  printf 'Gathering data objects to delete\n'
+
+  quest '%s %s/%s' \
+        "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
+         where COLL_NAME like '/iplant/trash/home/%'" \
+    | sed 's/^0//' \
+    | sort --numeric --key 1,1 \
+    | truncate_by_time "$upperBound" \
+    | cut --delimiter ' ' --fields 2- \
+    > "$trashList"
+
+  xargs --no-run-if-empty --delimiter '\n' irm -f -v < "$trashList"
+
+  # Remove the empty trash collections
+  printf 'Gathering home collections to prune\n'
+  quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/home'" > "$trashList"
+
+  while read -r parent
+  do
+    printf 'Pruning %s\n' "$parent"
+    prune_children "$trashTempFiles" "$parent"
+  done < "$trashList"
+
+  rm --force "$trashList"
+}
 
 
 mk_temp()
@@ -84,34 +118,6 @@ truncate_by_time()
 }
 
 
-readonly TrashTempFiles=$(mktemp)
-trap "rm_temps '$TrashTempFiles'" EXIT
+set -e
 
-readonly UpperBound=$(date --date '1 month ago' '+%s')
-readonly TrashList=$(mk_temp "$TrashTempFiles")
-
-# Build the list of data objects to delete, sorted by age
-printf 'Gathering data objects to delete\n'
-
-quest '%s %s/%s' \
-      "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
-       where COLL_NAME like '/iplant/trash/home/%'" \
-  | sed 's/^0//' \
-  | sort --numeric --key 1,1 \
-  | truncate_by_time "$UpperBound" \
-  | cut --delimiter ' ' --fields 2- \
-  > "$TrashList"
-
-xargs --no-run-if-empty --delimiter '\n' irm -f -v < "$TrashList"
-
-# Remove the empty trash collections
-printf 'Gathering home collections to prune\n'
-quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/home'" > "$TrashList"
-
-while read -r parent
-do
-  printf 'Pruning %s\n' "$parent"
-  prune_children "$TrashTempFiles" "$parent"
-done < "$TrashList"
-
-rm --force "$TrashList"
+main
