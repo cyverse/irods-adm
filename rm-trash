@@ -13,7 +13,7 @@ main()
   local trashList=$(mk_temp "$trashTempFiles")
 
   # Build the list of data objects to delete, sorted by age
-  printf 'Gathering data objects to delete\n'
+  printf 'Retrieving data objects to delete...\n'
 
   quest '%s %s/%s' \
         "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
@@ -24,15 +24,18 @@ main()
     | cut --delimiter ' ' --fields 2- \
     > "$trashList"
 
+  printf '%d data objects to delete\n' $(cat "$trashList" | wc --lines)
   xargs --no-run-if-empty --delimiter '\n' irm -f -v < "$trashList"
 
   # Remove the empty trash collections
-  printf 'Gathering home collections to prune\n'
+  printf 'Retrieving home collections to prune...\n'
   quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/home'" > "$trashList"
+
+  printf '%d home collections to prune\n' $(cat "$trashList" | wc --lines)
 
   while read -r parent
   do
-    printf 'Pruning %s\n' "$parent"
+    printf 'Pruning %s...\n' "$parent"
     prune_children "$trashTempFiles" "$parent"
   done < "$trashList"
 
