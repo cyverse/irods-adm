@@ -270,6 +270,23 @@ mk_prog_msg()
 }
 
 
+mk_repl_query()
+{
+  local maxTime="$1"
+  local baseCond="$2"
+  local resCond="$3"
+
+  cat <<EOSQL
+SELECT d.data_size, c.coll_name || '/' || d.data_name
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
+  AND d.create_ts < '0$maxTime'
+  AND ($baseCond)
+  AND ($resCond)
+EOSQL
+}
+
+
 track_prog()
 {
   local cnt="$1"
@@ -383,6 +400,8 @@ fi
 
 update_progress 'Retrieving data objects to replicate...\n'
 
+readonly MaxCreateTime=$(date --date $(date --iso-8601 --date yesterday) '+%s')
+
 if [ -n "$SrcRes" ]
 then
   readonly ResCond="d.resc_name = '$SrcRes'"
@@ -397,29 +416,12 @@ else
   readonly BaseCond=TRUE
 fi
 
-readonly MaxTime=$(date --date "$(date --iso-8601 --date yesterday)" '+%s')
-
-mk_repl_query()
-{
-  local maxTime="$1"
-
-  cat <<EOSQL
-SELECT d.data_size, c.coll_name || '/' || d.data_name
-FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
-  AND d.create_ts < '0$maxTime'
-  AND ($BaseCond)
-  AND ($ResCond)
-EOSQL
-}
-
-readonly ReplQuery=$(mk_repl_query $(date --date "$(date --iso-8601 --date yesterday)" '+%s'))
+readonly ReplQuery=$(mk_repl_query "$MaxCreateTime" "$BaseCond" "$ResCond")
 
 psql --no-align --tuples-only --record-separator-zero \
      --command "$ReplQuery" --field-separator ' ' --host irods-db3 \
      ICAT icat_reader \
   > "$ObjectList"
-
 
 readonly Tot=$(count < "$ObjectList")
 update_progress '%d data objects to replicate\n' "$Tot"
