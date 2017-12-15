@@ -30,6 +30,57 @@ EOF
 }
 
 
+main()
+{
+  local opts=$(getopt --longoptions help,host:,port:,version --name "$ExecName" --options hH:p:v \
+                      -- \
+                      "$@")
+
+  if [ "$?" -ne 0 ]
+  then
+    show_help >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      -H|--host)
+        local hostArg="--host $2"
+        shift 2
+        ;;
+      -p|--port)
+        local portArg="--port $2"
+        shift 2
+        ;;
+      -v|--version)
+        show_version
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
+  local now_s=$(date '+%s')
+  local cutOff_min=$((now_s / 60 - 31 * 24 * 60))
+  local cutOff_s=$((cutOff_min * 60))
+  mk_trash_report "$cutOff_s" | psql $hostArg $portArg ICAT icat_reader
+}
+
+
 mk_trash_report()
 {
   local cutOff_s="$1"
@@ -143,52 +194,5 @@ show_version()
 
 set -e
 
-readonly Opts=$(getopt --name "$ExecName" \
-                        --options hH:p:v \
-                        --longoptions help,host:,port:,version \
-                        -- \
-                        "$@")
 
-if [ "$?" -ne 0 ]
-then
-  show_help >&2
-  exit 1
-fi
-
-eval set -- "$Opts"
-
-while true
-do
-  case "$1" in
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -H|--host)
-      readonly HostArg="--host $2"
-      shift 2
-      ;;
-    -p|--port)
-      readonly PortArg="--port $2"
-      shift 2
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      show_help >&2
-      exit 1
-      ;;
-  esac
-done
-
-readonly Now_s=$(date '+%s')
-readonly CutOff_min=$((Now_s / 60 - 31 * 24 * 60))
-readonly CutOff_s=$((CutOff_min * 60))
-
-mk_trash_report "$CutOff_s" | psql $HostArg $PortArg ICAT icat_reader
+main "$@"
