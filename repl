@@ -33,11 +33,10 @@ Options:
  -v, --verison  show version and exit
 
 Summary:
-This script replicates data objects that haven't been created in the last day to
-the taccCorralRes resource. It only replicates objects that only have one
-replica that is not in the /iplant/home/shared/aegis collection nor on the
-cshlWildcatRes resource. It writes progress to standard error and all messages,
-error or otherwise, to standard out.
+This program replicates data objects that were created before yesterday. It only
+replicates objects to the <dest_resc> if a replica doesn't already exist there.
+It writes progress to standard error and all messages, error or otherwise, to
+standard out.
 
 Prerequisites:
  1) The user must be initialized with iRODS as an admin user.
@@ -398,18 +397,29 @@ else
   readonly BaseCond=TRUE
 fi
 
-readonly MaxTime=$(date --date yesterday '+%s')
+readonly MaxTime=$(date --date "$(date --iso-8601 --date yesterday)" '+%s')
 
-psql --no-align --tuples-only --record-separator-zero --field-separator ' ' --host irods-db3 \
-     ICAT icat_reader \
-<<EOSQL > "$ObjectList"
+mk_repl_query()
+{
+  local maxTime="$1"
+
+  cat <<EOSQL
 SELECT d.data_size, c.coll_name || '/' || d.data_name
-  FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-  WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
-    AND d.create_ts < '0$MaxTime'
-    AND ($BaseCond)
-    AND ($ResCond)
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
+  AND d.create_ts < '0$maxTime'
+  AND ($BaseCond)
+  AND ($ResCond)
 EOSQL
+}
+
+readonly ReplQuery=$(mk_repl_query $(date --date "$(date --iso-8601 --date yesterday)" '+%s'))
+
+psql --no-align --tuples-only --record-separator-zero \
+     --command "$ReplQuery" --field-separator ' ' --host irods-db3 \
+     ICAT icat_reader \
+  > "$ObjectList"
+
 
 readonly Tot=$(count < "$ObjectList")
 update_progress '%d data objects to replicate\n' "$Tot"

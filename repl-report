@@ -13,9 +13,10 @@ $ExecName version $Version
 Usage:
  $ExecName [options]
 
-Generates a report on the data objects that need to be replicated. It lists the
-number of unreplicated data objects and their volume broken down by the storage
-resource holding the corresponding files.
+This program generates a report on the data objects that need to be replicated.
+An object needs to be replicated if it was created before yesterday and has no
+replica yet. The report lists the number of unreplicated data objects and their
+volume broken down by the storage resource holding the corresponding files.
 
 Options:
  -H, --host <host>  connect to the ICAT's DBMS on the host <host> instead of
@@ -71,7 +72,8 @@ main()
     esac
   done
 
-  mk_report_query $(date --date yesterday '+%s') | psql $hostArg $portArg ICAT icat_reader
+  local query=$(mk_report_query $(date --date $(date --iso-8601 --date yesterday) '+%s'))
+  psql $hostArg $portArg --command "$query" ICAT icat_reader
 }
 
 
