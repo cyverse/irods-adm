@@ -24,15 +24,21 @@ Options:
  -p, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
                     instead of the PostgreSQL default
 
+ -d, --debug    display progress and query time information
  -h, --help     display help text and exit
  -v, --version  display version and exit
 EOF
 }
 
 
+Debug=false
+
+
 main()
 {
-  local opts=$(getopt --longoptions help,host:,port:,version --name "$ExecName" --options hH:p:v \
+  local opts=$(getopt --longoptions debug,help,host:,port:,version \
+                      --name "$ExecName" \
+                      --options dhH:p:v \
                       -- \
                       "$@")
 
@@ -47,6 +53,10 @@ main()
   while true
   do
     case "$1" in
+      -d|--debug)
+      Debug=true;
+      shift 1
+      ;;
       -h|--help)
         show_help
         return 0
@@ -79,17 +89,43 @@ main()
 }
 
 
+inject_debug_msg()
+{
+  local msg="$*"
+
+  inject_debug_newline
+  inject_debug_stmt \\echo \'$msg\'
+}
+
+
+inject_debug_newline()
+{
+  inject_debug_stmt \\echo \'\'
+}
+
+
+inject_debug_stmt()
+{
+  local stmt="$*"
+
+  if [ "$Debug" == true ]
+  then
+    printf '%s\n' "$stmt"
+  fi
+}
+
+
 mk_trash_report()
 {
   local cutOff_s="$1"
 
   cat <<SQL
-\\timing on
+$(inject_debug_stmt '\timing on')
+$(inject_debug_newline)
 
 BEGIN;
 
-\\echo
-\\echo Gathering trash collections
+$(inject_debug_msg Gathering trash collections)
 CREATE TEMPORARY TABLE trash_collections (id, owner) AS
 WITH RECURSIVE
   colls(id, name, owner) AS (
@@ -102,8 +138,7 @@ WITH RECURSIVE
 SELECT id, owner FROM colls;
 CREATE INDEX idx_trash_collections ON trash_collections(id);
 
-\\echo
-\\echo Gathering trash
+$(inject_debug_msg Gathering trash)
 CREATE TEMPORARY TABLE trash (id, size, resource, owner, delete) AS
 SELECT
   d.data_id,
@@ -115,8 +150,7 @@ FROM r_data_main AS d JOIN trash_collections AS c ON c.id = d.coll_id;
 CREATE INDEX idx_trash_owner ON trash(owner);
 CREATE INDEX idx_trash_resource ON trash(resource);
 
-\\echo
-\\echo Summarizing trash statistics by owner
+$(inject_debug_msg Summarizing trash statistics by owner)
 CREATE TEMPORARY TABLE trash_by_owner (owner, delete_count, delete_volume, count, volume) AS
 SELECT
   owner,
@@ -139,7 +173,7 @@ SELECT
   SUM(volume) / 2 ^ 40         AS "Trash Volume (TiB)"
 FROM trash_by_owner;
 
-\\echo
+$(inject_debug_newline)
 \\echo Trash by Resource
 \\echo =================
 SELECT
@@ -153,7 +187,7 @@ WHERE r.resc_name != 'bundleResc' AND r.resc_type_name IN ('unixfilesystem', 'un
 GROUP BY r.resc_name
 ORDER BY r.resc_name;
 
-\\echo
+$(inject_debug_newline)
 \\echo Top 10 Users by Delete Count
 \\echo ============================
 SELECT
@@ -166,7 +200,7 @@ FROM trash_by_owner
 ORDER BY delete_count DESC
 LIMIT 10;
 
-\\echo
+$(inject_debug_newline)
 \\echo Top 10 Users by Delete Volume
 \\echo =============================
 SELECT
