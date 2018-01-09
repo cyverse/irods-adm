@@ -115,6 +115,16 @@ inject_debug_stmt()
 }
 
 
+inject_set_title()
+{
+  local title="$*"
+
+  inject_debug_newline
+  printf "\\pset title '%s'\n" "$title"
+  printf "\\\\echo ''\n"
+}
+
+
 mk_trash_report()
 {
   local cutOff_s="$1"
@@ -163,9 +173,7 @@ GROUP BY owner;
 CREATE INDEX idx_trash_by_owner_delete_count ON trash_by_owner(delete_count);
 CREATE INDEX idx_trash_by_owner_delete_volume ON trash_by_owner(delete_volume);
 
-\\echo
-\\echo Trash Summary
-\\echo =============
+$(inject_set_title Trash Summary)
 SELECT
   SUM(delete_count)            AS "To Delete Count",
   SUM(delete_volume) / 2 ^ 40  AS "To Delete Volume (TiB)",
@@ -173,9 +181,7 @@ SELECT
   SUM(volume) / 2 ^ 40         AS "Trash Volume (TiB)"
 FROM trash_by_owner;
 
-$(inject_debug_newline)
-\\echo Trash by Resource
-\\echo =================
+$(inject_set_title Trash by Resource)
 SELECT
   r.resc_name                                              AS "Storage Resource",
   COUNT(NULLIF(t.delete, FALSE))                           AS "To Delete Count",
@@ -187,9 +193,7 @@ WHERE r.resc_name != 'bundleResc' AND r.resc_type_name IN ('unixfilesystem', 'un
 GROUP BY r.resc_name
 ORDER BY r.resc_name;
 
-$(inject_debug_newline)
-\\echo Top 10 Users by Delete Count
-\\echo ============================
+$(inject_set_title Top 10 Users by Delete Count)
 SELECT
   owner                   AS "User",
   delete_count            AS "To Delete Count",
@@ -200,9 +204,7 @@ FROM trash_by_owner
 ORDER BY delete_count DESC
 LIMIT 10;
 
-$(inject_debug_newline)
-\\echo Top 10 Users by Delete Volume
-\\echo =============================
+$(inject_set_title Top 10 Users by Delete Volume)
 SELECT
   owner                   AS "User",
   delete_count            AS "To Delete Count",
@@ -213,6 +215,7 @@ FROM trash_by_owner
 ORDER BY delete_volume DESC
 LIMIT 10;
 
+$(inject_debug_newline)
 ROLLBACK;
 SQL
 }
