@@ -120,7 +120,7 @@ mk_trash_report()
   local cutOff_s="$1"
 
   cat <<SQL
-$(inject_debug_stmt '\timing on')
+$(inject_debug_stmt \\timing on)
 $(inject_debug_newline)
 
 BEGIN;
