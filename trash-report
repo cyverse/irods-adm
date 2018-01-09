@@ -85,7 +85,7 @@ main()
   done
 
   local cutOff_s=$(date --date $(date --iso-8601 --date '1 month ago') '+%s');
-  mk_trash_report "$cutOff_s" | psql $hostArg $portArg ICAT icat_reader
+  mk_trash_report "$cutOff_s" | psql --quiet $hostArg $portArg ICAT icat_reader
 }
 
 
@@ -104,6 +104,14 @@ inject_debug_newline()
 }
 
 
+inject_debug_quiet()
+{
+  local state="$1"
+
+  inject_debug_stmt \\set QUIET "$state"
+}
+
+
 inject_debug_stmt()
 {
   local stmt="$*"
@@ -119,9 +127,9 @@ inject_set_title()
 {
   local title="$*"
 
-  inject_debug_newline
+  inject_debug_quiet on
   printf "\\pset title '%s'\n" "$title"
-  printf "\\\\echo ''\n"
+  inject_debug_quiet off
 }
 
 
@@ -132,7 +140,7 @@ mk_trash_report()
   cat <<SQL
 \\pset footer off
 $(inject_debug_stmt \\timing on)
-$(inject_debug_newline)
+$(inject_debug_quiet off)
 
 BEGIN;
 
@@ -174,6 +182,9 @@ GROUP BY owner;
 CREATE INDEX idx_trash_by_owner_delete_count ON trash_by_owner(delete_count);
 CREATE INDEX idx_trash_by_owner_delete_volume ON trash_by_owner(delete_volume);
 
+\\echo ''
+
+$(inject_debug_newline)
 $(inject_set_title Trash Summary)
 SELECT
   SUM(delete_count)            AS "To Delete Count",
@@ -182,6 +193,7 @@ SELECT
   SUM(volume) / 2 ^ 40         AS "Trash Volume (TiB)"
 FROM trash_by_owner;
 
+$(inject_debug_newline)
 $(inject_set_title Trash by Resource)
 SELECT
   r.resc_name                                              AS "Storage Resource",
@@ -194,6 +206,7 @@ WHERE r.resc_name != 'bundleResc' AND r.resc_type_name IN ('unixfilesystem', 'un
 GROUP BY r.resc_name
 ORDER BY r.resc_name;
 
+$(inject_debug_newline)
 $(inject_set_title Top 10 Users by Delete Count)
 SELECT
   owner                   AS "User",
@@ -205,6 +218,7 @@ FROM trash_by_owner
 ORDER BY delete_count DESC
 LIMIT 10;
 
+$(inject_debug_newline)
 $(inject_set_title Top 10 Users by Delete Volume)
 SELECT
   owner                   AS "User",
@@ -216,6 +230,7 @@ FROM trash_by_owner
 ORDER BY delete_volume DESC
 LIMIT 10;
 
+$(inject_debug_newline)
 $(inject_debug_newline)
 ROLLBACK;
 SQL
