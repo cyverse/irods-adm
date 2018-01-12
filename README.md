@@ -59,3 +59,5 @@ The program `data-store-fix` can be used to detect and repair issues with the Da
 ## Trash
 
 The program `trash-report` can be used to generate a report on how much trash there is.
+
+The program `rm-trash` can be used to empty trash older than one month.
