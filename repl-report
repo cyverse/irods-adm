@@ -1,7 +1,7 @@
 #! /bin/bash
 
 readonly ExecName=$(basename $0)
-readonly Version=2
+readonly Version=3
 
 
 show_help()
@@ -24,17 +24,29 @@ Options:
  -p, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
                     instead of the PostgreSQL default
 
+ -d, --debug    display progress and query time information
+ -f, --full     include all unreplicated objects, not just the ones created
+                before yesterday
  -h, --help     display help text and exit
  -v, --version  display version and exit
 EOF
 }
 
 
+Debug=false
+
+
 main()
 {
-  local opts=
+ local opts=
 
-  if ! opts=$(getopt --name "$ExecName" --longoptions help,host:,port:,version --options hH:p:v -- "$@")
+ opts=$(getopt --longoptions debug,full,help,host:,port:,version \
+               --name "$ExecName" \
+               --options dfhH:p:v \
+               -- \
+               "$@")
+
+  if [ $? != 0 ]
   then
     show_help >&2
     return 1
@@ -45,6 +57,14 @@ main()
   while true
   do
     case "$1" in
+      -d|--debug)
+        Debug=true
+        shift
+        ;;
+      -f|--full)
+        local noTimeRestriction=true
+        shift
+        ;;
       -h|--help)
         show_help
         return 0
@@ -72,23 +92,110 @@ main()
     esac
   done
 
-  local query=$(mk_report_query $(date --date $(date --iso-8601 --date yesterday) '+%s'))
-  psql $hostArg $portArg --command "$query" ICAT icat_reader
+  mk_report_query "$noTimeRestriction" | psql --quiet $hostArg $portArg ICAT icat_reader
+}
+
+
+inject_debug_msg()
+{
+  local msg="$*"
+
+  inject_debug_newline
+  inject_debug_stmt \\echo \'$msg\'
+}
+
+
+inject_debug_newline()
+{
+  inject_debug_stmt \\echo
+}
+
+
+inject_debug_quiet()
+{
+  local state="$1"
+
+  inject_debug_stmt \\set QUIET "$state"
+}
+
+
+inject_debug_stmt()
+{
+  local stmt="$*"
+
+  if [ "$Debug" == true ]
+  then
+    printf '%s\n' "$stmt"
+  fi
+}
+
+
+inject_set_title()
+{
+  local title="$*"
+
+  inject_debug_quiet on
+  printf "\\pset title '%s'\n" "$title"
+  inject_debug_quiet off
+}
+
+
+inject_time_restriction()
+{
+  local noTimeRestriction="$1"
+
+  if [ "$noTimeRestriction" == true ]
+  then
+    printf TRUE
+  else
+    printf "create_ts < '0%s'" $(date --date $(date --iso-8601 --date yesterday) '+%s')
+  fi
 }
 
 
 mk_report_query()
 {
-  local maxTime="$1"
+  local noTimeRestriction="$1"
 
   cat <<EOSQL
-SELECT resc_name AS resource, COUNT(*) AS count, SUM(data_size) / 1024 ^ 4 AS "volume (TiB)"
+\\pset footer off
+$(inject_debug_stmt \\timing on)
+$(inject_debug_quiet off)
+
+BEGIN;
+
+$(inject_debug_msg Gathering unreplicated data)
+CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) AS
+SELECT resc_name, resc_hier, data_size
 FROM r_data_main
 WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
-  AND create_ts < '0$maxTime'
-  AND resc_name NOT IN ('cyverseUKRes', 'haboobRes', 'unlRes')
-GROUP BY resc_name
-ORDER BY resc_name
+  AND $(inject_time_restriction "$noTimeRestriction")
+  AND resc_name NOT IN ('cyverseUKRes', 'haboobRes', 'unlRes');
+CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
+CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
+
+\\echo
+
+$(inject_debug_newline)
+$(inject_set_title Unreplicated in Storage Resources)
+SELECT
+    SUBSTRING(store_resc FROM '(%;)*#"%#"' FOR '#')  AS "storage resource",
+    COUNT(*)                                         AS count,
+    SUM(size) / 2 ^ 40                               AS "volume (TiB)"
+FROM unreplicated_data
+GROUP BY store_resc
+ORDER BY 1;
+
+$(inject_debug_newline)
+$(inject_set_title Unreplicated in Root Resources)
+SELECT root_resc AS "root resource", COUNT(*) AS count, SUM(size) / 2 ^ 40 AS "volume (TiB)"
+FROM unreplicated_data
+GROUP BY root_resc
+ORDER BY root_resc;
+
+$(inject_debug_newline)
+$(inject_debug_newline)
+ROLLBACK;
 EOSQL
 }
 
@@ -97,8 +204,5 @@ show_version()
 {
   printf '%s\n' "$Version"
 }
-
-
-set -e
 
 main "$@"
