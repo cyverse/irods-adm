@@ -9,7 +9,7 @@ A session is a group of log messages that occurred during a single connection.
 
 The awk script `group-log-by-pid.awk` can be used to group a sequence of log messages by the connection that generated them.
 
-The bash script `dump-logs.sh` can be used to dump all of the sessions with errors from the CyVerse portion of the CyVerse grid.
+The program `dump-logs` can be used to dump all of the sessions with errors from the CyVerse portion of the CyVerse grid.
 
 The awk script `filter-session-by-cuser.awk` can be combined with `group-log-by-pid.awk` to find all of the sessions for a given user.
 
