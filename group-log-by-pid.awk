@@ -63,6 +63,18 @@ function dump_agent (entries, entryCounts, pid) {
 }
 
 
+function dump_svr(entries, entryCounts, pid) {
+  if (pid in entryCounts) {
+    for (i = 0; i <= entryCounts[pid]; i++) {
+      print_section_start(entries[pid, i]);
+      delete entries[pid, i];
+    }
+
+    delete entryCounts[pid];
+  }
+}
+
+
 function extract_start (entries, entryCounts, pid, fromAddr, user, entry) {
   dump_agent(entries, entryCounts, pid);
 
@@ -88,19 +100,18 @@ BEGIN {
 
 {
   entry = $0;
-  pid = substr($4, 5);
+  pid = substr($3, 5);
 
-  if ($6 " " $7 == "Agent process") {
-    # If server process used to be an agent dump it.
-    dump_agent(entries, entryCounts, pid);
+  if ($5 " " $6 == "Agent process") {
+    dump_svr(entries, entryCounts, pid);
 
-    aPid = $8;
+    aPid = $7;
 
-    if ($9 == "started") {
-      user = substr($13, 7);
-      fromAddr = $15;
+    if ($8 == "started") {
+      user = substr($12, 7);
+      fromAddr = $14;
       extract_start(entries, entryCounts, aPid, fromAddr, user, entry);
-    } else if ($9 == "exited") {
+    } else if ($8 == "exited") {
       extract_stop(entries, entryCounts, aPid, entry);
     } else {
       print_section_start(entry);
