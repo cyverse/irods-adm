@@ -30,6 +30,7 @@
 #         <failed session count>/<total session count>
 
 
+readonly ExecDir=$(dirname $(readlink -f "$0"))
 readonly LogBase=/var/lib/irods/iRODS/server/log/rodsLog
 
 declare year=*
@@ -71,7 +72,7 @@ filter_day()
 
 group_sessions()
 {
-  ./format-log-entries | filter_day | ./group-log-by-pid.awk
+  "$ExecDir"/format-log-entries | filter_day | "$ExecDir"/group-log-by-pid.awk
 }
 
 
