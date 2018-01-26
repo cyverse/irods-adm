@@ -41,7 +41,7 @@ if [ $# -ge 2 ]; then printf -v month '%02d' "$2"; fi
 
 if [ $# -ge 3 ]
 then
-  declare -i day="$3"
+  printf -v day '%02d' "$3"
   startDay=$((1 + ((5 * ((((day - 1)) / 5))))))
   printf -v startDay '%02d' "$startDay"
 fi
@@ -49,19 +49,29 @@ fi
 readonly LogExt="$year"."$month"."$startDay"
 
 
-grab_messages()
+filter_day()
 {
-  local svr="$1"
-  local log="$2"
-
-  if [ -z $day ]
+  if [ -z "$day" ]
   then
-    local dayFilter=.*
+    cat
   else
-    local dayFilter="^$day\$"
+    while read -r -d• jnk logMonth logDay rest
+    do
+      if [ "$logDay" = "$day" ]
+      then
+        printf '• %s %s %s\n' "$logMonth" "$logDay" "$rest"
+      elif [[ "$logDay" > "$day" ]]
+      then
+        return 0
+      fi
+    done
   fi
+}
 
-  ssh -q "$svr" "awk '\$2 ~ /$dayFilter/{ print \$0 }' '$log'"
+
+group_sessions()
+{
+  ./format-log-entries | filter_day | ./group-log-by-pid.awk
 }
 
 
@@ -88,7 +98,6 @@ do
       tot=0
       printf '\r    %d/%d' "$cnt" "$tot" >&2
 
-      # The grep removes duplicate key SQL errors
       while IFS= read -r -d§ session
       do
         if [[ "$session" =~ ERROR: ]]
@@ -99,9 +108,7 @@ do
 
         (( tot++ ))
         printf '\r    %d/%d' "$cnt" "$tot" >&2
-      done \
-        < <(grab_messages "$svr" "$log" | ./group-log-by-pid.awk) \
-        >> "$out"
+      done < <(scp -q "$svr":"$log" /dev/stdout 2>/dev/null | group_sessions) >> "$out"
 
       printf '\r' >&2
       printf '    %d/%d\n' "$cnt" "$tot"
