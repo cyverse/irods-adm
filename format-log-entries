@@ -6,7 +6,7 @@
 #
 # Here's an example entry:
 #
-#     • Jan 21 18:20:57 pid:17536 ERROR: [-]    iRODS/server/core/src/rsApiHandler.cpp:520:readAndProcClientMsg :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message []
+#     • 01-21 18:20:57 pid:17536 ERROR: [-]    iRODS/server/core/src/rsApiHandler.cpp:520:readAndProcClientMsg :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message []
 #            [-]     iRODS/lib/core/src/sockComm.cpp:199:readMsgHeader :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [failed to call 'read header']
 #                 [-]     libtcp.cpp:197:tcp_read_msg_header :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [only read [0] of [4]]
 #
@@ -15,31 +15,82 @@
 # whitespace is removed.
 
 
+function month_number(month) {
+  switch(month) {
+    case "Jan":
+      return "01";
+    case "Feb":
+      return "02";
+    case "Mar":
+      return "03";
+    case "Apr":
+      return "04";
+    case "May":
+      return "05";
+    case "Jun":
+      return "06";
+    case "Jul":
+      return "07";
+    case "Aug":
+      return "08";
+    case "Sep":
+      return "09";
+    case "Oct":
+      return "10";
+    case "Nov":
+      return "11";
+    case "Dec":
+      return "12";
+    default:
+      return "??";
+  }
+}
+
+
 BEGIN {
   currentEntry = "";
+  lastMonth = "";
+
+  if (YEAR !~ /[0-9][0-9]*/) {
+    print "The YEAR variable must be set to a number on the command line" > "/dev/stderr";
+    exit 1;
+  }
 }
 
 
 /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [ 1-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] / {
-  # Ensure days are two digits
-  if ($2 ~ /^[1-9]$/) {
-    $2 = "0" $2;
+  if (currentEntry != "") {
+    print currentEntry;
   }
 
-  print currentEntry;
-  currentEntry = "";
+  month = month_number($1);
+  day = $2;
+  rest = substr($0, match($0, $3) - 1);
+
+  # Ensure days are two digits
+  if (day ~ /^[1-9]$/) {
+    day = "0" day;
+  }
+
+  if (lastMonth == "12" && month == "01") {
+    YEAR = YEAR + 1;
+  }
+
+  currentEntry = "• " YEAR "-" month "-" day rest;
+  lastMonth = month;
+  next;
 }
 
 
 NF > 0 {
-  if (currentEntry == "") {
-    currentEntry = "• " $0;
-  } else {
+  if (currentEntry != "") {
     currentEntry = currentEntry "\n  " $0;
   }
 }
 
 
 END {
-  print currentEntry;
+  if (currentEntry != "") {
+    print currentEntry;
+  }
 }

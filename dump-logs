@@ -56,11 +56,11 @@ filter_day()
   then
     cat
   else
-    while read -r -d• jnk logMonth logDay rest
+    while IFS=' -' read -r -d• jnk logYear logMonth logDay rest
     do
       if [ "$logDay" = "$day" ]
       then
-        printf '• %s %s %s\n' "$logMonth" "$logDay" "$rest"
+        printf '• %s-%s-%s %s\n' "$logYear" "$logMonth" "$logDay" "$rest"
       elif [[ "$logDay" > "$day" ]]
       then
         return 0
@@ -72,7 +72,9 @@ filter_day()
 
 group_sessions()
 {
-  "$ExecDir"/format-log-entries | filter_day | "$ExecDir"/group-log-by-pid.awk
+  local logYear="$1"
+
+  "$ExecDir"/format-log-entries -v YEAR="$logYear" | filter_day | "$ExecDir"/group-log-by-pid.awk
 }
 
 
@@ -99,6 +101,8 @@ do
       tot=0
       printf '\r    %d/%d' "$cnt" "$tot" >&2
 
+      IFS=. read -r root logYear rest < <(basename "$log")
+
       while IFS= read -r -d§ session
       do
         if [[ "$session" =~ ERROR: ]]
@@ -109,7 +113,7 @@ do
 
         (( tot++ ))
         printf '\r    %d/%d' "$cnt" "$tot" >&2
-      done < <(scp -q "$svr":"$log" /dev/stdout 2>/dev/null | group_sessions) >> "$out"
+      done < <(scp -q "$svr":"$log" /dev/stdout 2>/dev/null | group_sessions "$logYear") >> "$out"
 
       printf '\r' >&2
       printf '    %d/%d\n' "$cnt" "$tot"
