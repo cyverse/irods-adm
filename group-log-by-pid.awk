@@ -35,16 +35,13 @@ function assign_entry (entries, entryCounts, pid, entry) {
 
 
 function format_entry(entry) {
-  # Remove trailing whitespace
-  sub(/[ \t\r\n]+$/, "", entry);
-
-  gsub("\n", "\n ", entry);
+  gsub(/\\n/, "\n   ", entry);
   return entry;
 }
 
 
 function print_section_start(entry) {
-  print "§•" format_entry(entry);
+  print "§• " format_entry(entry);
 }
 
 
@@ -54,7 +51,7 @@ function dump_agent (entries, entryCounts, pid) {
     delete entries[pid, 0];
 
     for (i = 1; i <= entryCounts[pid]; i++) {
-      print " •" format_entry(entries[pid, i]);
+      print " • " format_entry(entries[pid, i]);
       delete entries[pid, i];
     }
 
@@ -90,11 +87,6 @@ function extract_stop (entries, entryCounts, pid, entry) {
   if (pid in entryCounts) {
     dump_agent(entries, entryCounts, pid);
   }
-}
-
-
-BEGIN {
-  RS = "•";
 }
 
 

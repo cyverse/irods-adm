@@ -6,9 +6,7 @@
 #
 # Here's an example entry:
 #
-#     • 01-21 18:20:57 pid:17536 ERROR: [-]    iRODS/server/core/src/rsApiHandler.cpp:520:readAndProcClientMsg :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message []
-#            [-]     iRODS/lib/core/src/sockComm.cpp:199:readMsgHeader :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [failed to call 'read header']
-#                 [-]     libtcp.cpp:197:tcp_read_msg_header :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [only read [0] of [4]]
+#     01-21 18:20:57 pid:17536 ERROR: [-]    iRODS/server/core/src/rsApiHandler.cpp:520:readAndProcClientMsg :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message []\n     [-]     iRODS/lib/core/src/sockComm.cpp:199:readMsgHeader :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [failed to call 'read header']
 #
 # Each entry is prefixed with a "• ". If a log entry has a carriage return in it,
 # the new line is indented two spaces. Before processing a line, all leading
@@ -76,7 +74,7 @@ BEGIN {
     YEAR = YEAR + 1;
   }
 
-  currentEntry = "• " YEAR "-" month "-" day rest;
+  currentEntry = YEAR "-" month "-" day rest;
   lastMonth = month;
   next;
 }
@@ -84,7 +82,7 @@ BEGIN {
 
 NF > 0 {
   if (currentEntry != "") {
-    currentEntry = currentEntry "\n  " $0;
+    currentEntry = currentEntry "\\n" $0;
   }
 }
 

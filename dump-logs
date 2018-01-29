@@ -56,11 +56,11 @@ filter_day()
   then
     cat
   else
-    while IFS=' -' read -r -d• jnk logYear logMonth logDay rest
+    while IFS=' -' read -r logYear logMonth logDay rest
     do
       if [ "$logDay" = "$day" ]
       then
-        printf '• %s-%s-%s %s\n' "$logYear" "$logMonth" "$logDay" "$rest"
+        printf '%s-%s-%s %s\n' "$logYear" "$logMonth" "$logDay" "$rest"
       elif [[ "$logDay" > "$day" ]]
       then
         return 0
