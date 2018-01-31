@@ -1,0 +1,215 @@
+#! /bin/bash
+#
+# This script goes through all of the rodsLog files on data.cyverse.org and
+# filters out the AMQP messages related to file uploads and downloads. It then
+# summarizes the daily uploads and downloads in a CSV format, written to
+# standard out.  It writes progress messages to standard error.
+#
+# Here's the format of the output. The first row is a header row with each
+# subsequent row containing the transfer summary for a single day. The first
+# column contains the ISO 8601 style date being summarized. The second column
+# contains the number of files at least partially downloaded on the given day.
+# The third column contains the total volume in bytes of unique files at least
+# partially downloaded on the given day. The fourth column contains the number
+# of files successfully uploaded on that day. Finally, the fifth column contains
+# the total volume in bytes of files successfully uploaded on that day.
+#
+# Here's an example.
+#
+#    Date,Download Count,Download Volume(B),Upload Count,Upload Volume(B)
+#    2017-07-01,40,527487476841,2706,1177598197127
+#    2017-07-02,0,0,6611,2526292721826
+#    2017-07-03,43,24533892584,21414,3125551395284
+
+readonly ExecDir=$(dirname $(readlink --canonicalize "$0"))
+
+readonly Ies=data.cyverse.org
+readonly DbmsHost=irods-db3.iplantcollaborative.org
+readonly DbmsPort=5432
+
+
+main()
+{
+  mkfifo downloads
+  mkfifo uploads
+  trap 'rm --force downloads uploads' EXIT
+
+  gather_logs "$Ies" \
+    | filter_msgs \
+    | tee >(mk_downloads "$DbmsHost" "$DbmsPort" > downloads) >(mk_uploads > uploads) \
+    > /dev/null &
+
+  join -a 1 -a 2 -e 0 -j 1 -o 0,1.2,1.3,2.2,2.3 -t , downloads uploads
+}
+
+
+extract_addmod_msgs()
+{
+  awk --file - <(cat) <<'EOF'
+/"data-object\.(add|mod)"/ {
+  timestamp = $1 "." $2;
+
+  # Remove through message type, two blanks, and the leading quote
+  match($0, /"data-object\.(add|mod)"/);
+  offset = RSTART + RLENGTH + 3;
+  msg = gensub(/\\("|')/, "\\1", "g", substr($0, offset));
+
+  msg = substr(msg, 1, length(msg) - 1);  # remove trailing quote
+  msg = gensub(/\r/, "\\r", "g", msg);    # escape carriage returns
+
+  # Add timestamp to start of message and
+  print "{\"timestamp\":\"" timestamp "\"," substr(msg, 2);
+}
+EOF
+
+  printf 'extract_addmod_msgs:  done\n' >&2
+}
+
+
+extract_open_msgs()
+{
+  awk --file - <(cat) <<'EOF'
+/"data-object\.open"/ {
+  # Remove through "data-object.open"m two blanks, and the leading quote
+  match($0, /"data-object\.open"/);
+  offset = RSTART + RLENGTH + 3;
+  msg = gensub(/\\("|')/, "\\1", "g", substr($0, offset));
+
+  msg = substr(msg, 1, length(msg) - 1);  # remove trailing quote
+  print gensub(/\r/, "\\r", "g", msg);    # escape carriage returns
+}
+EOF
+
+  printf 'extract_open_msgs:  done\n' >&2
+}
+
+
+filter_msgs()
+{
+  awk --file - <(cat) <<'EOF'
+$4 == "NOTICE:" && $5 == "execCmd:cmd/amqptopicsend.py" {
+  msg = gensub($3 " " $4 " ", "", 1, $0);
+
+  # Remove potential trailing garabage
+  print gensub(/[^\r]\\n.*/, "", 1, msg);
+}
+EOF
+
+  printf 'filter_msgs:  done\n' >&2
+}
+
+
+gather_logs()
+{
+  local ies="$1"
+
+  for log in $(ssh -q "$ies" 'ls /var/lib/irods/iRODS/server/log/rodsLog.*')
+  do
+    local logName=$(basename "$log")
+
+    scp -q "$Ies":"$log" /dev/stdout 2> /dev/null \
+      | "$ExecDir"/format-log-entries --assign YEAR="${logName:8:4}"
+
+    printf 'gather_logs:  finished processing %s\n' "$logName" >&2
+  done
+}
+
+
+mk_downloads()
+{
+  local dbmsHost="$1"
+  local dbmsPort="$2"
+
+  printf 'Date,Download Count,Download Volume(B)\n'
+  extract_open_msgs | summarize_downloads "$dbmsHost" "$dbmsPort"
+
+  printf 'mk_downloads:  done\n' >&2
+}
+
+
+mk_uploads()
+{
+  printf 'Date,Upload Count,Upload Volume(B)\n'
+
+  extract_addmod_msgs \
+    | jq -r -s '[ .[] |
+                  { date: (.timestamp | sub("[.].*"; "")),
+                    size: .size                            } ] |
+                group_by(.date) |
+                map({ date:   .[0].date,
+                      count:  . | length,
+                      volume: map(.size) | add }) |
+                .[] |
+                [ .date,
+                  (.count | tostring),
+                  (.volume | tostring) ] |
+                join(",")'
+
+  printf 'mk_uploads:  done\n' >&2
+}
+
+
+prep_downloads_sql_data()
+{
+  jq -r -s '[ .[] |
+              { date:   (.timestamp | sub("[.].*"; "")),
+                entity: .entity                         } ] |
+            group_by(.) |
+            map({ date:   .[0].date,
+                  entity: .[0].entity,
+                  count:  . | length   }) |
+            .[] |
+            [ .date,
+              .entity,
+              (.count | tostring) ] |
+            join(",")'
+
+  printf 'prep_downloads_sql_data:  done\n' >&2
+}
+
+
+summarize_downloads()
+{
+  local dbmsHost="$1"
+  local dbmsPort="$2"
+
+  psql --quiet --host "$dbmsHost" --port "$dbmsPort" ICAT icat_reader <<SQL 2> /dev/null
+BEGIN;
+
+CREATE TEMPORARY TABLE downloads(date DATE, data_uuid CHAR(37), count BIGINT) ON COMMIT DROP;
+
+COPY downloads FROM STDIN WITH (FORMAT CSV);
+$(prep_downloads_sql_data)
+\\.
+
+CREATE INDEX idx_downloads_all ON downloads(data_uuid);
+CREATE INDEX idx_downloads_date ON downloads(date, data_uuid, count);
+
+
+CREATE TEMPORARY TABLE resolved_downloads(date, count, size) ON COMMIT DROP AS
+SELECT d.date, d.count, AVG(COALESCE(dm.data_size, 0))
+FROM downloads AS d
+  LEFT JOIN r_meta_main AS mm ON mm.meta_attr_name = 'ipc_UUID' AND mm.meta_attr_value = d.data_uuid
+  LEFT JOIN r_objt_metamap AS om ON om.meta_id = mm.meta_id
+  LEFT JOIN r_data_main AS dm ON dm.data_id = om.object_id
+GROUP BY d.date, d.data_uuid, d.count;
+
+CREATE INDEX idx_resolved_downloads ON resolved_downloads(date);
+
+
+COPY (
+  SELECT date, SUM(count), CAST(SUM(size) AS BIGINT)
+  FROM resolved_downloads
+  GROUP BY date
+  ORDER BY date)
+TO STDOUT
+WITH (FORMAT CSV);
+
+ROLLBACK;
+SQL
+
+printf 'summarize_downloads:  done\n' >&2
+}
+
+
+main
