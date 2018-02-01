@@ -1,0 +1,35 @@
+#! /usr/bin/awk -f
+#
+# This program filters a list of iRODS sessions for those that overlap with a
+# given time interval. It reads the sessions from standard in and writes the
+# filtered sessions to standard out.
+#
+# It requires two command line parameters and both should be provided in awk
+# form, i.e., `-v var=val`.
+#
+# PARAMETERS:
+#  ERA_BEGIN:  The beginning time of the interval of interest. The time should
+#              be specified in the form `yyyy-MM-dd hh:mm:ss`.
+#  ERA_END:    The ending time of the interval of interest. The time should be
+#              specified in the form `yyyy-MM-dd hh:mm:ss`.
+#
+# EXAMPLE:
+#  filter-sessions-by-time -v ERA_BEGIN='2018-01-24 14:08:56' \
+#                          -v ERA_END='2018-01-24 14:09:34' \
+#    < irods.sessions
+
+
+BEGIN {
+  RS = "§";
+  FS = "•";
+}
+
+
+{
+  beginTime = substr($2, 2, 19);
+  endTime = substr($NF, 2, 19);
+
+  if (beginTime <= ERA_END && endTime >= ERA_BEGIN) {
+    printf "§%s", $0;
+  }
+}

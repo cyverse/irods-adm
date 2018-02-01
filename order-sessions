@@ -1,0 +1,25 @@
+#! /usr/bin/awk -f
+#
+# This program orders a list of iRODS sessions by their respective start times.
+# It reads the list from standard in and writes the sorted list to standard out.
+# The sorting is order preserving, i.e., if two sessions have the same start
+# time, the session read first will be written first.
+
+
+BEGIN {
+  PROCINFO["sorted_in"] = "@ind_str_asc";
+  RS = "§";
+  cnt=0;
+}
+
+
+{
+  entries[$2 " " $3 " " cnt++] = $0;
+}
+
+
+END {
+  for (idx in entries) {
+    printf "§%s", entries[idx];
+  }
+}

@@ -19,6 +19,13 @@ the CyVerse portion of the CyVerse grid.
 The awk script `filter-session-by-cuser.awk` can be combined with
 `group-log-by-pid.awk` to find all of the sessions for a given user.
 
+The program `filter-sessions-by-time` can be combined with 
+`group-log-by-pid.awk` to find all of the open sessions during a given time
+interval.
+
+The program `order-sessions` can be combined with `group-log-by-pid.awk` to list
+sessions by the order of their start times.
+
 The awk script `session-intervals.awk` can be combined with
 `group-log-by-pid.awk` to find all of the time intervals for each session from a
 log file.
