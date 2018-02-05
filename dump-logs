@@ -30,9 +30,9 @@
 #         <failed session count>/<total session count>
 
 
-
 readonly ExecDir=$(dirname $(readlink -f "$0"))
-readonly LogBase=/var/lib/irods/iRODS/server/log/rodsLog
+readonly LogDir=/var/lib/irods/iRODS/server/log
+readonly LogBase=rodsLog
 
 declare year=*
 declare month=*
@@ -57,25 +57,46 @@ filter_day()
   then
     cat
   else
-    while IFS=' -' read -r logYear logMonth logDay rest
-    do
-      if [ "$logDay" = "$day" ]
-      then
-        printf '%s-%s-%s %s\n' "$logYear" "$logMonth" "$logDay" "$rest"
-      elif [[ "$logDay" > "$day" ]]
-      then
-        return 0
-      fi
-    done
+    local date="$year"-"$month"-"$day"
+
+    "$ExecDir"/filter-sessions-by-time \
+      --assign ERA_BEGIN="$date 00:00:00" --assign ERA_END="$date 23:59:59"
   fi
 }
 
 
-group_sessions()
+filter_failed()
+{
+  local cnt=0
+  local tot=0
+  printf '\r    %d/%d' "$cnt" "$tot" >&2
+
+  local session=
+
+  while IFS= read -r -d§ session
+  do
+    if [[ "$session" =~ ERROR: ]]
+    then
+      printf '§%s' "${session:1}"
+      (( cnt++ ))
+    fi
+
+    (( tot++ ))
+    printf '\r    %d/%d' "$cnt" "$tot" >&2
+  done
+
+  printf '\r' >&2
+  printf '    %d/%d\n' "$cnt" "$tot"
+}
+
+
+get_sessions()
 {
   local logYear="$1"
 
-  "$ExecDir"/format-log-entries -v YEAR="$logYear" | filter_day | "$ExecDir"/group-log-by-pid.awk
+  "$ExecDir"/format-log-entries --assign YEAR="$logYear" \
+    | "$ExecDir"/group-log-by-pid.awk \
+    | filter_day
 }
 
 
@@ -93,32 +114,19 @@ do
   out=logs/"$svr".err
   rm -f "$out"
 
-  for log in $(ssh -q "$svr" ls "$LogBase"."$LogExt")
+  for log in $(ssh -q "$svr" find "$LogDir" -maxdepth 1 -name "$LogBase"."$LogExt" -type f)
   do
-    if [[ "$log" =~ $LogBase ]]
+    if [[ "$log" =~ $LogDir/$LogBase ]]
     then
       printf '\r  dumping %s\n' "$log"
 
-      cnt=0
-      tot=0
-      printf '\r    %d/%d' "$cnt" "$tot" >&2
-
       IFS=. read -r root logYear rest < <(basename "$log")
 
-      while IFS= read -r -d§ session
-      do
-        if [[ "$session" =~ ERROR: ]]
-        then
-          printf '§%s' "${session:1}"
-          (( cnt++ ))
-        fi
-
-        (( tot++ ))
-        printf '\r    %d/%d' "$cnt" "$tot" >&2
-      done < <(scp -q "$svr":"$log" /dev/stdout 2>/dev/null | group_sessions "$logYear") >> "$out"
-
-      printf '\r' >&2
-      printf '    %d/%d\n' "$cnt" "$tot"
+      scp -q "$svr":"$log" /dev/stdout 2>/dev/null \
+        | get_sessions "$logYear" \
+        | filter_failed \
+        | "$ExecDir"/order-sessions \
+        >> "$out"
     fi
   done
 done
