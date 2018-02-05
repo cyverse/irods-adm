@@ -9,50 +9,16 @@
 
 
 
-function read_time(month, day, time) {
-  switch (month) {
-  case "Jan":
-    monNum = "01";
-    break;
-  case "Feb":
-    monNum = "02";
-    break;
-  case "Mar":
-    monNum = "03";
-    break;
-  case "Apr":
-    monNum = "04";
-    break;
-  case "May":
-    monNum = "05";
-    break;
-  case "Jun":
-    monNum = "06";
-    break;
-  case "Jul":
-    monNum = "07";
-    break;
-  case "Aug":
-    monNum = "08";
-    break;
-  case "Sep":
-    monNum = "09";
-    break;
-  case "Oct":
-    monNum = "10";
-    break;
-  case "Nov":
-    monNum = "11";
-    break;
-  case "Dec":
-    monNum = "12";
-    break;
-  default:
-    break;
-  }
+function read_time(entry) {
+  split(entry, parts, " ");
+  date = gensub(/-/, " ", "g", parts[1]);
+  time = gensub(/:/, " ", "g", parts[2]);
+  return mktime(date " " time " MST");
+}
 
-  gsub(":", " ", time)
-  return mktime("2017 " monNum " " day " " time " MST")
+
+function read_user(entry) {
+  return gensub(/.*cuser=([^ ]*) .*/, "\\1", 1, entry);
 }
 
 
@@ -62,28 +28,11 @@ function print_interval(startTime, endTime, user) {
 
 
 BEGIN {
-  startTime=-1
-  endTime=0
-  user=""
+  RS = "§";
+  FS = "•";
 }
 
 
-$1 ~ "§•" {
-  if (startTime > 0) {
-    print_interval(startTime, endTime, user)
-  }
-
-  startTime = read_time($2, $3, $4)
-  endTime = startTime
-  user = substr($14, 7)
-}
-
-
-$1 ~ "•" {
-  endTime = read_time($2, $3, $4)
-}
-
-
-END {
-  print_interval(startTime, endTime, user)
+$2 ~ /cuser=/ {
+  print_interval(read_time($2), read_time($NF), read_user($2));
 }
