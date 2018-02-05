@@ -7,14 +7,14 @@
 # the number of the day of the month to restrict the dump to. 1 is the first of
 # the month, 2 is the second, etc.
 #
-# This script dumps all of the errors from rodsLog files on the IES and all of
-# the local resource servers. It groups the log by session, and it dumps each
-# session that logs an error message. See group-log-by-pid.awk for the details
-# on how a session is logged.
+# This script dumps all of the logs from the rodsLog files on the IES and all of
+# the resource servers. It groups the log by session, and it dumps each session
+# that logs an error message. See group-log-by-pid.awk for the details on how a
+# session is logged.
 #
-# The session error logs are written into the directory $CWD/logs. The session
-# errors are written into one file for each server. The file has the name
-# <server>.err.
+# The session logs are written into the directory $CWD/logs. The logs are
+# written into one file for each server. The file has the name
+# <server>.sessions.
 #
 # By default, it will process all of the logs. By specifying a year, year and
 # month number, or year, month number, and day number, only the logs for that
@@ -26,8 +26,8 @@
 # The script shows its progress in the following form:
 #
 #     dumping logs from <server>
-#       dumping /var/log/irods/iRODS/server/log/rodsLog.<year>.<month>.01
-#         <failed session count>/<total session count>
+#       dumping /var/log/irods/iRODS/server/log/rodsLog.<year>.<month>.<start_day>
+#         <total session count>
 
 
 readonly ExecDir=$(dirname $(readlink -f "$0"))
@@ -65,28 +65,19 @@ filter_day()
 }
 
 
-filter_failed()
+count_sessions()
 {
   local cnt=0
-  local tot=0
-  printf '\r    %d/%d' "$cnt" "$tot" >&2
+  printf '\r    %d' "$cnt" >&2
 
-  local session=
-
-  while IFS= read -r -d§ session
+  while IFS= read -r -d§
   do
-    if [[ "$session" =~ ERROR: ]]
-    then
-      printf '§%s' "${session:1}"
-      (( cnt++ ))
-    fi
-
-    (( tot++ ))
-    printf '\r    %d/%d' "$cnt" "$tot" >&2
+    printf '§%s' "${REPLY:1}"
+    (( cnt++ ))
+    printf '\r    %d' "$cnt" >&2
   done
 
-  printf '\r' >&2
-  printf '    %d/%d\n' "$cnt" "$tot"
+  printf '\n' >&2
 }
 
 
@@ -110,21 +101,21 @@ readonly RS=$(iquest '%s' "SELECT ORDER(RESC_LOC) WHERE RESC_LOC != 'EMPTY_RESC_
 
 for svr in "$Ies" $RS
 do
-  printf '\rdumping logs from %s\n' "$svr"
-  out=logs/"$svr".err
-  rm -f "$out"
+  printf '\rdumping logs from %s\n' "$svr" >&2
+  out=logs/"$svr".sessions
+  rm --force "$out"
 
   for log in $(ssh -q "$svr" find "$LogDir" -maxdepth 1 -name "$LogBase"."$LogExt" -type f)
   do
     if [[ "$log" =~ $LogDir/$LogBase ]]
     then
-      printf '\r  dumping %s\n' "$log"
+      printf '\r  dumping %s\n' "$log" >&2
 
       IFS=. read -r root logYear rest < <(basename "$log")
 
       scp -q "$svr":"$log" /dev/stdout 2>/dev/null \
         | get_sessions "$logYear" \
-        | filter_failed \
+        | count_sessions \
         | "$ExecDir"/order-sessions \
         >> "$out"
     fi

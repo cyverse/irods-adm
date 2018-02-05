@@ -1,0 +1,13 @@
+#! /usr/bin/awk -f
+#
+# This program filters a list of iRODS sessions for those that contain error
+# messages.
+
+BEGIN {
+  RS = "§";
+}
+
+
+/ERROR: / {
+  printf "%s%s", RS, $0;
+}

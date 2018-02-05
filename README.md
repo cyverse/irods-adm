@@ -10,29 +10,32 @@ A session is a group of log messages that occurred during a single connection.
 The program `format-log-entries` can be used to generate a sequence of formatted
 log file messages from an iRODS log file.
 
-The awk script `group-log-by-pid.awk` can be used to group a sequence of
-formatted log messages by the connection that generated them.
+The awk script `group-log-by-pid.awk` can be combined with `format-log-entries`
+to group log messages by the connection that generated them. This group of
+messages is called a session.
 
-The program `dump-logs` can be used to dump all of the sessions with errors from
-the CyVerse portion of the CyVerse grid.
-
-The awk script `filter-session-by-cuser.awk` can be combined with
-`group-log-by-pid.awk` to find all of the sessions for a given user.
-
-The program `filter-sessions-by-time` can be combined with 
+The program `filter-sessions-by-time` can be combined with
 `group-log-by-pid.awk` to find all of the open sessions during a given time
 interval.
 
 The program `order-sessions` can be combined with `group-log-by-pid.awk` to list
 sessions by the order of their start times.
 
-The awk script `session-intervals.awk` can be combined with
-`group-log-by-pid.awk` to find all of the time intervals for each session from a
-log file.
+The program `dump-logs` can be used to dump all of the sessions from the CyVerse
+grid.
+
+The program `filter-failed-sessions` can be used to filter a sequence of
+sessions for those containing errors.
+
+The awk script `filter-session-by-cuser.awk` can be used to filter a sequence of
+sessions for a given client user.
+
+The awk script `session-intervals.awk` can be used to extract session time
+intervals from a sequence of sessions.
 
 The program `count-sessions` can be combined with `sessions-intervals.awk` to
 generate a report on the number of concurrent sessions during each second for
-the time period covered by a log file.
+the time period covered by a sequence of sessions.
 
 
 ## Resources
