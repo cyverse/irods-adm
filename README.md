@@ -14,6 +14,10 @@ The awk script `group-log-by-pid.awk` can be combined with `format-log-entries`
 to group log messages by the connection that generated them. This group of
 messages is called a session.
 
+The program `filter-sessions-by-origin` can be combined with
+`group-log-by-pid.awk` to find all of the sessions originating from a certain
+host.
+
 The program `filter-sessions-by-time` can be combined with
 `group-log-by-pid.awk` to find all of the open sessions during a given time
 interval.
