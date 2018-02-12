@@ -9,7 +9,7 @@
 #
 # This script dumps all of the logs from the rodsLog files on the IES and all of
 # the resource servers. It groups the log by session, and it dumps each session
-# that logs an error message. See group-log-by-pid.awk for the details on how a
+# that logs an error message. See group-log-by-pid for the details on how a
 # session is logged.
 #
 # The session logs are written into the directory $CWD/logs. The logs are
@@ -85,9 +85,7 @@ get_sessions()
 {
   local logYear="$1"
 
-  "$ExecDir"/format-log-entries --assign YEAR="$logYear" \
-    | "$ExecDir"/group-log-by-pid.awk \
-    | filter_day
+  "$ExecDir"/format-log-entries --assign YEAR="$logYear" | "$ExecDir"/group-log-by-pid | filter_day
 }
 
 

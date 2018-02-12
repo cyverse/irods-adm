@@ -10,19 +10,17 @@ A session is a group of log messages that occurred during a single connection.
 The program `format-log-entries` can be used to generate a sequence of formatted
 log file messages from an iRODS log file.
 
-The awk script `group-log-by-pid.awk` can be combined with `format-log-entries`
-to group log messages by the connection that generated them. This group of
-messages is called a session.
+The program `group-log-by-pid` can be combined with `format-log-entries` to
+group log messages by the connection that generated them. This group of messages
+is called a session.
 
-The program `filter-sessions-by-origin` can be combined with
-`group-log-by-pid.awk` to find all of the sessions originating from a certain
-host.
+The program `filter-sessions-by-origin` can be combined with `group-log-by-pid`
+to find all of the sessions originating from a certain host.
 
-The program `filter-sessions-by-time` can be combined with
-`group-log-by-pid.awk` to find all of the open sessions during a given time
-interval.
+The program `filter-sessions-by-time` can be combined with `group-log-by-pid` to
+find all of the open sessions during a given time interval.
 
-The program `order-sessions` can be combined with `group-log-by-pid.awk` to list
+The program `order-sessions` can be combined with `group-log-by-pid` to list
 sessions by the order of their start times.
 
 The program `dump-logs` can be used to dump all of the sessions from the CyVerse
