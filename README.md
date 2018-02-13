@@ -29,7 +29,7 @@ grid.
 The program `filter-failed-sessions` can be used to filter a sequence of
 sessions for those containing errors.
 
-The awk script `filter-session-by-cuser.awk` can be used to filter a sequence of
+The program `filter-sessions-by-user` can be used to filter a sequence of
 sessions for a given client user.
 
 The awk script `session-intervals.awk` can be used to extract session time
