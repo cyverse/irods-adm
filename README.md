@@ -51,7 +51,8 @@ resources from various locations.
 
 ## Generating a histogram of an SQL query for byte-based sizes
 
-The bash script `histgram.sh` can be used to generate a histogram of file sizes.
+The program `histogram` can be used to generate a histogram of sizes from an
+arbitrary SQL query for byte-based sizes.
 
 
 ## Synchronizing data object and file sizes
