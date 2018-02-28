@@ -32,10 +32,10 @@ sessions for those containing errors.
 The program `filter-sessions-by-user` can be used to filter a sequence of
 sessions for a given client user.
 
-The awk script `session-intervals.awk` can be used to extract session time
-intervals from a sequence of sessions.
+The program `session-intervals` can be used to extract session time intervals
+from a sequence of sessions.
 
-The program `count-sessions` can be combined with `sessions-intervals.awk` to
+The program `count-sessions` can be combined with `sessions-intervals` to
 generate a report on the number of concurrent sessions during each second for
 the time period covered by a sequence of sessions.
 
