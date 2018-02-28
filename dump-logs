@@ -103,7 +103,7 @@ do
   out=logs/"$svr".sessions
   rm --force "$out"
 
-  for log in $(ssh -q "$svr" find "$LogDir" -maxdepth 1 -name "$LogBase"."$LogExt" -type f)
+  for log in $(ssh -q "$svr" find "$LogDir" -maxdepth 1 -name "$LogBase"."$LogExt" -type f | sort)
   do
     if [[ "$log" =~ $LogDir/$LogBase ]]
     then
