@@ -57,8 +57,8 @@ extract_addmod_msgs()
   msg = substr(msg, 1, length(msg) - 1);  # remove trailing quote
   msg = gensub(/\r/, "\\r", "g", msg);    # escape carriage returns
 
-  # Add timestamp to start of message and
-  print "{\"timestamp\":\"" timestamp "\"," substr(msg, 2);
+  # Add timestamp to start of message and record separator before
+  print "\x1e{\"timestamp\":\"" timestamp "\"," substr(msg, 2);
 }
 EOF
 
@@ -75,8 +75,8 @@ extract_open_msgs()
   offset = RSTART + RLENGTH + 3;
   msg = gensub(/\\("|')/, "\\1", "g", substr($0, offset));
 
-  msg = substr(msg, 1, length(msg) - 1);  # remove trailing quote
-  print gensub(/\r/, "\\r", "g", msg);    # escape carriage returns
+  msg = substr(msg, 1, length(msg) - 1);       # remove trailing quote
+  printf "\x1e%s\n", gensub(/\r/, "\\r", "g", msg);  # escape carriage returns and prefix with record sep
 }
 EOF
 
@@ -103,7 +103,7 @@ gather_logs()
 {
   local ies="$1"
 
-  for log in $(ssh -q "$ies" 'ls /var/lib/irods/iRODS/server/log/rodsLog.*')
+  for log in $(ssh -q "$ies" find /var/lib/irods/iRODS/server/log -maxdepth 1 -name rodsLog.* -type f | sort)
   do
     local logName=$(basename "$log")
 
@@ -132,18 +132,23 @@ mk_uploads()
   printf 'Date,Upload Count,Upload Volume(B)\n'
 
   extract_addmod_msgs \
-    | jq -r -s '[ .[] |
-                  { date: (.timestamp | sub("[.].*"; "")),
-                    size: .size                            } ] |
-                group_by(.date) |
-                map({ date:   .[0].date,
-                      count:  . | length,
-                      volume: map(.size) | add }) |
-                .[] |
-                [ .date,
-                  (.count | tostring),
-                  (.volume | tostring) ] |
-                join(",")'
+    | jq --raw-output --seq --slurp \
+         '[ .[] |
+            if (.size | not) or (.timestamp | not) then
+              empty
+            else
+              { date: (.timestamp | sub("[.].*"; "")),
+                size: .size                            }
+            end                                          ] |
+          group_by(.date) |
+          map({ date:   .[0].date,
+                count:  . | length,
+                volume: map(.size) | add }) |
+          .[] |
+          [ .date,
+            (.count | tostring),
+            (.volume | tostring) ] |
+          join(",")'
 
   printf 'mk_uploads:  done\n' >&2
 }
@@ -151,18 +156,21 @@ mk_uploads()
 
 prep_downloads_sql_data()
 {
-  jq -r -s '[ .[] |
-              { date:   (.timestamp | sub("[.].*"; "")),
-                entity: .entity                         } ] |
-            group_by(.) |
-            map({ date:   .[0].date,
-                  entity: .[0].entity,
-                  count:  . | length   }) |
-            .[] |
-            [ .date,
-              .entity,
-              (.count | tostring) ] |
-            join(",")'
+  jq --raw-output --seq --slurp \
+     '[ .[] |
+        if (.entity | not) or (.timestamp | not) then
+          empty
+        else
+          { date:   (.timestamp | sub("[.].*"; "")),
+            entity: .entity                          }
+        end                                            ] |
+      group_by(.) |
+      map({ date:   .[0].date,
+            entity: .[0].entity,
+            count:  . | length   }) |
+      .[] |
+      [ .date, .entity, .count ] |
+      @csv'
 
   printf 'prep_downloads_sql_data:  done\n' >&2
 }
