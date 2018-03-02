@@ -8,9 +8,20 @@
 #
 #     01-21 18:20:57 pid:17536 ERROR: [-]    iRODS/server/core/src/rsApiHandler.cpp:520:readAndProcClientMsg :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message []\n     [-]     iRODS/lib/core/src/sockComm.cpp:199:readMsgHeader :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [failed to call 'read header']
 #
-# Each entry is prefixed with a "• ". If a log entry has a carriage return in it,
-# the new line is indented two spaces. Before processing a line, all leading
-# whitespace is removed.
+# All control characters including line feed (new line) are replaced with there
+# escaped hex ASCII code, e.g., line feed => \x0a, carriage return => \x0d, etc.
+
+
+function escape_ctrls(line) {
+  patsplit(line, ctrlChars, /[\x01-\x1f]/, segs);
+  escLine = segs[0];
+
+  for (idx in ctrlChars) {
+    escLine = escLine ctrlEsc[ctrlChars[idx]] segs[idx];
+  }
+
+  return escLine;
+}
 
 
 function month_number(month) {
@@ -49,6 +60,10 @@ BEGIN {
   currentEntry = "";
   lastMonth = "";
 
+  for (n = 1; n <= 0x1f; n++) {
+    ctrlEsc[sprintf("%c", n)] = sprintf("\\x%02x", n);
+  }
+
   if (YEAR !~ /[0-9][0-9]*/) {
     print "The YEAR variable must be set to a number on the command line" > "/dev/stderr";
     exit 1;
@@ -74,7 +89,7 @@ BEGIN {
     YEAR = YEAR + 1;
   }
 
-  currentEntry = YEAR "-" month "-" day rest;
+  currentEntry = YEAR "-" month "-" day escape_ctrls(rest);
   lastMonth = month;
   next;
 }
@@ -82,7 +97,7 @@ BEGIN {
 
 NF > 0 {
   if (currentEntry != "") {
-    currentEntry = currentEntry "\\n" $0;
+    currentEntry = currentEntry ctrlEsc["\x0a"] escape_ctrls($0);
   }
 }
 

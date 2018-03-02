@@ -35,7 +35,7 @@ function assign_entry (entries, entryCounts, pid, entry) {
 
 
 function format_entry(entry) {
-  gsub(/\\n/, "\n   ", entry);
+  gsub(/\\x0a/, "\n   ", entry);
   return entry;
 }
 
