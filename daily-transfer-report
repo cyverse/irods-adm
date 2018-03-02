@@ -26,6 +26,7 @@ readonly ExecDir=$(dirname $(readlink --canonicalize "$0"))
 readonly Ies=data.cyverse.org
 readonly DbmsHost=irods-db3.iplantcollaborative.org
 readonly DbmsPort=5432
+readonly LogDir=/var/lib/irods/iRODS/server/log
 
 
 main()
@@ -103,11 +104,11 @@ gather_logs()
 {
   local ies="$1"
 
-  for log in $(ssh -q "$ies" find /var/lib/irods/iRODS/server/log -maxdepth 1 -name rodsLog.* -type f | sort)
+  for log in $(ssh -q "$ies" find "$LogDir" -maxdepth 1 -name rodsLog.* -type f | sort)
   do
     local logName=$(basename "$log")
 
-    scp -q "$Ies":"$log" /dev/stdout 2> /dev/null \
+    scp -q "$ies":"$log" /dev/stdout 2> /dev/null \
       | "$ExecDir"/format-log-entries --assign YEAR="${logName:8:4}"
 
     printf 'gather_logs:  finished processing %s\n' "$logName" >&2
