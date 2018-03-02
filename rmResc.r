@@ -1,3 +1,5 @@
+#! /usr/bin/irule -F
+#
 # Removes all of the files in a given resource
 #
 # INPUT PARAMETERS:
