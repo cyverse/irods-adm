@@ -94,3 +94,9 @@ The program `trash-report` can be used to generate a report on how much trash
 there is.
 
 The program `rm-trash` can be used to empty trash older than one month.
+
+
+## Transfer report
+
+The program `daily-transfer-report` generates a report summarizing the amount of
+data uploaded and downloaded each day.
