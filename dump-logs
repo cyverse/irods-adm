@@ -97,6 +97,9 @@ mkdir --parents logs
 readonly Ies=$(ienv | sed --quiet 's/NOTICE: irods_host - //p')
 readonly RS=$(iquest '%s' "SELECT ORDER(RESC_LOC) WHERE RESC_LOC != 'EMPTY_RESC_HOST'")
 
+readonly UnsortedSessions=$(mktemp)
+trap "rm --force '$UnsortedSessions'" EXIT
+
 for svr in "$Ies" $RS
 do
   printf '\rdumping logs from %s\n' "$svr" >&2
@@ -114,8 +117,11 @@ do
       scp -q "$svr":"$log" /dev/stdout 2>/dev/null \
         | get_sessions "$logYear" \
         | count_sessions \
-        | "$ExecDir"/order-sessions \
-        >> "$out"
+        > "$UnsortedSessions"
+
+      printf '    sorting...' >&2
+      "$ExecDir"/order-sessions < "$UnsortedSessions" >> "$out"
+      printf 'done\n' >&2
     fi
   done
 done
