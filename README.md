@@ -81,6 +81,9 @@ resource.
 The program `classify-repl-errors` takes the output of `repl` and group the
 errors by type.
 
+The program `get-replicas` looks up information on the replicas of a data
+object.
+
 
 ## Repair
 
