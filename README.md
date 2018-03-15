@@ -72,6 +72,9 @@ the time period covered by a sequence of sessions.
 The program `daily-transfer-report` generates a report summarizing the amount of
 data uploaded and downloaded each day.
 
+The program `growth-report` generates a report showing the monthly growth of the
+Data Store.
+
 The program `histogram` can be used to generate a histogram of sizes from an
 arbitrary SQL query for byte-based sizes.
 
