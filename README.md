@@ -78,6 +78,9 @@ Data Store.
 The program `histogram` can be used to generate a histogram of sizes from an
 arbitrary SQL query for byte-based sizes.
 
+The program `resource-report` generates a report on the size of the root
+resources.
+
 The program `trash-report` can be used to generate a report on how much trash
 there is.
 
