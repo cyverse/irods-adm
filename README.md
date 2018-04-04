@@ -93,6 +93,9 @@ creation time.
 The program `check-irods` generates a report on the accessibility of the IES and
 resources from various locations.
 
+The program `rm-resc` can be used to remove all of the files from a given
+resource.
+
 
 ## Synchronizing data object and file sizes
 
