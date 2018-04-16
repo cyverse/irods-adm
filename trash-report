@@ -243,6 +243,4 @@ show_version()
 
 
 set -e
-
-
 main "$@"
