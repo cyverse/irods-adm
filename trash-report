@@ -1,6 +1,6 @@
 #! /bin/bash
 
-readonly ExecName=$(basename $0)
+readonly ExecName=$(basename "$0")
 readonly Version=1
 
 
@@ -35,11 +35,12 @@ Debug=false
 
 main()
 {
-  local opts=$(getopt --longoptions debug,help,host:,port:,version \
-                      --name "$ExecName" \
-                      --options dhH:p:v \
-                      -- \
-                      "$@")
+  local opts
+  opts=$(getopt --longoptions debug,help,host:,port:,version \
+                --name "$ExecName" \
+                --options dhH:p:v \
+                -- \
+                "$@")
 
   if [ "$?" -ne 0 ]
   then
@@ -83,7 +84,10 @@ main()
     esac
   done
 
-  local cutOff_s=$(date --date $(date --iso-8601 --date '1 month ago') '+%s');
+  local cutOff_s
+  cutOff_s=$(date --date "$(date --iso-8601 --date '1 month ago')" '+%s')
+
+  # shellcheck disable=SC2086
   mk_trash_report "$cutOff_s" | psql --quiet $hostArg $portArg ICAT icat_reader
 }
 
@@ -93,7 +97,7 @@ inject_debug_msg()
   local msg="$*"
 
   inject_debug_newline
-  inject_debug_stmt \\echo \'$msg\'
+  inject_debug_stmt \\echo \'"$msg"\'
 }
 
 
