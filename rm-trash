@@ -1,7 +1,6 @@
 #! /bin/bash
 #
 # This script deletes the trash older than one month. It deletes the oldest trash first.
-#
 
 
 main()
@@ -51,22 +50,20 @@ mk_temp()
 }
 
 
-rm_temps()
+prune_children()
 {
   local trashTempFiles="$1"
+  local parent="$2"
 
-  xargs --no-run-if-empty rm --force < "$trashTempFiles"
-  rm --force "$trashTempFiles"
-}
+  local childList=$(mk_temp "$trashTempFiles")
+  quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '$parent'" > "$childList"
 
+  while read -r collection
+  do
+    prune_collection "$trashTempFiles" "$collection"
+  done < "$childList"
 
-quest()
-{
-  local fmt="$1"
-  local query="$2"
-
-  iquest --no-page "$fmt" "$query" \
-    | sed '/^CAT_NO_ROWS_FOUND: Nothing was found matching your query$/d'
+  rm --force "$childList"
 }
 
 
@@ -88,20 +85,22 @@ prune_collection()
 }
 
 
-prune_children()
+quest()
+{
+  local fmt="$1"
+  local query="$2"
+
+  iquest --no-page "$fmt" "$query" \
+    | sed '/^CAT_NO_ROWS_FOUND: Nothing was found matching your query$/d'
+}
+
+
+rm_temps()
 {
   local trashTempFiles="$1"
-  local parent="$2"
 
-  local childList=$(mk_temp "$trashTempFiles")
-  quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '$parent'" > "$childList"
-
-  while read -r collection
-  do
-    prune_collection "$trashTempFiles" "$collection"
-  done < "$childList"
-
-  rm --force "$childList"
+  xargs --no-run-if-empty rm --force < "$trashTempFiles"
+  rm --force "$trashTempFiles"
 }
 
 
@@ -122,5 +121,4 @@ truncate_by_time()
 
 
 set -e
-
 main
