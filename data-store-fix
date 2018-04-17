@@ -85,7 +85,8 @@ inject_debug_msg()
 
 display_problems()
 {
-  local cutoffTS=$(date --date="$CUTOFF_TIME" '+0%s')
+  local cutoffTS
+  cutoffTS=$(date --date="$CUTOFF_TIME" '+0%s')
 
   psql --host "$HOST" --port "$PORT" ICAT "$USER" <<EOF
 $(inject_debug_stmt '\timing on')
@@ -247,7 +248,7 @@ unescape()
 
       escaped=0
     else
-      if [ "$curChar" = '\' ]
+      if [ "$curChar" = \\ ]
       then
         escaped=1
       else
@@ -265,7 +266,7 @@ process_perm_issue()
   local issue="$1"
   local entity="$2"
 
-  if [ $issue == t ]
+  if [ "${issue// /}" = t ]
   then
     if ichmod -M own rodsadmin "$entity"
     then
@@ -291,14 +292,14 @@ process_uuid_issue()
 
   case $cnt in
     0)
-      if [ "$entityType" == coll ]
+      if [ "$entityType" = coll ]
       then
         local flag=-c
       else
         local flag=-d
       fi
 
-      if imeta set "$flag" "$entity" ipc_UUID $(uuidgen -t)
+      if imeta set "$flag" "$entity" ipc_UUID "$(uuidgen -t)"
       then
         printf '%s✓ ' "$uuidCntField"
       else
@@ -325,7 +326,7 @@ process_chksum_issue()
 
   resc="${resc%%;*}"
 
-  if [ $issue == t ]
+  if [ "${issue// /}" = t ]
   then
     if ichksum --silent -R "$resc" "$obj" > /dev/null
     then
@@ -344,6 +345,12 @@ fix_collection_problems()
 {
   pass_hdr_thru
 
+  local permIssue
+  local uuidCnt
+  local owner
+  local createTime
+  local collField
+
   while IFS='|' read -r permIssue uuidCnt owner createTime collField
   do
     if [ -z "$collField" ]
@@ -352,8 +359,11 @@ fix_collection_problems()
       break
     fi
 
-    local escColl=$(trim "$collField")
-    local coll=$(unescape "$escColl")
+    local escColl
+    escColl=$(trim "$collField")
+
+    local coll
+    coll=$(unescape "$escColl")
 
     permIssue=$(process_perm_issue "$permIssue" "$coll")
     uuidCnt=$(process_uuid_issue "$uuidCnt" coll "$coll")
@@ -366,6 +376,14 @@ fix_object_problems()
 {
   pass_hdr_thru
 
+  local permIssue
+  local missingChksum
+  local uuidCnt
+  local owner
+  local rescField
+  local createTime
+  local objField
+
   while IFS='|' read -r permIssue missingChksum uuidCnt owner rescField createTime objField
   do
     if [ -z "$objField" ]
@@ -374,9 +392,14 @@ fix_object_problems()
       break
     fi
 
-    local escObj=$(trim "$objField")
-    local obj=$(unescape "$escObj")
-    local resc=$(trim "$rescField")
+    local escObj
+    escObj=$(trim "$objField")
+
+    local obj
+    obj=$(unescape "$escObj")
+
+    local resc
+    resc=$(trim "$rescField")
 
     permIssue=$(process_perm_issue "$permIssue" "$obj")
     missingChksum=$(process_chksum_issue "$missingChksum" "$resc" "$obj")

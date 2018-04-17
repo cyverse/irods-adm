@@ -18,10 +18,10 @@ readonly LB=$(cut --delimiter ' ' --fields 1 "$IntervalsFile" \
 declare -a counts
 max=0
 
-while read -r start stop junk
+while read -r -a words
 do
-  start=$((start - LB))
-  stop=$((stop - LB))
+  start=$((words[0] - LB))
+  stop=$((words[1] - LB))
 
   for t in $(seq "$start" "$stop")
   do

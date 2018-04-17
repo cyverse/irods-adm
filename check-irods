@@ -1,6 +1,6 @@
 #!/bin/bash
 
-readonly ExecName=$(basename $0)
+readonly ExecName=$(basename "$0")
 readonly Version=2
 
 
@@ -235,7 +235,8 @@ log_statuses()
 {
   local client="$1"
 
-  local logTime=$(date --date="$TestTime" --iso-8601=seconds)
+  local logTime
+  logTime=$(date --date="$TestTime" --iso-8601=seconds)
 
   while read -r system status
   do
