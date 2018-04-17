@@ -1,4 +1,4 @@
-#! /usr/bin/awk -f
+#!/usr/bin/awk -f
 #
 # This program orders a list of iRODS sessions by their respective start times.
 # It reads the list from standard in and writes the sorted list to standard out.

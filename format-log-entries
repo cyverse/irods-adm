@@ -1,4 +1,4 @@
-#! /usr/bin/awk -f
+#!/usr/bin/awk -f
 #
 # This program parses the lines from a iRODS log file into log entries.
 #

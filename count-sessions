@@ -1,11 +1,11 @@
-#! /bin/bash
+#!/bin/bash
 #
 # Generates a report on the number of concurrent sessions during each second.
 # It reads an interval report with the following format.
 #
 # START_TIME STOP_TIME ...
 #
-# START_TIME is the time when a session started in seconds since the POSIX 
+# START_TIME is the time when a session started in seconds since the POSIX
 # epoch. STOP_TIME is the time when the same session ended in seconds since the
 # POSIX epoch.  The rest if the line is ignored.
 
@@ -27,7 +27,7 @@ do
   do
     counts["$t"]=$((counts[t] + 1))
   done
-  
+
   if [ "$stop" -gt "$max" ]
   then
     max="$stop"

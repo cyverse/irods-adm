@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 #
 # This script goes through all of the rodsLog files on data.cyverse.org and
 # filters out the AMQP messages related to file uploads and downloads. It then

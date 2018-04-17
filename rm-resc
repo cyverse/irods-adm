@@ -1,4 +1,4 @@
-#! /usr/bin/irule -F
+#!/usr/bin/irule -F
 #
 # Removes all of the files in a given resource
 #
