@@ -1,6 +1,6 @@
 #!/bin/bash
 
-readonly ExecName=$(basename $0)
+readonly ExecName=$(basename "$0")
 readonly Version=1
 
 
@@ -118,8 +118,11 @@ split_out_class()
   local substitution="$3"
   local classFile="$4"
 
-  local errors=$(cat "$errorsFile")
-  local classifiedErrors=$(sed --quiet "/$classifier/p" <<< "$errors")
+  local errors
+  errors=$(cat "$errorsFile")
+
+  local classifiedErrors
+  classifiedErrors=$(sed --quiet "/$classifier/p" <<< "$errors")
 
   if [ -n "$classifiedErrors" ]
   then
@@ -145,13 +148,13 @@ split_out_repl_class()
 
 readonly ErrorsFile=$(mktemp)
 readonly ReplErrorsFile=$(mktemp)
-trap "rm --force '$ErrorsFile' '$ReplErrorsFile'" EXIT
+trap 'rm --force "$ErrorsFile" "$ReplErrorsFile"' EXIT
 
 sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
   | sed '/connectToRhost: readVersion to data.cyverse.org failed, msg=/d' \
   | sort > "$ErrorsFile"
 
-readonly ErrCnt=$(cat "$ErrorsFile" | wc --lines)
+readonly ErrCnt=$(wc --lines < "$ErrorsFile")
 readonly CntWid=${#ErrCnt}
 
 printf '%*d errors\n' "$CntWid" "$ErrCnt"
@@ -201,16 +204,18 @@ readonly UFOECnt=$(split_out_repl_class "$ReplErrorsFile" \
                                         "$LogBase".missing_file)
 printf '%*d file open errors\n' "$CntWid" "$UFOECnt"
 
-printf '%*d unclassified replication errors\n' "$CntWid" $(cat "$ReplErrorsFile" | wc --lines)
+readonly UnclassifiedReplErrCnt=$(wc --lines < "$ReplErrorsFile")
+printf '%*d unclassified replication errors\n' "$CntWid" "$UnclassifiedReplErrCnt"
 
-if [ -s "$ReplErrorsFile" ]
+if [ "$UnclassifiedReplErrCnt" -gt 0 ]
 then
   mv "$ReplErrorsFile" "$LogBase".unclassified_repl_errors
 fi
 
-printf '%*d unclassified errors\n' "$CntWid" $(cat "$ErrorsFile" | wc --lines)
+readonly UnclassifiedErrCnt=$(wc --lines < "$ErrorsFile")
+printf '%*d unclassified errors\n' "$CntWid" "$UnclassifiedErrCnt"
 
-if [ -s "$ErrorsFile" ]
+if [ "$UnclassifiedErrCnt" -gt 0 ]
 then
   mv "$ErrorsFile" "$LogBase".unclassified_errors
 fi
