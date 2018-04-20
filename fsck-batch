@@ -1,6 +1,6 @@
 #!/bin/bash
 
-readonly ExecName=($basename "$0")
+readonly ExecName=$(basename "$0")
 readonly Version=2
 
 
@@ -97,7 +97,10 @@ fi
 
 readonly ClassBase="$1"
 
-export EXEC_DIR=$(dirname $(readlink -f "$0"))
+readonly ExecPath=$(readlink --canonicalize "$0")
+export EXEC_DIR
+EXEC_DIR=$(dirname "$ExecPath")
+
 export ERR_LOG="$ClassBase".errors
 
 
@@ -107,8 +110,9 @@ CHECK_OBJ()
 
   while read -r rescHier storeHost filePath
   do
-    local reason=
-    local resp=$(ssh -q "$storeHost" ifsck -K \'$filePath\' 2>> "$ERR_LOG")
+    local reason
+    local resp
+    resp=$(ssh -q "$storeHost" ifsck -K \'"$filePath"\' 2>> "$ERR_LOG")
 
     if [[ "$resp" =~ size\.$ ]]
     then
