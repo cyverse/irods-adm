@@ -23,7 +23,6 @@ main()
   quest '%s %s/%s' \
         "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
          where COLL_NAME like '/iplant/trash/home/%'" \
-    | sed 's/^0//' \
     | sort --numeric --key 1,1 \
     | truncate_by_time "$upperBound" \
     | cut --delimiter ' ' --fields 2- \
@@ -134,7 +133,7 @@ truncate_by_time()
       break
     fi
 
-    printf '%d %s\n' "$modifyTs" "$dataObj"
+    printf '%s %s\n' "$modifyTs" "$dataObj"
   done
 }
 
