@@ -75,7 +75,9 @@ do
   esac
 done
 
-export EXEC_DIR=$(dirname $(readlink -f "$0"))
+readonly ExecPath=$(readlink --canonicalize "$0")
+export EXEC_DIR
+EXEC_DIR=$(dirname "$ExecPath")
 
 
 FIX()
@@ -92,11 +94,11 @@ FIX()
     ssh -q -t -t "$storeHost" \
         su --login \
            --command \
-             \'mv --no-clobber \"$filePath\" \"$tmp\" \&\& \
-               touch \"$filePath\" \&\& \
-               \(irsync -K -s -v -R \"$coordResc\" \"$tmp\" \"i:$objPath\"\; \
-                 mv \"$tmp\" \"$filePath\"\)\' \
-           irods
+             \'mv --no-clobber \""$filePath"\" \""$tmp"\" \&\& \
+               touch \""$filePath"\" \&\& \
+               \(irsync -K -s -v -R \""$coordResc"\" \""$tmp"\" \"i:"$objPath"\"\; \
+                 mv \""$tmp"\" \""$filePath"\"\)\' \
+           irods \
       < /dev/null
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 }
