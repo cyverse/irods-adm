@@ -30,13 +30,14 @@
 #         <total session count>
 
 
-readonly ExecDir=$(dirname $(readlink -f "$0"))
+readonly ExecPath=$(readlink --canonicalize "$0")
+readonly ExecDir=$(dirname "$ExecPath")
 readonly LogDir=/var/lib/irods/iRODS/server/log
 readonly LogBase=rodsLog
 
-declare year=*
-declare month=*
-declare startDay=*
+declare year=\*
+declare month=\*
+declare startDay=\*
 
 if [ $# -ge 1 ]; then printf -v year '%04d' "$1"; fi
 if [ $# -ge 2 ]; then printf -v month '%02d' "$2"; fi
@@ -90,7 +91,6 @@ get_sessions()
 
 
 declare -i cnt
-declare -i tot
 
 mkdir --parents logs
 
@@ -98,7 +98,7 @@ readonly Ies=$(ienv | sed --quiet 's/NOTICE: irods_host - //p')
 readonly RS=$(iquest '%s' "SELECT ORDER(RESC_LOC) WHERE RESC_LOC != 'EMPTY_RESC_HOST'")
 
 readonly UnsortedSessions=$(mktemp)
-trap "rm --force '$UnsortedSessions'" EXIT
+trap 'rm --force "$UnsortedSessions"' EXIT
 
 for svr in "$Ies" $RS
 do
@@ -112,7 +112,8 @@ do
     then
       printf '\r  dumping %s\n' "$log" >&2
 
-      IFS=. read -r root logYear rest < <(basename "$log")
+      IFS=. read -r -a parts < <(basename "$log")
+      logYear="${parts[1]}"
 
       scp -q "$svr":"$log" /dev/stdout 2>/dev/null \
         | get_sessions "$logYear" \
