@@ -2,7 +2,7 @@
 
 set -e
 
-readonly ExecName=$(basename $0)
+readonly ExecName=$(basename "$0")
 readonly SizeQuery="$*"
 
 readonly HIST_WID=60

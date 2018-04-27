@@ -5,7 +5,7 @@ set -e
 readonly DEFAULT_HOST=localhost
 readonly DEFAULT_PORT=5432
 
-readonly ExecName=$(basename $0)
+readonly ExecName=$(basename "$0")
 
 
 print_help()

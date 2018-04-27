@@ -93,13 +93,17 @@ readonly OBJ_PATH="$*"
 
 ask_irods()
 {
-  local collPath=$(dirname "$OBJ_PATH")
-  local objName=$(basename "$OBJ_PATH")
+  local collPath
+  collPath=$(dirname "$OBJ_PATH")
 
-  local resp=$(iquest --no-page \
-                 '%s %s %s' \
-                 "SELECT DATA_ID, DATA_RESC_HIER, DATA_PATH
-                  WHERE COLL_NAME = '$collPath' AND DATA_NAME = '$objName'")
+  local objName
+  objName=$(basename "$OBJ_PATH")
+
+  local resp
+  resp=$(iquest --no-page \
+                '%s %s %s' \
+                "SELECT DATA_ID, DATA_RESC_HIER, DATA_PATH
+                 WHERE COLL_NAME = '$collPath' AND DATA_NAME = '$objName'")
 
   if [ "$?" -ne 0 ] || [ "$resp" = 'CAT_NO_ROWS_FOUND: Nothing was found matching your query' ]
   then

@@ -72,11 +72,11 @@ do
       shift 2
       ;;
     -d|--dbms)
-      readonly DbmsArg="--host $2"
+      export PGHOST="$2"
       shift 2
       ;;
     --dbms-port)
-      readonly DbmsPortArg="--port $2"
+      export PGPORT="$2"
       shift 2
       ;;
     -h|--help)
@@ -153,7 +153,7 @@ count_unmovable()
 {
   local baseCond="$1"
 
-  psql --no-align --tuples-only $DbmsArg $DbmsPortArg ICAT icat_reader <<EOSQL
+  psql --no-align --tuples-only ICAT icat_reader <<EOSQL
 SELECT COUNT(data_id)
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id = ANY(ARRAY(
@@ -243,7 +243,9 @@ select_cohort()
 
   local minSizeMiB=$((minThreads * 32))
   local minSizeB=$((minSizeMiB * ((1024 ** 2))))
-  local cohortList=$(mktemp)
+
+  local cohortList
+  cohortList=$(mktemp)
 
   if [ -n "$maxThreads" ]
   then
@@ -255,7 +257,8 @@ select_cohort()
     partition "$minSizeB"
   fi > "$cohortList"
 
-  local subTotal=$(count_list <"$cohortList")
+  local subTotal
+  subTotal=$(count_list <"$cohortList")
 
   if [ -n "$maxSizeMiB" ]
   then
@@ -291,15 +294,14 @@ then
   exit 1
 fi
 
-if ! psql $DbmsArg $DbmsPortArg ICAT icat_reader <<< '' &> /dev/null
+if ! psql ICAT icat_reader <<< '' &> /dev/null
 then
   printf "aren't able to connect to the ICAT DB as the icat_reader without a password\n" >&2
   exit 1
 fi
 
 readonly ObjectList=$(mktemp)
-
-trap "finish '$ObjectList'" EXIT
+trap 'finish "$ObjectList"' EXIT
 
 if [ -n "$BaseColl" ]
 then
@@ -310,7 +312,9 @@ fi
 
 printf 'Checking to see if all data objects can be physically moved...\n' >&2
 
-if [ $(count_unmovable "$BaseCond") -gt 0 ]
+readonly UnmovableCount=$(count_unmovable "$BaseCond")
+
+if [ "$UnmovableCount" -gt 0 ]
 then
   cat <<EOF >&2
 WARNING: NOT ALL DATA OBJECTS COULD BE MOVED BECAUSE REPLICAS ARE ALREADY ON THE
@@ -320,8 +324,7 @@ fi
 
 printf 'Retrieving data objects to physically move...\n' >&2
 
-psql --no-align --tuples-only --record-separator-zero --field-separator ' ' $DbmsArg $DbmsPortArg \
-     ICAT icat_reader \
+psql --no-align --tuples-only --record-separator-zero --field-separator ' ' ICAT icat_reader \
 <<EOSQL > "$ObjectList"
 SELECT d.data_size, c.coll_name || '/' || d.data_name
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
