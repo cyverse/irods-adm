@@ -6,6 +6,7 @@ readonly Version=2
 
 show_help()
 {
+# shellcheck disable=SC2006
   cat <<EOF
 
 $ExecName version $Version
@@ -66,8 +67,8 @@ readonly Opts=$(getopt --name "$ExecName" \
                        --longoptions collection:,help,multiplier:,resource:,serial,until:,version \
                        -- \
                        "$@")
-
-if [ "$?" -ne 0 ]
+ret="$?"
+if [ "$ret" -ne 0 ]
 then
   exit_with_help
 fi
@@ -136,12 +137,13 @@ fi
 
 if [ -n "$Serial" ]
 then
-  export SERIAL_OPT='-N 0'
+  export SERIAL_OPT=-N0
 fi
 
 if [ -n "$Until" ]
 then
-  if ! export UNTIL_TS=$(date --date="$Until" '+%s')
+  export UNTIL_TS
+  if ! UNTIL_TS=$(date --date="$Until" '+%s')
   then
     printf '%s is not a valid date format\n' "$Until"
     exit 1
@@ -155,7 +157,7 @@ eval "exec $Log>&1"
 
 CHECK_TIME()
 {
-  if [ -n "$UNTIL_TS" ] && [ $(date '+%s') -ge "$UNTIL_TS" ]
+  if [ -n "$UNTIL_TS" ] && [ "$(date '+%s')" -ge "$UNTIL_TS" ]
   then
     return 1
   fi
@@ -170,7 +172,7 @@ REPL_BATCH()
     exit 1
   fi
 
-  irepl -B -M -T -v $SERIAL_OPT -R "$DEST_RESC" "$@"
+  irepl -B -M -T -v "$SERIAL_OPT" -R "$DEST_RESC" "$@"
 
 # XXX: Trying to figure out the irepl error code for when irepl logs a
 # '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably
@@ -191,7 +193,7 @@ export -f REPL_BATCH
 
 update_progress()
 {
-  printf "$@" >&2
+  printf '%s' "$@" >&2
 }
 
 
@@ -294,7 +296,9 @@ track_prog()
   local subTot="$3"
 
   local subCnt=0
-  local msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
+
+  local msg
+  msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
 
   update_progress "$msg"
 
@@ -336,8 +340,10 @@ select_cohort()
   fi
 
   local minSizeMiB=$((minThreads * 32))
-  local minSizeB=$((minSizeMiB * ((1024 ** 2))))
-  local cohortList=$(mktemp)
+  local minSizeB=$((minSizeMiB * 1024 ** 2))
+
+  local cohortList
+  cohortList=$(mktemp)
 
   if [ -n "$maxThreads" ]
   then
@@ -349,7 +355,8 @@ select_cohort()
     partition "$minSizeB"
   fi > "$cohortList"
 
-  local subTotal=$(count <"$cohortList")
+  local subTotal
+  subTotal=$(count <"$cohortList")
 
   if [ -n "$maxSizeMiB" ]
   then
@@ -378,7 +385,7 @@ select_cohort()
 
 readonly ObjectList=$(mktemp)
 
-trap "finish $ObjectList" EXIT
+trap 'finish "$ObjectList"' EXIT
 
 if ! iadmin lz &> /dev/null
 then
@@ -400,7 +407,7 @@ fi
 
 update_progress 'Retrieving data objects to replicate...\n'
 
-readonly MaxCreateTime=$(date --date $(date --iso-8601 --date yesterday) '+%s')
+readonly MaxCreateTime=$(date --date "$(date --iso-8601 --date yesterday)" '+%s')
 
 if [ -n "$SrcRes" ]
 then
