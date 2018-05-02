@@ -92,6 +92,7 @@ main()
         ;;
       -l|--log-dir)
         logDir="$2"
+        shift 2
         ;;
       -v,--version)
         show_version
