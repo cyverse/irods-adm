@@ -41,8 +41,8 @@ main()
                 --options dhH:p:v \
                 -- \
                 "$@")
-
-  if [ "$?" -ne 0 ]
+  local ret="$?"
+  if [ "$ret" -ne 0 ]
   then
     show_help >&2
     return 1
