@@ -68,54 +68,81 @@ EOF
 }
 
 
-show_version()
+main()
 {
-  printf '%s\n' "$Version"
+  local opts
+  opts=$(getopt --name "$ExecName" --options d:hv --longoptions directory:,help,version -- "$@")
+  local ret="$?"
+  if [ "$ret" -ne 0 ]
+  then
+    show_help >&2
+    return 1
+  fi
+
+  local logDir
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h,--help)
+        show_help
+        return 0
+        ;;
+      -l|--log-dir)
+        logDir="$2"
+        ;;
+      -v,--version)
+        show_version
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
+  if [ -z "$logDir" ]
+  then
+    logDir=.
+  fi
+
+  local clients=("$@")
+
+  local testTime
+  testTime=$(date)
+
+  local log
+  log="$logDir"/irods-check-log-$(date --iso-8601 --date="$testTime").tsv
+
+  if [ ! -e "$logDir" ]
+  then
+    if ! mkdir --parents "$logDir"
+    then
+      return 1
+    fi
+  fi
+
+  if [ ! -s "$log" ]
+  then
+    if ! printf 'time\tclient\tresource\tstatus\n' > "$log"
+    then
+      return 1
+    fi
+  fi
+
+  for client in "${clients[@]}"
+  do
+    check_from_client "$client" \
+      1> >(log_statuses "$client" "$testTime") 2> >(display_errors "$client") &
+  done | sort --ignore-case --stable --key 2,2 >> "$log"
 }
-
-
-set -e
-
-if ! opts=$(getopt --name "$ExecName" --options d:hv --longoptions directory:,help,version -- "$@")
-then
-  show_help >&2
-  exit 1
-fi
-
-eval set -- "$opts"
-
-while true
-do
-  case "$1" in
-    -h,--help)
-      show_help
-      exit 0
-      ;;
-    -l|--log-dir)
-      readonly LogDir="$2"
-      ;;
-    -v,--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      show_help >&2
-      exit 1
-      ;;
-  esac
-done
-
-if [ -z "$LogDir" ]
-then
-  readonly LogDir=.
-fi
-
-readonly Clients=("$@")
-readonly TestTime=$(date)
 
 
 check_from_client()
@@ -234,9 +261,10 @@ display_errors()
 log_statuses()
 {
   local client="$1"
+  local testTime="$2"
 
   local logTime
-  logTime=$(date --date="$TestTime" --iso-8601=seconds)
+  logTime=$(date --date="$testTime" --iso-8601=seconds)
 
   while read -r system status
   do
@@ -245,25 +273,11 @@ log_statuses()
 }
 
 
-readonly Log=$LogDir/irods-check-log-$(date --iso-8601 --date="$TestTime").tsv
+show_version()
+{
+  printf '%s\n' "$Version"
+}
 
-if [ ! -e "$LogDir" ]
-then
-  if ! mkdir --parents "$LogDir"
-  then
-    exit 1
-  fi
-fi
 
-if [ ! -s "$Log" ]
-then
-  if ! printf 'time\tclient\tresource\tstatus\n' > "$Log"
-  then
-    exit 1
-  fi
-fi
-
-for client in "${Clients[@]}"
-do
-  check_from_client "$client" 1> >(log_statuses "$client") 2> >(display_errors "$client") &
-done | sort --ignore-case --stable --key 2,2 >> "$Log"
+set -e
+main "$@"
