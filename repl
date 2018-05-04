@@ -191,19 +191,13 @@ REPL_BATCH()
 export -f REPL_BATCH
 
 
-update_progress()
-{
-  printf '%s' "$@" >&2
-}
-
-
 finish()
 {
   local objList="$1"
 
   if ! CHECK_TIME
   then
-    update_progress 'out of time\n'
+    printf 'out of time\n' >&2
   fi
 
   rm --force "$objList"
@@ -300,7 +294,7 @@ track_prog()
   local msg
   msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
 
-  update_progress "$msg"
+  printf '%s' "$msg" >&2
 
   while read -r
   do
@@ -308,15 +302,15 @@ track_prog()
     then
       ((subCnt++))
       ((cnt++))
-      update_progress '\r%*s\r' ${#msg} ''
+      printf '\r%*s\r' ${#msg} '' >&2
       msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
-      update_progress "$msg"
+      printf '%s' "$msg" >&2
     fi
   done
 
-  update_progress '\r%*s\r' ${#msg} ''
+  printf '\r%*s\r' ${#msg} '' >&2
   msg=$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")
-  update_progress '%s\n' "$msg"
+  printf '%s\n' "$msg" >&2
   printf '%s' "$cnt"
 }
 
@@ -360,10 +354,11 @@ select_cohort()
 
   if [ -n "$maxSizeMiB" ]
   then
-    update_progress 'Replicating %s files with size in [%s, %s) MiB\n' \
-                    "$subTotal" "$minSizeMiB" "$maxSizeMiB"
+    printf 'Replicating %s files with size in [%s, %s) MiB\n' \
+           "$subTotal" "$minSizeMiB" "$maxSizeMiB" \
+      >&2
   else
-    update_progress 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB"
+    printf 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
   fi
 
   if [ "$subTotal" -gt 0 ]
@@ -405,7 +400,7 @@ then
  exit 1
 fi
 
-update_progress 'Retrieving data objects to replicate...\n'
+printf 'Retrieving data objects to replicate...\n' >&2
 
 readonly MaxCreateTime=$(date --date "$(date --iso-8601 --date yesterday)" '+%s')
 
@@ -431,7 +426,7 @@ psql --no-align --tuples-only --record-separator-zero \
   > "$ObjectList"
 
 readonly Tot=$(count < "$ObjectList")
-update_progress '%d data objects to replicate\n' "$Tot"
+printf '%d data objects to replicate\n' "$Tot" >&2
 
 if [ "$Tot" -gt 0 ]
 then
