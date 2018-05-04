@@ -1,0 +1,214 @@
+#!/bin/bash
+
+readonly ExecName=$(basename "$0")
+readonly Version=2
+
+
+show_help()
+{
+  cat <<EOF
+
+$ExecName version $Version
+
+Usage:
+ $ExecName [options] <client> ...
+
+This script will check that an iRODS grid is reachable from various places on
+the Internet.
+
+Parameters:
+ <client>  the host name or IP address of a computer to use to connect to iRODS
+
+Options:
+ -l, --log-dir <directory>  the directory where the status logs are to be
+                            written (default is current working directory)
+
+ -h, --help     display help text and exit
+ -v, --version  display version and exit
+
+Summary:
+
+Given a list of hosts, this script will check that the IES and each of the
+resources in the corresponding zone can be accessed. The script assumes that the
+account on the remote host is configured to use the desired iRODS grid. It will
+make an ilsresc request to check that the IES is reachable. Then it will upload
+a 64 MiB to each of the resources in the ilsresc response.
+
+Prerequisites:
+
+ 1. The local host will need the following software installed.
+
+   - bash
+   - date
+   - sort
+   - ssh
+
+ 2. Each remote host will need the following software installed.
+
+   - bash
+   - cat
+   - date
+   - iCommands
+   - mktemp
+   - sed
+   - sort
+   - timeout
+   - wc
+
+ 3. Each remote host will need to have an account configured to use the desired
+    iRODS grid with iCommands by default. Also the account must already be
+    authenticated with iRODS. In other words, calling an iCommand will act on
+    the desired grid without prompting for a password.
+
+ 4. ssh on the account on the local host must be configured to connect to each
+    remote host as the correct user by default. Furthermore, it should be
+    configured so that ssh can connect to each remote host without prompting for
+    a password.
+EOF
+}
+
+
+readonly ExecPath=$(readlink --canonicalize "$0")
+readonly ExecDir=$(dirname "$ExecPath")
+
+
+main()
+{
+  local opts
+  opts=$(getopt --name "$ExecName" --options d:hv --longoptions directory:,help,version -- "$@")
+  local ret="$?"
+  if [ "$ret" -ne 0 ]
+  then
+    show_help >&2
+    return 1
+  fi
+
+  local logDir=.
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h,--help)
+        show_help
+        return 0
+        ;;
+      -l|--log-dir)
+        logDir="$2"
+        shift 2
+        ;;
+      -v,--version)
+        show_version
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
+  local clients=("$@")
+
+  local testTime
+  testTime=$(date)
+
+  local log
+  log="$logDir"/irods-check-log-$(date --iso-8601 --date="$testTime").tsv
+  prep_log "$log"
+  check_from_clients "$testTime" "${clients[@]}" >> "$log"
+}
+
+
+check_from_client()
+{
+  local testTime="$1"
+  local client="$2"
+
+  ssh -q "$client" bash \
+    < "$ExecDir"/check-irods \
+    1> >(log_statuses "$client" "$testTime") \
+    2> >(display_errors "$client")
+}
+
+
+check_from_clients()
+{
+  local testTime="$1"
+  shift
+  local clients=("$@")
+
+  for client in "${clients[@]}"
+  do
+    check_from_client "$testTime" "$client" &
+  done | sort --ignore-case --stable --key 2,2
+}
+
+
+display_errors()
+{
+  local client="$1"
+
+  while IFS= read -r
+  do
+    if [ -n "$REPLY" ]
+    then
+      printf '%s: %s\n' "$client" "$REPLY" >&2
+    fi
+  done
+}
+
+
+log_statuses()
+{
+  local client="$1"
+  local testTime="$2"
+
+  local logTime
+  logTime=$(date --date="$testTime" --iso-8601=seconds)
+
+  while read -r system status
+  do
+    printf '%s\t%s\t%s\t%s\n' "$logTime" "$client" "$system" "$status"
+  done
+}
+
+
+prep_log()
+{
+  local log="$1"
+
+  local logDir
+  logDir=$(dirname "$log")
+
+  if [ ! -e "$logDir" ]
+  then
+    if ! mkdir --parents "$logDir"
+    then
+      return 1
+    fi
+  fi
+
+  if [ ! -s "$log" ]
+  then
+    if ! printf 'time\tclient\tresource\tstatus\n' > "$log"
+    then
+      return 1
+    fi
+  fi
+}
+
+
+show_version()
+{
+  printf '%s\n' "$Version"
+}
+
+
+set -e
+main "$@"

@@ -65,6 +65,9 @@ object.
 
 ## Report generation
 
+The program `check-irods-report` generates a report on the accessibility of the
+IES and resources from various locations.
+
 The program `count-sessions` can be combined with `sessions-intervals` to
 generate a report on the number of concurrent sessions during each second for
 the time period covered by a sequence of sessions.
@@ -90,8 +93,8 @@ there is.
 The program `resc-create-times` lists all of the root resources sorted by
 creation time.
 
-The program `check-irods` generates a report on the accessibility of the IES and
-resources from various locations.
+The program `check-irods` checks to see if the IES and the resources servers are
+accessible.
 
 The program `rm-resc` can be used to remove all of the files from a given
 resource.
