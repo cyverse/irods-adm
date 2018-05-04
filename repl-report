@@ -149,7 +149,7 @@ inject_time_restriction()
   else
     local supCreateTs
     supCreateTs=$(date --date "$(date --iso-8601 --date yesterday)" '+%s')
-    printf 'create_ts < \"0%s\"' "$supCreateTs"
+    printf $'create_ts < \'0%s\'' "$supCreateTs"
   fi
 }
 
