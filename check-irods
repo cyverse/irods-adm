@@ -1,13 +1,13 @@
 #!/bin/bash
 
 readonly ExecName=$(basename "$0")
-
+readonly Version=1
 
 show_help()
 {
   cat <<EOF
 
-$ExecName
+$ExecName version $Version
 
 Usage:
  $ExecName [options]
@@ -15,8 +15,8 @@ Usage:
 This script will check that an iRODS grid is reachable from localhost.
 
 Options:
- -h, --help  display help text and exit
-
+ -h, --help     display help text and exit
+ -v, --version  display version and exit
 Summary:
 
 This script will check that the IES and each of the resource in the currently
@@ -33,7 +33,7 @@ readonly TestFileSize=$((64 * 1024 * 1024))
 main()
 {
   local opts
-  if ! opts=$(getopt --name "$ExecName" --longoptions help --options h -- "$@")
+  if ! opts=$(getopt --name "$ExecName" --longoptions help,version --options hv -- "$@")
   then
     show_help >&2
     return 1
@@ -48,12 +48,16 @@ main()
         show_help
         return 0
         ;;
+      -v,--version)
+        show_version
+        return 0
+        ;;
       --)
         shift
         break
         ;;
       *)
-        show_Help >&2
+        show_help >&2
         return 1
         ;;
     esac
@@ -127,6 +131,12 @@ log_status()
   local status="$2"
 
   printf '%s %s\n' "$system" "$status"
+}
+
+
+show_version()
+{
+  printf '%s\n' "$Version"
 }
 
 
