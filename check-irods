@@ -3,6 +3,48 @@
 readonly TestFileSize=$((64 * 1024 * 1024))
 
 
+main()
+{
+  if ! testFile=$(mktemp)
+  then
+    log_status '*' error
+    return 1
+  fi
+
+  if ! trap 'rm --force "$testFile"' EXIT
+  then
+    log_status '*' error
+    return 1
+  fi
+
+  if ! truncate --size "$TestFileSize" "$testFile"
+  then
+    log_status '*' error
+    return 1
+  fi
+
+  if lsrescResp=$(ilsresc)
+  then
+    log_status IES ok
+  else
+    log_status IES fail
+    return 0
+  fi
+
+  resources=()
+
+  while IFS= read -r
+  do
+    resources+=("$REPLY")
+  done < <(sed --quiet 's/^\([A-Za-z][^:]*\).*/\1/p' <<< "$lsrescResp")
+
+  for resource in "${resources[@]}"
+  do
+    test_resource "$resource" "$testFile" 2> >(display_errors "$resource") &
+  done | sort --ignore-case --key 1
+}
+
+
 display_errors()
 {
   local resource="$1"
@@ -53,40 +95,5 @@ test_resource()
 }
 
 
-if ! testFile=$(mktemp)
-then
-  log_status '*' error
-  exit 1
-fi
-
-if ! trap 'rm --force "$testFile"' EXIT
-then
-  log_status '*' error
-  exit 1
-fi
-
-if ! truncate --size "$TestFileSize" "$testFile"
-then
-  log_status '*' error
-  exit 1
-fi
-
-if lsrescResp=$(ilsresc)
-then
-  log_status IES ok
-else
-  log_status IES fail
-  exit 0
-fi
-
-resources=()
-
-while IFS= read -r
-do
-  resources+=("$REPLY")
-done < <(sed --quiet 's/^\([A-Za-z][^:]*\).*/\1/p' <<< "$lsrescResp")
-
-for resource in "${resources[@]}"
-do
-  test_resource "$resource" "$testFile" 2> >(display_errors "$resource") &
-done | sort --ignore-case --key 1
+set -e
+main
