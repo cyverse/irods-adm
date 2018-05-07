@@ -1,17 +1,93 @@
 #!/bin/bash
 
+readonly ExecName=$(basename "$0")
+
+
+show_help()
+{
+  cat <<EOF
+
+$ExecName
+
+Usage:
+ $ExecName [options]
+
+This script will check that an iRODS grid is reachable from localhost.
+
+Options:
+ -h, --help  display help text and exit
+
+Summary:
+
+This script will check that the IES and each of the resource in the currently
+configured iRODS zone for localhost can be accessed. It will make an ilsresc
+request to check that the IES is reacable. Then it will upload a 64 MiB file to
+each of the resources in the ilsresc response.
+EOF
+}
+
+
 readonly TestFileSize=$((64 * 1024 * 1024))
 
 
 main()
 {
+  local opts
+  if ! opts=$(getopt --name "$ExecName" --longoptions help --options h -- "$@")
+  then
+    show_help >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h,--help)
+        show_help
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_Help >&2
+        return 1
+        ;;
+    esac
+  done
+
+  do_checks
+}
+
+
+display_errors()
+{
+  local resource="$1"
+
+  while IFS= read -r
+  do
+    if [ -n "$REPLY" ]
+    then
+      printf '(%s) %s\n' "$resource" "$REPLY" >&2
+    fi
+  done
+}
+
+
+do_checks()
+{
+  local testFile
   if ! testFile=$(mktemp)
   then
     log_status '*' error
     return 1
   fi
 
-  if ! trap 'rm --force "$testFile"' EXIT
+  # shellcheck disable=SC2064
+  if ! trap "rm --force '$testFile'" EXIT
   then
     log_status '*' error
     return 1
@@ -31,7 +107,7 @@ main()
     return 0
   fi
 
-  resources=()
+  local resources=()
 
   while IFS= read -r
   do
@@ -42,20 +118,6 @@ main()
   do
     test_resource "$resource" "$testFile" 2> >(display_errors "$resource") &
   done | sort --ignore-case --key 1
-}
-
-
-display_errors()
-{
-  local resource="$1"
-
-  while IFS= read -r
-  do
-    if [ -n "$REPLY" ]
-    then
-      printf '(%s) %s\n' "$resource" "$REPLY" >&2
-    fi
-  done
 }
 
 
@@ -96,4 +158,4 @@ test_resource()
 
 
 set -e
-main
+main "$@"
