@@ -60,16 +60,51 @@ EOF
 }
 
 
+exit_with_help()
+{
+  show_help >&2
+  exit 1
+}
+
+
 show_version()
 {
   printf '%s\n' "$Version"
 }
 
 
-exit_with_help()
+split_out_class()
 {
-  show_help >&2
-  exit 1
+  local errorsFile="$1"
+  local classifier="$2"
+  local substitution="$3"
+  local classFile="$4"
+
+  local errors
+  errors=$(cat "$errorsFile")
+
+  local classifiedErrors
+  classifiedErrors=$(sed --quiet "/$classifier/p" <<< "$errors")
+
+  if [ -n "$classifiedErrors" ]
+  then
+    comm -2 -3 <(echo "$errors") <(echo "$classifiedErrors") > "$errorsFile"
+    sed "s/$classifier/$substitution/" <<< "$classifiedErrors" > "$classFile"
+    wc --lines <<< "$classifiedErrors"
+  else
+    printf '0'
+  fi
+}
+
+
+split_out_repl_class()
+{
+  local errorsFile="$1"
+  local status="$2"
+  local error="$3"
+  local classFile="$4"
+
+  split_out_class "$errorsFile" ", status = $status status = $status $error\$" '' "$classFile"
 }
 
 
@@ -109,42 +144,6 @@ then
 fi
 
 readonly LogBase="$1"
-
-
-split_out_class()
-{
-  local errorsFile="$1"
-  local classifier="$2"
-  local substitution="$3"
-  local classFile="$4"
-
-  local errors
-  errors=$(cat "$errorsFile")
-
-  local classifiedErrors
-  classifiedErrors=$(sed --quiet "/$classifier/p" <<< "$errors")
-
-  if [ -n "$classifiedErrors" ]
-  then
-    comm -2 -3 <(echo "$errors") <(echo "$classifiedErrors") > "$errorsFile"
-    sed "s/$classifier/$substitution/" <<< "$classifiedErrors" > "$classFile"
-    wc --lines <<< "$classifiedErrors"
-  else
-    printf '0'
-  fi
-}
-
-
-split_out_repl_class()
-{
-  local errorsFile="$1"
-  local status="$2"
-  local error="$3"
-  local classFile="$4"
-
-  split_out_class "$errorsFile" ", status = $status status = $status $error\$" '' "$classFile"
-}
-
 
 readonly ErrorsFile=$(mktemp)
 readonly ReplErrorsFile=$(mktemp)
