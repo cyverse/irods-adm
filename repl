@@ -95,7 +95,7 @@ do
       shift 2
       ;;
     -s|--serial)
-      readonly Serial=1
+      export SERIAL=true
       shift
       ;;
     -u|--until)
@@ -135,11 +135,6 @@ else
   readonly ProcMult=1
 fi
 
-if [ -n "$Serial" ]
-then
-  export SERIAL_OPT=-N0
-fi
-
 if [ -n "$Until" ]
 then
   export UNTIL_TS
@@ -172,7 +167,14 @@ REPL_BATCH()
     exit 1
   fi
 
-  irepl -B -M -T -v "$SERIAL_OPT" -R "$DEST_RESC" "$@"
+  local maxThreads=16
+
+  if [ "$SERIAL" ]
+  then
+    maxThreads=0
+  fi
+
+  irepl -B -M -T -v -N "$maxThreads" -R "$DEST_RESC" "$@"
 
 # XXX: Trying to figure out the irepl error code for when irepl logs a
 # '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably
@@ -430,7 +432,7 @@ printf '%d data objects to replicate\n' "$Tot" >&2
 
 if [ "$Tot" -gt 0 ]
 then
-  if [ -z "$Serial" ]
+  if [ -z "$SERIAL" ]
   then
     cnt=0
     cnt=$(select_cohort "$cnt" "$Tot" 16 512  0  1 < "$ObjectList")  # 16 1-threaded transfers
