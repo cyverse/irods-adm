@@ -115,9 +115,7 @@ classify()
   # shellcheck disable=SC2064
   trap "rm --force '$errorsFile' '$replErrorsFile'" EXIT
 
-  sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
-    | sed '/connectToRhost: readVersion to data.cyverse.org failed, msg=/d' \
-    | sort > "$errorsFile"
+  filter_errors > "$errorsFile"
 
   local errCnt
   errCnt=$(wc --lines < "$errorsFile")
@@ -201,6 +199,14 @@ exit_with_help()
 {
   show_help >&2
   exit 1
+}
+
+
+filter_errors ()
+{
+  sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
+    | sed '/connectToRhost: readVersion to data.cyverse.org failed, msg=/d' \
+    | sort
 }
 
 
