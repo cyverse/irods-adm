@@ -98,11 +98,36 @@ main()
 
   local logBase="$1"
 
-  classify "$logBase"
+  process_input "$logBase"
 }
 
 
-classify()
+display_error_count()
+{
+  local label="$1"
+  local count="$2"
+  local total="$3"
+
+  printf '%*d %s\n' "${#total}" "$count" "$label"
+}
+
+
+exit_with_help()
+{
+  show_help >&2
+  exit 1
+}
+
+
+filter_errors ()
+{
+  sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
+    | sed '/connectToRhost: readVersion to data.cyverse.org failed, msg=/d' \
+    | sort
+}
+
+
+process_input()
 {
   local logBase="$1"
 
@@ -200,31 +225,6 @@ classify()
   then
     mv "$errorsFile" "$logBase".unclassified_errors
   fi
-}
-
-
-display_error_count()
-{
-  local label="$1"
-  local count="$2"
-  local total="$3"
-
-  printf '%*d %s\n' "${#total}" "$count" "$label"
-}
-
-
-exit_with_help()
-{
-  show_help >&2
-  exit 1
-}
-
-
-filter_errors ()
-{
-  sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
-    | sed '/connectToRhost: readVersion to data.cyverse.org failed, msg=/d' \
-    | sort
 }
 
 
