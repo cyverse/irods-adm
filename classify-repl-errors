@@ -106,44 +106,19 @@ main()
 }
 
 
-display_error_count()
+remove_temp_files()
 {
-  local label="$1"
-  local count="$2"
-  local total="$3"
-
-  printf '%*d %s\n' "${#total}" "$count" "$label"
+  if [ "${#TempFiles[@]}" -gt 0 ]
+  then
+    rm --force "${TempFiles[@]}"
+  fi
 }
 
 
-exit_with_help()
+classify_errors()
 {
-  show_help >&2
-  exit 1
-}
-
-
-filter_errors ()
-{
-  sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
-    | sed '/connectToRhost: readVersion to data.cyverse.org failed, msg=/d' \
-    | sort
-}
-
-
-process_input()
-{
-  local logBase="$1"
-
-  local errorsFile
-  errorsFile=$(mktemp)
-  TempFiles+=("$errorsFile")
-  filter_errors > "$errorsFile"
-
-  local errCnt
-  errCnt=$(wc --lines < "$errorsFile")
-
-  display_error_count errors "$errCnt" "$errCnt"
+  local errorsFile="$1"
+  local errCnt="$2"
 
   local iTCnt
   iTCnt=$(split_out_class "$errorsFile" \
@@ -230,12 +205,46 @@ process_input()
 }
 
 
-remove_temp_files()
+display_error_count()
 {
-  if [ "${#TempFiles[@]}" -gt 0 ]
-  then
-    rm --force "${TempFiles[@]}"
-  fi
+  local label="$1"
+  local count="$2"
+  local total="$3"
+
+  printf '%*d %s\n' "${#total}" "$count" "$label"
+}
+
+
+exit_with_help()
+{
+  show_help >&2
+  exit 1
+}
+
+
+filter_errors ()
+{
+  sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
+    | sed '/connectToRhost: readVersion to data.cyverse.org failed, msg=/d' \
+    | sort
+}
+
+
+process_input()
+{
+  local logBase="$1"
+
+  local errorsFile
+  errorsFile=$(mktemp)
+  TempFiles+=("$errorsFile")
+  
+  filter_errors > "$errorsFile"
+
+  local errCnt
+  errCnt=$(wc --lines < "$errorsFile")
+
+  display_error_count errors "$errCnt" "$errCnt"
+  classify_errors "$errorsFile" "$errCnt"
 }
 
 
