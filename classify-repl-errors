@@ -60,6 +60,9 @@ EOF
 }
 
 
+declare -a TempFiles
+
+
 main()
 {
   local opts
@@ -98,6 +101,7 @@ main()
 
   local logBase="$1"
 
+  trap remove_temp_files EXIT
   process_input "$logBase"
 }
 
@@ -133,13 +137,7 @@ process_input()
 
   local errorsFile
   errorsFile=$(mktemp)
-
-  local replErrorsFile
-  replErrorsFile=$(mktemp)
-
-  # shellcheck disable=SC2064
-  trap "rm --force '$errorsFile' '$replErrorsFile'" EXIT
-
+  TempFiles+=("$errorsFile")
   filter_errors > "$errorsFile"
 
   local errCnt
@@ -162,6 +160,10 @@ process_input()
                            "$logBase".src_path_errors)
 
   display_error_count 'source path errors' "$sPECnt" "$errCnt"
+
+  local replErrorsFile
+  replErrorsFile=$(mktemp)
+  TempFiles+=("$replErrorsFile")
 
   split_out_class "$errorsFile" '^replUtil: repl error for ' '' "$replErrorsFile" > /dev/null
   sort --output "$replErrorsFile" "$replErrorsFile"
@@ -224,6 +226,15 @@ process_input()
   if [ "$unclassifiedErrCnt" -gt 0 ]
   then
     mv "$errorsFile" "$logBase".unclassified_errors
+  fi
+}
+
+
+remove_temp_files()
+{
+  if [ "${#TempFiles[@]}" -gt 0 ]
+  then
+    rm --force "${TempFiles[@]}"
   fi
 }
 
