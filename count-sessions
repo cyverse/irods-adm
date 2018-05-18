@@ -20,6 +20,7 @@ main()
   local max=0
 
   local counts
+  
   local words
   while read -r -a words
   do
@@ -44,4 +45,5 @@ main()
 }
 
 
+set -e
 main "$@"
