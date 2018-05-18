@@ -9,32 +9,39 @@
 # epoch. STOP_TIME is the time when the same session ended in seconds since the
 # POSIX epoch.  The rest if the line is ignored.
 
-readonly IntervalsFile="$1"
 
-readonly LB=$(cut --delimiter ' ' --fields 1 "$IntervalsFile" \
-              | sort --numeric-sort \
-              | head --lines 1)
+main()
+{
+  local intervalsFile="$1"
 
-declare -a counts
-max=0
+  local lb
+  lb=$(cut --delimiter ' ' --fields 1 "$intervalsFile" | sort --numeric-sort | head --lines 1)
 
-while read -r -a words
-do
-  start=$((words[0] - LB))
-  stop=$((words[1] - LB))
+  local max=0
 
-  for t in $(seq "$start" "$stop")
+  local counts
+  local words
+  while read -r -a words
   do
-    counts["$t"]=$((counts[t] + 1))
+    local start=$((words[0] - lb))
+    local stop=$((words[1] - lb))
+
+    for t in $(seq "$start" "$stop")
+    do
+      counts["$t"]=$((counts[t] + 1))
+    done
+
+    if [ "$stop" -gt "$max" ]
+    then
+      max="$stop"
+    fi
+  done < "$intervalsFile"
+
+  for t in $(seq 0 "$max")
+  do
+    printf '%d %d\n' $((lb + t)) $((counts[t] + 0))
   done
+}
 
-  if [ "$stop" -gt "$max" ]
-  then
-    max="$stop"
-  fi
-done < "$IntervalsFile"
 
-for t in $(seq 0 "$max")
-do
-  printf '%d %d\n' $((LB + t)) $((counts[t] + 0))
-done
+main "$@"
