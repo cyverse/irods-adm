@@ -297,4 +297,5 @@ split_out_repl_class()
 }
 
 
+set -u
 main "$@"
