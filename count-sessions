@@ -37,7 +37,6 @@ EOF
 
 main()
 {
-
   local opts
   if ! opts=$(getopt --name "$ExecName" --options h --longoptions help -- "$@")
   then
@@ -63,6 +62,18 @@ main()
     esac
   done
 
+  if [ "$#" -lt 1 ]
+  then
+    exit_with_help
+  fi
+
+  local intervalsFile="$1"
+  count "$intervalsFile"
+}
+
+
+count()
+{
   local intervalsFile="$1"
 
   local lb
