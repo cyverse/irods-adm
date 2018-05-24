@@ -31,6 +31,17 @@ START_TIME STOP_TIME ...
 START_TIME is the time when a session started in seconds since the POSIX epoch.
 STOP_TIME is the time when the same session ended in seconds since the POSIX
 epoch. The rest of the line is ignored.
+
+The generate report is written to standard output where each line has the
+following format.
+
+TIME OPEN_SESSION_COUNT
+
+TIME is in seconds since the POSIX epoch. OPEN_SESSION_COUNT is the number of
+open sessions at TIME.
+
+The report is sorted by time with the first time being the earliest start time
+and the last time being the latest stop time. 
 EOF
 }
 
