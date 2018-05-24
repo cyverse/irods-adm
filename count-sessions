@@ -1,17 +1,68 @@
 #!/bin/bash
-#
-# Generates a report on the number of concurrent sessions during each second.
-# It reads an interval report with the following format.
-#
-# START_TIME STOP_TIME ...
-#
-# START_TIME is the time when a session started in seconds since the POSIX
-# epoch. STOP_TIME is the time when the same session ended in seconds since the
-# POSIX epoch.  The rest if the line is ignored.
+
+readonly ExecName=$(basename "$0")
+readonly Version=1
+
+
+show_help()
+{
+  cat << EOF
+
+$ExecName version $Version
+
+Usage:
+  $ExecName [options] <intervals_file>
+
+Generates a report on the number of concurrent sessions during each second.
+
+Parameters:
+  <intervals_file>  the file containing session intervals
+
+Options:
+ -h, --help  show help and exit
+
+Summary:
+
+Generates a report on the number of concurrent sessions during each second. It
+reads an interval report with the following format.
+
+START_TIME STOP_TIME ...
+
+START_TIME is the time when a session started in seconds since the POSIX epoch.
+STOP_TIME is the time when the same session ended in seconds since the POSIX
+epoch. The rest of the line is ignored.
+EOF
+}
 
 
 main()
 {
+
+  local opts
+  if ! opts=$(getopt --name "$ExecName" --options h --longoptions help -- "$@")
+  then
+    exit_with_help
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        exit_with_help
+        ;;
+    esac
+  done
+
   local intervalsFile="$1"
 
   local lb
@@ -42,6 +93,13 @@ main()
   do
     printf '%d %d\n' $((lb + t)) $((counts[t] + 0))
   done
+}
+
+
+exit_with_help()
+{
+  show_help >&2
+  return 1
 }
 
 
