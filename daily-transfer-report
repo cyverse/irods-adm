@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# This script goes through all of the rodsLog files on data.cyverse.org and
-# filters out the AMQP messages related to file uploads and downloads. It then
+# This script goes through all of the rodsLog files on a given IES and filters
+# out the AMQP messages related to file uploads and downloads. It then
 # summarizes the daily uploads and downloads in a CSV format, written to
-# standard out.  It writes progress messages to standard error.
+# standard out. It writes progress messages to standard error.
 #
 # Here's the format of the output. The first row is a header row with each
 # subsequent row containing the transfer summary for a single day. The first
@@ -22,23 +22,60 @@
 #    2017-07-03,43,24533892584,21414,3125551395284
 
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
 readonly ExecDir=$(dirname "$ExecAbsPath")
 
-readonly Ies=data.cyverse.org
-readonly DbmsHost=irods-db3.iplantcollaborative.org
-readonly DbmsPort=5432
 readonly LogDir=/var/lib/irods/iRODS/server/log
 
 
 main()
 {
+  local opts
+  if ! opts=$(getopt --name "$ExecName" --options H:p: --longoptions dbms_host:,dbms_port: -- "$@")
+  then
+    printf 'failed to parse command line\n' >&2
+    exit 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -H|--dbms-host)
+        export PGHOST="$2"
+        shift 2
+        ;;
+      -p|--dbms-port)
+        export PGPORT="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        printf 'Unknown option %s\n' "$1" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  if [ "$#" -lt 1 ]
+  then
+    printf 'IES required\n' >&2
+    exit 1
+  fi
+
+  local ies="$1"
+
   mkfifo downloads
   mkfifo uploads
   trap 'rm --force downloads uploads' EXIT
 
-  gather_logs "$Ies" \
+  gather_logs "$ies" \
     | filter_msgs \
-    | tee >(mk_downloads "$DbmsHost" "$DbmsPort" > downloads) >(mk_uploads > uploads) \
+    | tee >(mk_downloads > downloads) >(mk_uploads > uploads) \
     > /dev/null &
 
   join -a 1 -a 2 -e 0 -j 1 -o 0,1.2,1.3,2.2,2.3 -t , downloads uploads
@@ -105,7 +142,11 @@ gather_logs()
 {
   local ies="$1"
 
-  for log in $(ssh -q "$ies" find "$LogDir" -maxdepth 1 -name rodsLog.* -type f | sort)
+  # TODO figure out how to get sudo to ask for a password on stderr on the
+  # client machine and read the response silently from stdin.
+  #ssh -q -t "$ies" sudo -S find "$LogDir" -maxdepth 1 -name rodsLog.* -type f
+
+  for log in $(ssh -q find "$LogDir" -maxdepth 1 -name rodsLog.* -type f | sort)
   do
     local logName
     logName=$(basename "$log")
@@ -120,11 +161,8 @@ gather_logs()
 
 mk_downloads()
 {
-  local dbmsHost="$1"
-  local dbmsPort="$2"
-
   printf 'Date,Download Count,Download Volume(B)\n'
-  extract_open_msgs | summarize_downloads "$dbmsHost" "$dbmsPort"
+  extract_open_msgs | summarize_downloads
 
   printf 'mk_downloads:  done\n' >&2
 }
@@ -181,10 +219,7 @@ prep_downloads_sql_data()
 
 summarize_downloads()
 {
-  local dbmsHost="$1"
-  local dbmsPort="$2"
-
-  psql --quiet --host "$dbmsHost" --port "$dbmsPort" ICAT icat_reader <<SQL 2> /dev/null
+  psql --quiet ICAT icat_reader <<SQL 2> /dev/null
 BEGIN;
 
 CREATE TEMPORARY TABLE downloads(date DATE, data_uuid CHAR(37), count BIGINT) ON COMMIT DROP;
@@ -223,4 +258,4 @@ printf 'summarize_downloads:  done\n' >&2
 }
 
 
-main
+main "$@"
