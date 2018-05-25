@@ -19,7 +19,8 @@ Parameters:
   <intervals_file>  the file containing session intervals
 
 Options:
- -h, --help  show help and exit
+ -h, --help     show help and exit
+ -v, --version  show version and exit
 
 Summary:
 
@@ -41,7 +42,7 @@ TIME is in seconds since the POSIX epoch. OPEN_SESSION_COUNT is the number of
 open sessions at TIME.
 
 The report is sorted by time with the first time being the earliest start time
-and the last time being the latest stop time. 
+and the last time being the latest stop time.
 EOF
 }
 
@@ -49,7 +50,7 @@ EOF
 main()
 {
   local opts
-  if ! opts=$(getopt --name "$ExecName" --options h --longoptions help -- "$@")
+  if ! opts=$(getopt --name "$ExecName" --options hv --longoptions help,version -- "$@")
   then
     exit_with_help
   fi
@@ -61,6 +62,10 @@ main()
     case "$1" in
       -h|--help)
         show_help
+        return 0
+        ;;
+      -v|--version)
+        show_version
         return 0
         ;;
       --)
@@ -122,6 +127,12 @@ exit_with_help()
 {
   show_help >&2
   return 1
+}
+
+
+show_version()
+{
+   printf '%s\n' "$Version"
 }
 
 
