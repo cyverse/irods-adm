@@ -171,7 +171,7 @@ SELECT resc_name, resc_hier, data_size
 FROM r_data_main
 WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
   AND $(inject_time_restriction "$noTimeRestriction")
-  AND resc_name NOT IN ('cyverseUKRes', 'haboobRes', 'unlRes');
+  AND resc_name NOT IN ('cyverseUKRes', 'haboobRes');
 CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
 CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
 
