@@ -6,17 +6,19 @@ readonly Version=3
 
 show_help()
 {
-  cat <<EOF
+  cat \
+<<EOF
 
 $ExecName version $Version
 
 Usage:
  $ExecName [options]
 
-This program generates a report on the data objects that need to be replicated.
-An object needs to be replicated if it was created before yesterday and has no
-replica yet. The report lists the number of unreplicated data objects and their
-volume broken down by the storage resource holding the corresponding files.
+This program generates a report on the data objects in /iplant/home that need to
+be replicated. An object needs to be replicated if it was created before
+yesterday and has no replica yet. The report lists the number of unreplicated
+data objects and their volume broken down by the storage resource holding the
+corresponding files.
 
 Options:
  -H, --host <host>  connect to the ICAT's DBMS on the host <host> instead of
@@ -158,7 +160,8 @@ mk_report_query()
 {
   local noTimeRestriction="$1"
 
-  cat <<EOSQL
+  cat \
+<<EOSQL
 \\pset footer off
 $(inject_debug_stmt \\timing on)
 $(inject_debug_quiet off)
@@ -169,9 +172,9 @@ $(inject_debug_msg Gathering unreplicated data)
 CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) AS
 SELECT resc_name, resc_hier, data_size
 FROM r_data_main
-WHERE data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
-  AND $(inject_time_restriction "$noTimeRestriction")
-  AND resc_name NOT IN ('cyverseUKRes', 'haboobRes');
+WHERE data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
+  AND coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/iplant/home/%')
+  AND $(inject_time_restriction "$noTimeRestriction");
 CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
 CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
 
@@ -205,5 +208,6 @@ show_version()
 {
   printf '%s\n' "$Version"
 }
+
 
 main "$@"
