@@ -324,15 +324,25 @@ fi
 
 printf 'Retrieving data objects to physically move...\n' >&2
 
-psql --no-align --tuples-only --record-separator-zero --field-separator ' ' ICAT icat_reader \
-<<EOSQL > "$ObjectList"
+psql --no-align --quiet --tuples-only --record-separator-zero --field-separator ' ' \
+     ICAT icat_reader \
+  > "$ObjectList" \
+<<EOSQL
+BEGIN;
+
+CREATE TEMPORARY TABLE src_data (id) AS
+SELECT data_id FROM r_data_main WHERE resc_name = '$SrcResc'
+EXCEPT SELECT data_id FROM r_data_main WHERE resc_name = '$DestResc';
+
+CREATE INDEX src_data_idx ON src_data (id);
+
 SELECT d.data_size, c.coll_name || '/' || d.data_name
-  FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-  WHERE d.data_id = ANY(ARRAY(
-      SELECT data_id FROM r_data_main WHERE resc_name = '$SrcResc'
-      EXCEPT SELECT data_id FROM r_data_main WHERE resc_name = '$DestResc'))
-    AND d.resc_name = '$SrcResc'
-    AND ($BaseCond)
+FROM r_data_main AS d
+  JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+  JOIN src_data AS s ON s.id = d.data_id
+WHERE d.resc_name = '$SrcResc' AND ($BaseCond);
+
+ROLLBACK;
 EOSQL
 
 readonly Tot=$(count_list < "$ObjectList")
