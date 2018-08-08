@@ -88,12 +88,12 @@ main()
   mkfifo uploads
   trap 'rm --force downloads uploads' EXIT
 
-  gather_logs "$ies" "$password" #\
-#    | filter_msgs \
-#    | tee >(mk_downloads > downloads) >(mk_uploads > uploads) \
-#    > /dev/null &
+  gather_logs "$ies" "$password" \
+    | filter_msgs \
+    | tee >(mk_downloads > downloads) >(mk_uploads > uploads) \
+    > /dev/null &
 
-#  join -a 1 -a 2 -e 0 -j 1 -o 0,1.2,1.3,2.2,2.3 -t , downloads uploads
+  join -a 1 -a 2 -e 0 -j 1 -o 0,1.2,1.3,2.2,2.3 -t , downloads uploads
 }
 
 
@@ -158,23 +158,28 @@ gather_logs()
   local ies="$1"
   local password="$2"
 
-# TODO figure out how to switch to root to download the files
-#   ssh -q -t "$ies" <<EOF
-# echo '$password' | sudo -S find '$LogDir' -maxdepth 1 -name rodsLog.* -type f -exec cp '{}' . \\;
-# sudo find . -maxdepth 1 -name rodsLog.* -type f -exec chown "\$USER" '{}' \\;
-# EOF
-#   return 0
-
-  for log in $(ssh "$ies" -q find "$LogDir" -maxdepth 1 -name rodsLog.* -type f | sort)
+  for log in $(list_logs "$ies" "$password")
   do
     local logName
     logName=$(basename "$log")
 
+    # TODO figure out how to switch to root to download the files
     scp -q "$ies":"$log" /dev/stdout 2> /dev/null \
       | "$ExecDir"/format-log-entries --assign YEAR="${logName:8:4}"
 
     printf 'gather_logs:  finished processing %s\n' "$logName" >&2
   done
+}
+
+
+list_logs()
+{
+  local ies="$1"
+  local password="$2"
+
+  ssh -q -t "$ies" <<EOF
+printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name rodsLog.* -type f | sort
+EOF
 }
 
 
