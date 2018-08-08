@@ -111,7 +111,7 @@ AS
   SELECT coll_id
   FROM r_coll_main AS c
   WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
-    AND c.coll_name LIKE '/iplant/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS';
+    AND c.coll_name LIKE '/iplant/%/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS';
 CREATE INDEX idx_coll_perm_probs ON coll_perm_probs(coll_id);
 
 -- This may overestimate the number of problems, since it may find objects not in the iplant zone.
@@ -119,8 +119,9 @@ $(inject_debug_msg creating data_perm_probs)
 CREATE TEMPORARY TABLE data_perm_probs
 AS
   SELECT DISTINCT data_id
-  FROM r_data_main AS d
-  WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
+  FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+  WHERE c.coll_name LIKE '/iplant/%'
+    AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
     AND d.create_ts < '$cutoffTS';
 CREATE INDEX idx_data_perm_probs ON data_perm_probs(data_id);
 
