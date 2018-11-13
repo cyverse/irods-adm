@@ -88,7 +88,7 @@ main()
   mkfifo uploads
   trap 'rm --force downloads uploads' EXIT
 
-  gather_logs "$ies" "$password" \
+  "$ExecDir"/gather-logs "$ies" "$password" \
     | filter_msgs \
     | tee >(mk_downloads > downloads) >(mk_uploads > uploads) \
     > /dev/null &
@@ -153,35 +153,6 @@ EOF
 }
 
 
-gather_logs()
-{
-  local ies="$1"
-  local password="$2"
-
-  for log in $(list_logs "$ies" "$password")
-  do
-    local logName
-    logName=$(basename "$log")
-
-    rcat_log "$ies" "$password" "$log" \
-      | "$ExecDir"/format-log-entries --assign YEAR="${logName:8:4}"
-
-    printf 'gather_logs:  finished processing %s\n' "$logName" >&2
-  done
-}
-
-
-list_logs()
-{
-  local ies="$1"
-  local password="$2"
-
-  ssh -q -t "$ies" <<EOF 2> /dev/null
-printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name rodsLog.* -type f | sort
-EOF
-}
-
-
 mk_downloads()
 {
   printf 'Date,Download Count,Download Volume(B)\n'
@@ -237,18 +208,6 @@ prep_downloads_sql_data()
       @csv'
 
   printf 'prep_downloads_sql_data:  done\n' >&2
-}
-
-
-rcat_log()
-{
-  local ies="$1"
-  local password="$2"
-  local log="$3"
-
-  ssh -q -t "$ies" <<EOF 2> /dev/null
-printf '%s\n' "$password" | sudo -S cat "$log"
-EOF
 }
 
 

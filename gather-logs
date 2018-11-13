@@ -1,0 +1,50 @@
+#!/bin/bash
+
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecDir=$(dirname "$ExecAbsPath")
+
+readonly LogDir=/var/lib/irods/iRODS/server/log
+
+
+main()
+{
+  local ies="$1"
+  local password="$2"
+
+  for log in $(list_logs "$ies" "$password")
+  do
+    local logName
+    logName=$(basename "$log")
+
+    rcat_log "$ies" "$password" "$log" \
+      | "$ExecDir"/format-log-entries --assign YEAR="${logName:8:4}"
+
+    printf 'gather_logs:  finished processing %s\n' "$logName" >&2
+  done
+}
+
+
+list_logs()
+{
+  local ies="$1"
+  local password="$2"
+
+  ssh -q -t "$ies" <<EOF 2> /dev/null
+printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name rodsLog.* -type f | sort
+EOF
+}
+
+
+rcat_log()
+{
+  local ies="$1"
+  local password="$2"
+  local log="$3"
+
+  ssh -q -t "$ies" <<EOF 2> /dev/null
+printf '%s\n' "$password" | sudo -S cat "$log"
+EOF
+}
+
+
+main "$@"
