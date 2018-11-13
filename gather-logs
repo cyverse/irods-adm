@@ -8,9 +8,16 @@ readonly LogDir=/var/lib/irods/iRODS/server/log
 
 main()
 {
-  local host="$1"
-  local password="$2"
 
+  local host="$1"
+
+  local password
+  if [ "$@" -ge 2 ]
+  then
+    password="$2"
+  fi
+
+  local log
   for log in $(list_logs "$host" "$password")
   do
     local logName
