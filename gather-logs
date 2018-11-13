@@ -8,16 +8,16 @@ readonly LogDir=/var/lib/irods/iRODS/server/log
 
 main()
 {
-  local ies="$1"
+  local host="$1"
   local password="$2"
 
-  for log in $(list_logs "$ies" "$password")
+  for log in $(list_logs "$host" "$password")
   do
     local logName
     logName=$(basename "$log")
 
-    rcat_log "$ies" "$password" "$log" \
-      | "$ExecDir"/format-log-entries --assign YEAR="${logName:8:4}"
+    rcat_log "$host" "$password" "$log" \
+      | "$ExecDir"/format-log-entrhost --assign YEAR="${logName:8:4}"
 
     printf 'gather_logs:  finished processing %s\n' "$logName" >&2
   done
@@ -26,10 +26,10 @@ main()
 
 list_logs()
 {
-  local ies="$1"
+  local host="$1"
   local password="$2"
 
-  ssh -q -t "$ies" <<EOF 2> /dev/null
+  ssh -q -t "$host" <<EOF 2> /dev/null
 printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name rodsLog.* -type f | sort
 EOF
 }
@@ -37,11 +37,11 @@ EOF
 
 rcat_log()
 {
-  local ies="$1"
+  local host="$1"
   local password="$2"
   local log="$3"
 
-  ssh -q -t "$ies" <<EOF 2> /dev/null
+  ssh -q -t "$host" <<EOF 2> /dev/null
 printf '%s\n' "$password" | sudo -S cat "$log"
 EOF
 }
