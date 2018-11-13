@@ -24,7 +24,7 @@ main()
     logName=$(basename "$log")
 
     rcat_log "$host" "$password" "$log" \
-      | "$ExecDir"/format-log-entrhost --assign YEAR="${logName:8:4}"
+      | "$ExecDir"/format-log-entries --assign YEAR="${logName:8:4}"
 
     printf 'gather_logs:  finished processing %s\n' "$logName" >&2
   done
