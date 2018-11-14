@@ -86,7 +86,7 @@ main()
   mkfifo uploads
   trap 'rm --force downloads uploads' EXIT
 
-  "$ExecDir"/gather-logs "$ies" "$password" \
+  "$ExecDir"/gather-logs "$ies" '*' "$password" \
     | filter_msgs \
     | tee >(mk_downloads > downloads) >(mk_uploads > uploads) \
     > /dev/null &

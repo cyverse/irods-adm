@@ -4,21 +4,22 @@ readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecDir=$(dirname "$ExecAbsPath")
 
 readonly LogDir=/var/lib/irods/iRODS/server/log
-
+readonly LogBase=rodsLog
 
 main()
 {
 
   local host="$1"
+  local logExtPat="$2"
 
   local password
-  if [ "$@" -ge 2 ]
+  if [ "$#" -ge 3 ]
   then
-    password="$2"
+    password="$3"
   fi
 
   local log
-  for log in $(list_logs "$host" "$password")
+  for log in $(list_logs "$host" "$password" "$LogBase"."$logExtPat")
   do
     local logName
     logName=$(basename "$log")
@@ -35,9 +36,10 @@ list_logs()
 {
   local host="$1"
   local password="$2"
+  local logNamePat="$3"
 
   ssh -q -t "$host" <<EOF 2> /dev/null
-printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name rodsLog.* -type f | sort
+printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name "$logNamePat" -type f | sort
 EOF
 }
 
