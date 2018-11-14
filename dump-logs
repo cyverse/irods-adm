@@ -84,9 +84,7 @@ count_sessions()
 
 get_sessions()
 {
-  local logYear="$1"
-
-  "$ExecDir"/format-log-entries --assign YEAR="$logYear" | "$ExecDir"/group-log-by-pid | filter_day
+  "$ExecDir"/group-log-by-pid | filter_day
 }
 
 
@@ -106,23 +104,6 @@ do
   out=logs/"$svr".sessions
   rm --force "$out"
 
-  for log in $(ssh -q "$svr" find "$LogDir" -maxdepth 1 -name "$LogBase"."$LogExt" -type f | sort)
-  do
-    if [[ "$log" =~ $LogDir/$LogBase ]]
-    then
-      printf '\r  dumping %s\n' "$log" >&2
-
-      IFS=. read -r -a parts < <(basename "$log")
-      logYear="${parts[1]}"
-
-      scp -q "$svr":"$log" /dev/stdout 2>/dev/null \
-        | get_sessions "$logYear" \
-        | count_sessions \
-        > "$UnsortedSessions"
-
-      printf '    sorting...' >&2
-      "$ExecDir"/order-sessions < "$UnsortedSessions" >> "$out"
-      printf 'done\n' >&2
-    fi
-  done
+  "$ExecDir"/gather-logs "$svr" "$LogExt" | get_sessions | count_sessions > "$UnsortedSessions"
+  "$ExecDir"/order-sessions < "$UnsortedSessions" >> "$out"
 done
