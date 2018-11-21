@@ -22,7 +22,7 @@ main()
 
   quest '%s %s/%s' \
         "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
-         where COLL_NAME like '/iplant/trash/home/%'" \
+         where COLL_NAME like '/iplant/trash/%'" \
     | sort --numeric --key 1,1 \
     | truncate_by_time "$upperBound" \
     | cut --delimiter ' ' --fields 2- \
@@ -38,7 +38,7 @@ main()
   # Remove the empty trash collections
   printf 'Retrieving home collections to prune...\n'
   quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/home'" > "$trashList"
-
+  quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/orphan'" >> "$trashList"
   delTot=$(wc --lines < "$trashList")
   printf '%d home collections to prune\n' "$delTot"
 
