@@ -1,7 +1,7 @@
 #!/bin/bash
 
-
-readonly ExecName=$(basename "$0")
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
 readonly Version=1
 
 
@@ -14,17 +14,17 @@ $ExecName version $Version
 Usage:
  $ExecName [options] HOST
 
-Checks to see is if an iRODS service is online. If connects to iRODS is it 
-prints 'up' to standard output and exits with status code 0. If it doesn't 
+Checks to see is if an iRODS service is online. If connects to iRODS is it
+prints 'up' to standard output and exits with status code 0. If it doesn't
 connect to anything, it prints 'down' to standard output and exits with status
 code 1. If it connects to something that isn't iRODS, it prints 'not iRODS' and
 exits with status code 2.
 
-The rodsLog will show a connection from the host where this is run with the proxy 
-user set to $ExecName. If SERVICE is specified, the client user will be se to 
+The rodsLog will show a connection from the host where this is run with the proxy
+user set to $ExecName. If SERVICE is specified, the client user will be se to
 SERVICE. If ZONE is specificed, the zone for both users will be ZONE.
 
-If ips happens to be called while this is program is connected to iRODS, ips 
+If ips happens to be called while this is program is connected to iRODS, ips
 will show this program's connection as comming from $ExecName.
 
 Parameters:
@@ -32,9 +32,9 @@ Parameters:
 
 Options:
  -P, --port PORT        the TCP port the iRODS listens to on HOST (default 1247)
- -S, --service SERVICE  the name of the service checking iRODS, identified as 
+ -S, --service SERVICE  the name of the service checking iRODS, identified as
                         client user to iRODS
- -Z, --zone ZONE        the name of the zone to tell iRODS this program and 
+ -Z, --zone ZONE        the name of the zone to tell iRODS this program and
                         SERVICE belong to.
 
  -h, --help     show help and exit
@@ -64,7 +64,7 @@ main()
   local zone
 
   while true
-  do  
+  do
     case "$1" in
       -h|--help)
         show_help
@@ -143,7 +143,7 @@ encode_header_len()
 {
   local len="$1"
 
-  printf '0: %.8x' "$len" | xxd -revert -g 0 
+  printf '0: %.8x' "$len" | xxd -revert -g 0
 }
 
 
@@ -231,7 +231,7 @@ parse_resp()
   then
     return 1
   fi
-  
+
   local msgLen="${header#*<msgLen>}"
   msgLen="${msgLen%%<*}"
 
@@ -260,7 +260,7 @@ ping()
 
   if mk_req RODS_CONNECT "$connMsgBody" >&3
   then
-    local respMsg 
+    local respMsg
     if respMsg=$(parse_resp <&3)
     then
       mk_req RODS_DISCONNECT >&3
