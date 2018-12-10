@@ -1,6 +1,7 @@
 #!/bin/bash
 
-readonly ExecName=$(basename "$0")
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
 readonly Version=1
 
 
