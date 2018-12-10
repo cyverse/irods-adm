@@ -20,6 +20,8 @@ Parameters:
  <dest_resc>  the resource where the files will be replicated
 
 Options:
+ -A, --age <age>                how many days old a data object must be to be
+                                replicated, default: 1
  -c, --collection <collection>  only replicate the data objects in this
                                 collection
  -m, --multiplier <multiplier>  a multiplier on the number of processes to run
@@ -62,11 +64,14 @@ exit_with_help()
 
 set -e
 
-readonly Opts=$(getopt --name "$ExecName" \
-                       --options c:hm:r:su:v \
-                       --longoptions collection:,help,multiplier:,resource:,serial,until:,version \
-                       -- \
-                       "$@")
+Age=1
+
+readonly Opts=$(getopt \
+                  --name "$ExecName" \
+                  --options A:c:hm:r:su:v \
+                  --longoptions age:,collection:,help,multiplier:,resource:,serial,until:,version \
+                  -- \
+                  "$@")
 ret="$?"
 if [ "$ret" -ne 0 ]
 then
@@ -78,6 +83,10 @@ eval set -- "$Opts"
 while true
 do
   case "$1" in
+    -A|--age)
+      Age="$2"
+      shift 2
+      ;;
     -c|--collection)
       readonly BaseColl="$2"
       shift 2
@@ -404,7 +413,8 @@ fi
 
 printf 'Retrieving data objects to replicate...\n' >&2
 
-readonly MaxCreateTime=$(date --date "$(date --iso-8601 --date yesterday)" '+%s')
+readonly MaxCreateDate=$(date --iso-8601 --date "$Age days ago")
+readonly MaxCreateTime=$(date --date "$MaxCreateDate" '+%s')
 
 if [ -n "$SrcRes" ]
 then
