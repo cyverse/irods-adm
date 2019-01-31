@@ -1,0 +1,281 @@
+#!/bin/bash
+
+set -e
+
+readonly ExecName=$(basename "$0")
+readonly Version=2
+
+
+show_help()
+{
+  cat <<EOF
+
+$ExecName version $Version
+
+Usage:
+ $ExecName [options]
+
+This program acts like the iCommand ips -v, but it resolves the client IP
+addresses on the other side of an HAProxy server.
+
+Options:
+  -h, --help     show help and exit
+  -v, --version  show version and exit
+
+Requirements:
+ 1) iCommands need to be installed.
+ 2) Need the iRODS environment set up and authenticated for the iCommands, i.e.,
+    iinit needs to have been called.
+ 3) Need passwordless access to root@ares.iplantcollaborative.org, e.g., shared 
+    public key without passphrase.
+ 4) Need passwordless access to root@davos.cyverse.org.
+EOF
+}
+
+
+main()
+{
+  local opts
+  if ! opts=$(getopt --name "$ExecName" --options hv --longoptions help,version -- "$@")
+  then
+    show_help >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      -v|--version)
+        show_version
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
+  generate_report
+}
+
+
+# Format the output in a way similar to the ips does.
+#
+# parameter:
+#   ies  the FQDN of the IES
+#
+# stdout:
+#    The report formatted like ips -v
+format_report() {
+  local ies="$1"
+
+  printf 'Server: %s\n' "$ies"
+
+  local pid
+  local proxyUser
+  local clientUser
+  local connTime
+  local app
+  local clientHost
+  sort --numeric | while read -r pid proxyUser clientUser connTime app clientHost
+  do
+    printf '%9d %s  %s  %s  %s  %s\n' \
+           "$pid" "$proxyUser" "$clientUser" "$connTime" "$app" "$clientHost"
+  done
+}
+
+
+# Generate the report
+generate_report()
+{
+  local irodsHost
+  irodsHost=$(ienv | sed --quiet 's/NOTICE: irods_host - //p')
+
+  if [ -z "$irodsHost" ]
+  then
+    printf 'iRODS Host is not configured\n' >&2
+    exit 1
+  fi
+
+  local proxyHost
+  proxyHost=$(resolve_name "$irodsHost")
+
+  local proxyIp
+  proxyIp=$(lookup_address "$proxyHost")
+
+  local ipsReport
+  ipsReport=$(ips -v)
+
+  local iesHost
+  iesHost=$(sed 's/Server: //;q' <<<"$ipsReport")
+
+  local iesIp
+  iesIp=$(lookup_address "$iesHost")
+
+  if [ "$iesIp" = "$proxyIp" ]
+  then
+    echo "$ipsReport"
+  else
+    local iesProcReport
+    iesProcReport=$(ssh -q -p 1657 "$iesHost" sudo lsof -n -P)
+
+    local proxyReport
+    proxyReport=$( \
+      ssh -q -p 1657 "$proxyHost" sudo socat /var/run/haproxy.sock stdio <<<'show sess all')
+
+    local proxyPortClientMap
+    proxyPortClientMap=$(map_proxy_port_client "$proxyIp" <<<"$proxyReport")
+
+    local iesPidProxyPortMap
+    iesPidProxyPortMap=$( \
+      sed --quiet "s/^[^ ]* *\\([^ ]*\\) .* TCP $iesIp:1247->$proxyIp:\\(.*\\) .*/\1 \2/p" \
+        <<<"$iesProcReport")
+
+    local iesPidClientMap
+    iesPidClientMap=$( \
+      join -1 2 -o 1.1,2.2 \
+        <(sort --key 2 <<<"$iesPidProxyPortMap") \
+        <(sort <<<"$proxyPortClientMap"))
+
+    local ipsProxy
+    # sed's last line indicator, $, as a shell expansion by shellcheck
+    # shellcheck disable=SC2016
+    ipsProxy=$(sed --quiet '2,${s/^ *//;s/  */ /g;p}' <<<"$ipsReport")
+
+    join -a 1 -o 0,1.2,1.3,1.4,1.5,2.2 <(sort <<<"$ipsProxy") <(sort <<<"$iesPidClientMap") \
+      | awk 'NF == 6 { print $0 }' \
+      | format_report "$iesHost"
+  fi
+}
+
+
+# Lookup the IP address of the provided
+#
+# parameter:
+#   name  the host name to resolve
+#
+# stdout:
+#   the corresponding IP address
+lookup_address() {
+  local name="$1"
+
+  host "$name" | sed 's/.* has address //'
+}
+
+
+# From the output of the HAProxy stats command 'show sess all'. this function
+# generates a map of proxy TCP ports to the IP address of the correspong client
+# being proxied.
+#
+# parameter:
+#   proxy  the IP address used by HAProxy to connect to the IES
+#
+# stdin:
+#   It expects the output of the 'show sess all' command as input.
+#
+# stdout:
+#   It generates a map of TCP ports to IP addresses, one per line.
+#
+#   <port> <address?
+#
+#   The address is the address of the client being proxied. The port is the one
+#   used to connect to the IES.
+map_proxy_port_client() {
+  local proxy="$1"
+
+  awk --file - <(cat) \
+<<EOS
+function print_session(svrPort, source) {
+  if (svrPort != "" && source != "") {
+    printf "%s %s\n", svrPort, source;
+  }
+}
+
+
+BEGIN {
+  svrPort = "";
+  source = "";
+}
+
+
+/^[^ ]/ {
+  print_session(svrPort, source);
+  source = "";
+  svrPort = "";
+
+  patsplit(\$5, terms, "[^=:]+");
+
+  if (terms[2] != "unix") {
+    source = terms[2];
+  }
+}
+
+
+/^  backend=(irods_single_conn|irods_extra_conn)/ {
+  if (source != "") {
+    patsplit(\$4, terms, "[^=:]+");
+
+    if (terms[2] == "$proxy") {
+      svrPort = terms[3];
+    }
+  }
+}
+
+
+END {
+  print_session(svrPort, source);
+}
+EOS
+}
+
+
+# This function looks up the domain name a canonical domain name aliases. It
+# does this recursively, so that if a canonical name is an alias for another
+# canonical name, the latter will be resolved too. This will repeat until a
+# name that isn't an alias is reached.
+#
+# parameter:
+#   cname  the canonical name to resolve
+#
+# stdout:
+#   the resolved domain. This will be cname if cname isn't an alias.
+resolve_name()
+{
+  local cname="$1"
+
+  local name
+  while [ -z "$name" ]
+  do
+    name=$(host "$cname" | sed --quiet "s/$cname is an alias for \(.*\)\./\1/p")
+
+    if [ -n "$name" ]
+    then
+      cname="$name"
+      name=
+    else
+      name="$cname"
+    fi
+  done
+
+  printf '%s' "$name"
+}
+
+
+show_version()
+{
+  printf '%s\n' "$Version"
+}
+
+
+main "$@"
