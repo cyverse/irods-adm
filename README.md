@@ -78,6 +78,9 @@ Data Store.
 The program `histogram` can be used to generate a histogram of sizes from an
 arbitrary SQL query for byte-based sizes.
 
+The program `ips-proxy` can be used to generate a report similar to ips, but 
+when the IES behind a proxy.
+
 The program `resource-report` generates a report on the size of the root
 resources.
 
