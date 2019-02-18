@@ -80,6 +80,43 @@ export EXEC_DIR
 EXEC_DIR=$(dirname "$ExecPath")
 
 
+EXEC_ON_RS()
+{
+  local rs="$1"
+  local cmd="$2"
+
+  #shellcheck disable=SC2087
+  ssh -q -t "$rs" <<EOSSH
+if [[ "\$USER" = irods ]]
+then
+  $cmd
+else
+  sudo -i -u irods <<'EOSUDO'
+$cmd
+EOSUDO
+fi
+EOSSH
+}
+export -f EXEC_ON_RS
+
+
+FIX_CMD()
+{
+  local obj="$1"
+  local resc="$2"
+  local file="$3"
+
+  cat <<EOCMD
+readonly TmpFile='$file'.tmp
+
+mv --no-clobber '$file' "\$TmpFile" && \\
+  touch '$file' && \\
+  (irsync -K -s -v -R '$resc' "\$TmpFile" i:'$obj'; mv "\$TmpFile" '$file')
+EOCMD
+}
+export -f FIX_CMD
+
+
 FIX()
 {
   local objPath="$1"
@@ -89,17 +126,11 @@ FIX()
   while read -r rescHier storeHost filePath
   do
     local coordResc="${rescHier%%;*}"
-    local tmp="$filePath".tmp
 
-    ssh -q -t -t "$storeHost" \
-        su --login \
-           --command \
-             \'mv --no-clobber \""$filePath"\" \""$tmp"\" \&\& \
-               touch \""$filePath"\" \&\& \
-               \(irsync -K -s -v -R \""$coordResc"\" \""$tmp"\" \"i:"$objPath"\"\; \
-                 mv \""$tmp"\" \""$filePath"\"\)\' \
-           irods \
-      < /dev/null
+    local fixCmd
+    fixCmd=$(FIX_CMD "$objPath" "$coordResc" "$filePath")
+
+    EXEC_ON_RS "$storeHost" "$fixCmd"
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 }
 export -f FIX
