@@ -80,7 +80,7 @@ export EXEC_DIR
 EXEC_DIR=$(dirname "$ExecPath")
 
 
-exec_on_rs()
+EXEC_ON_RS()
 {
   local rs="$1"
   local cmd="$2"
@@ -97,9 +97,10 @@ EOSUDO
 fi
 EOSSH
 }
+export -f EXEC_ON_RS
 
 
-fix_cmd()
+FIX_CMD()
 {
   local obj="$1"
   local resc="$2"
@@ -113,6 +114,7 @@ mv --no-clobber '$file' "\$TmpFile" && \\
   (irsync -K -s -v -R '$resc' "\$TmpFile" i:'$obj'; mv "\$TmpFile" '$file')
 EOCMD
 }
+export -f FIX_CMD
 
 
 FIX()
@@ -126,9 +128,9 @@ FIX()
     local coordResc="${rescHier%%;*}"
 
     local fixCmd
-    fixCmd=$(fix_cmd "$objPath" "$coordResc" "$filePath")
+    fixCmd=$(FIX_CMD "$objPath" "$coordResc" "$filePath")
 
-    exec_on_rs "$storeHost" "$fixCmd"
+    EXEC_ON_RS "$storeHost" "$fixCmd"
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 }
 export -f FIX
