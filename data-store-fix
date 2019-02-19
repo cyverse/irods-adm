@@ -285,7 +285,7 @@ process_perm_issue()
 
   if [ "${issue// /}" = t ]
   then
-    if ichmod -M own rodsadmin "$entity"
+    if ichmod -M own rodsadmin "$entity" > /dev/null
     then
       printf '%s' "${issue/%  /✓ }"
     else
