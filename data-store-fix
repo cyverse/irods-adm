@@ -57,6 +57,22 @@ then
 fi
 
 
+main()
+{
+  readonly ErrorLog=$(mktemp)
+
+  display_problems | strip_noise | fix_problems 2>"$ErrorLog"
+
+  if [ -s "$ErrorLog" ]
+  then
+    printf '\n\nErrors Occuring While Attempting to Fix Problems\n\n'
+    cat "$ErrorLog"
+  fi
+
+  rm --force "$ErrorLog"
+}
+
+
 inject_debug_stmt()
 {
   local stmt="$*"
@@ -451,14 +467,4 @@ strip_noise()
 }
 
 
-readonly ErrorLog=$(mktemp)
-
-display_problems | strip_noise | fix_problems 2>"$ErrorLog"
-
-if [ -s "$ErrorLog" ]
-then
-  printf '\n\nErrors Occuring While Attempting to Fix Problems\n\n'
-  cat "$ErrorLog"
-fi
-
-rm --force "$ErrorLog"
+main "$@"
