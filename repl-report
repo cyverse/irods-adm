@@ -25,6 +25,8 @@ Options:
                     the PostgreSQL default
  -p, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
                     instead of the PostgreSQL default
+ -U, --user <user>  authorize the DBMS connection as user <user> instead of the
+                    default.
 
  -d, --debug    display progress and query time information
  -f, --full     include all unreplicated objects, not just the ones created
@@ -41,9 +43,9 @@ Debug=false
 main()
 {
   local opts
-  opts=$(getopt --longoptions debug,full,help,host:,port:,version \
+  opts=$(getopt --longoptions debug,full,help,host:,port:,user:,version \
                 --name "$ExecName" \
-                --options dfhH:p:v \
+                --options dfhH:p:U:v \
                 -- \
                 "$@")
   local ret="$?"
@@ -78,6 +80,10 @@ main()
         export PGPORT="$2"
         shift 2
         ;;
+      -U|--user)
+        export PGUSER="$2"
+        shift 2
+        ;;
       -v|--version)
         show_version
         return 0
@@ -93,7 +99,7 @@ main()
     esac
   done
 
-  mk_report_query "$noTimeRestriction" | psql --quiet ICAT icat_reader
+  mk_report_query "$noTimeRestriction" | psql --quiet ICAT
 }
 
 
