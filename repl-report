@@ -1,7 +1,7 @@
 #!/bin/bash
 
 readonly ExecName=$(basename "$0")
-readonly Version=3
+readonly Version=4
 
 
 show_help()
@@ -23,7 +23,7 @@ corresponding files.
 Options:
  -H, --host <host>  connect to the ICAT's DBMS on the host <host> instead of
                     the PostgreSQL default
- -p, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
+ -P, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
                     instead of the PostgreSQL default
  -U, --user <user>  authorize the DBMS connection as user <user> instead of the
                     default.
@@ -45,7 +45,7 @@ main()
   local opts
   opts=$(getopt --longoptions debug,full,help,host:,port:,user:,version \
                 --name "$ExecName" \
-                --options dfhH:p:U:v \
+                --options dfhH:P:U:v \
                 -- \
                 "$@")
   local ret="$?"
@@ -76,7 +76,7 @@ main()
         export PGHOST="$2"
         shift 2
         ;;
-      -p|--port)
+      -P|--port)
         export PGPORT="$2"
         shift 2
         ;;
