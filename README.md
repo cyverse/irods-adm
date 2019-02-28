@@ -32,6 +32,9 @@ sessions for those containing errors.
 The program `filter-sessions-by-user` can be used to filter a sequence of
 sessions for a given client user.
 
+The program `gather-logs` can be used to retrieve all of the log messages from
+selected log files on a given server.
+
 The program `session-intervals` can be used to extract session time intervals
 from a sequence of sessions.
 
@@ -78,7 +81,7 @@ Data Store.
 The program `histogram` can be used to generate a histogram of sizes from an
 arbitrary SQL query for byte-based sizes.
 
-The program `ips-proxy` can be used to generate a report similar to ips, but 
+The program `ips-proxy` can be used to generate a report similar to ips, but
 when the IES behind a proxy.
 
 The program `resource-report` generates a report on the size of the root
