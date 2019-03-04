@@ -24,13 +24,19 @@ Options:
                                 replicated, default: 1
  -c, --collection <collection>  only replicate the data objects in this
                                 collection
+ -H, --host <host>              connect to the ICAT's DBMS on the host <host>
+                                instead of the PostgreSQL default
  -m, --multiplier <multiplier>  a multiplier on the number of processes to run
                                 at once, default: 1
+ -P, --port <port>              connect to the ICAT's DBMS listening on TCP port
+                                <port> instead of the PostgreSQL default
  -r, --resource <resource>      only replicate the data objects with a file on
                                 this resource
  -s, --serial                   disable parallel transport
  -u, --until <stop_time>        the time to stop replication in a format
                                 understandable by `date`
+ -U, --user <user>              authorize the DBMS connection as user <user>
+                                instead of the default
 
  -h, --help     show help and exit
  -v, --verison  show version and exit
@@ -43,8 +49,8 @@ standard out.
 
 Prerequisites:
  1) The user must be initialized with iRODS as an admin user.
- 2) The user must be able to connect to the ICAT DB as the icat_reader user
-    without providing a password.
+ 2) The user must be able to connect to the ICAT DB without providing a
+    password.
 EOF
 }
 
@@ -66,12 +72,14 @@ set -e
 
 Age=1
 
-readonly Opts=$(getopt \
-                  --name "$ExecName" \
-                  --options A:c:hm:r:su:v \
-                  --longoptions age:,collection:,help,multiplier:,resource:,serial,until:,version \
-                  -- \
-                  "$@")
+readonly Opts=$( \
+  getopt \
+    --name "$ExecName" \
+    --longoptions \
+      age:,collection:,help,host:,multiplier:,port:,resource:,serial,until:,user:,version \
+    --options A:c:hH:m:P:r:su:U:v \
+    -- \
+    "$@")
 ret="$?"
 if [ "$ret" -ne 0 ]
 then
@@ -95,8 +103,16 @@ do
       show_help
       exit 0
       ;;
+    -H|--host)
+      export PGHOST="$2"
+      shift 2
+      ;;
     -m|--multiplier)
       readonly ProcMult="$2"
+      shift 2
+      ;;
+    -P|--port)
+      readonly PGPORT="$2"
       shift 2
       ;;
     -r|--resource)
@@ -109,6 +125,10 @@ do
       ;;
     -u|--until)
       readonly Until="$2"
+      shift 2
+      ;;
+    -U|--user)
+      export PGUSER="$2"
       shift 2
       ;;
     -v|--version)
@@ -379,8 +399,8 @@ select_cohort()
     parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" REPL_BATCH \
         < "$cohortList" \
         2>&"$Log" \
-        | tee >(cat >&"$Log") \
-        | track_prog "$cnt" "$tot" "$subTotal"
+      | tee >(cat >&"$Log") \
+      | track_prog "$cnt" "$tot" "$subTotal"
   else
     printf '%s\n' "$cnt"
   fi
@@ -399,9 +419,9 @@ then
   exit 1
 fi
 
-if ! psql --host irods-db3 ICAT icat_reader <<< '' &> /dev/null
+if ! psql ICAT <<<'' &> /dev/null
 then
-  printf "aren't able to connect to the ICAT DB as the icat_reader without a password\n" >&2
+  printf "aren't able to connect to the ICAT DB without a password\n" >&2
   exit 1
 fi
 
@@ -432,9 +452,9 @@ fi
 
 readonly ReplQuery=$(mk_repl_query "$MaxCreateTime" "$BaseCond" "$ResCond")
 
-psql --no-align --tuples-only --record-separator-zero \
-     --command "$ReplQuery" --field-separator ' ' --host irods-db3 \
-     ICAT icat_reader \
+psql \
+    --no-align --tuples-only --record-separator-zero --command "$ReplQuery" --field-separator ' ' \
+    ICAT \
   > "$ObjectList"
 
 readonly Tot=$(count < "$ObjectList")
