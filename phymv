@@ -60,7 +60,8 @@ readonly Opts=$( \
     --options c:d:hm:U:v \
     -- \
     "$@")
-if [ "$?" -ne 0 ]
+ret="$?"
+if [ "$ret" -ne 0 ]
 then
   printf '\n' >&2
   exit_with_help
