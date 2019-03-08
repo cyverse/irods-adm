@@ -64,7 +64,7 @@ main()
         shift
         ;;
       -f|--full)
-        local noTimeRestriction=true
+        local timeRestriction=false
         shift
         ;;
       -h|--help)
@@ -98,7 +98,7 @@ main()
     esac
   done
 
-  mk_report_query "$noTimeRestriction" | psql --quiet ICAT
+  mk_report_query "${timeRestriction-true}" | psql --quiet ICAT
 }
 
 
@@ -148,9 +148,9 @@ inject_set_title()
 
 inject_time_restriction()
 {
-  local noTimeRestriction="$1"
+  local timeRestriction="$1"
 
-  if [[ "$noTimeRestriction" == true ]]
+  if [[ "$timeRestriction" == false ]]
   then
     printf TRUE
   else
@@ -163,7 +163,7 @@ inject_time_restriction()
 
 mk_report_query()
 {
-  local noTimeRestriction="$1"
+  local timeRestriction="$1"
 
   cat <<EOSQL
     \\pset footer off
@@ -178,7 +178,7 @@ mk_report_query()
     FROM r_data_main
     WHERE data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
     AND coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/iplant/home/%')
-    AND $(inject_time_restriction "$noTimeRestriction");
+    AND $(inject_time_restriction "$timeRestriction");
 
     CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
     CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
