@@ -51,91 +51,6 @@ exit_with_help()
 }
 
 
-set -e
-
-readonly Opts=$( \
-  getopt \
-    --name "$ExecName" \
-    --longoptions collection:,dbms:,dbms-port:,help,multiplier:,user:,version \
-    --options c:d:hm:U:v \
-    -- \
-    "$@")
-ret="$?"
-if [ "$ret" -ne 0 ]
-then
-  printf '\n' >&2
-  exit_with_help
-fi
-
-eval set -- "$Opts"
-
-while true
-do
-  case "$1" in
-    -c|--collection)
-      readonly BaseColl="$2"
-      shift 2
-      ;;
-    -d|--dbms)
-      export PGHOST="$2"
-      shift 2
-      ;;
-    --dbms-port)
-      export PGPORT="$2"
-      shift 2
-      ;;
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -m|--multiplier)
-      readonly ProcMult="$2"
-      shift 2
-      ;;
-    -U|--user)
-      export PGUSER="$2"
-      shift 2
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      exit_with_help
-      ;;
-  esac
-done
-
-if [ -n "$ProcMult" ]
-then
-  if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
-  then
-    printf 'The -m option value must be a positive number. The given value was %s.\n' "$ProcMult" \
-      >&2
-    exit 1
-  fi
-else
-  readonly ProcMult=1
-fi
-
-if [ "$#" -lt 2 ]
-then
-  exit_with_help
-fi
-
-readonly SrcResc="$1"
-readonly DestResc="$2"
-
-
-# Redirect stadout to FD 3 to use as a logging channel
-readonly Log=3
-eval "exec $Log>&1"
-
-
 finish()
 {
   local objList="$1"
@@ -296,6 +211,89 @@ select_cohort()
   rm --force "$cohortList"
 }
 
+
+set -e
+
+readonly Opts=$( \
+  getopt \
+    --name "$ExecName" \
+    --longoptions collection:,dbms:,dbms-port:,help,multiplier:,user:,version \
+    --options c:d:hm:U:v \
+    -- \
+    "$@")
+ret="$?"
+if [ "$ret" -ne 0 ]
+then
+  printf '\n' >&2
+  exit_with_help
+fi
+
+eval set -- "$Opts"
+
+while true
+do
+  case "$1" in
+    -c|--collection)
+      readonly BaseColl="$2"
+      shift 2
+      ;;
+    -d|--dbms)
+      export PGHOST="$2"
+      shift 2
+      ;;
+    --dbms-port)
+      export PGPORT="$2"
+      shift 2
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -m|--multiplier)
+      readonly ProcMult="$2"
+      shift 2
+      ;;
+    -U|--user)
+      export PGUSER="$2"
+      shift 2
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      exit_with_help
+      ;;
+  esac
+done
+
+if [ -n "$ProcMult" ]
+then
+  if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
+  then
+    printf 'The -m option value must be a positive number. The given value was %s.\n' "$ProcMult" \
+      >&2
+    exit 1
+  fi
+else
+  readonly ProcMult=1
+fi
+
+if [ "$#" -lt 2 ]
+then
+  exit_with_help
+fi
+
+readonly SrcResc="$1"
+readonly DestResc="$2"
+
+# Redirect stadout to FD 3 to use as a logging channel
+readonly Log=3
+eval "exec $Log>&1"
 
 if ! iadmin lz &> /dev/null
 then
