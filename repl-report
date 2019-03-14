@@ -98,7 +98,7 @@ main()
     esac
   done
 
-  mk_report_query "${timeRestriction-true}" | psql --quiet ICAT
+  mk_report "${timeRestriction-true}"
 }
 
 
@@ -161,11 +161,11 @@ inject_time_restriction()
 }
 
 
-mk_report_query()
+mk_report()
 {
   local timeRestriction="$1"
 
-  cat <<EOSQL
+  psql --quiet ICAT <<EOSQL
     \\pset footer off
     $(inject_debug_stmt \\timing on)
     $(inject_debug_quiet off)
