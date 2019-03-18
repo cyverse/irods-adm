@@ -68,117 +68,6 @@ exit_with_help()
 }
 
 
-set -e
-
-Age=1
-
-readonly Opts=$( \
-  getopt \
-    --name "$ExecName" \
-    --longoptions \
-      age:,collection:,help,host:,multiplier:,port:,resource:,serial,until:,user:,version \
-    --options A:c:hH:m:P:r:su:U:v \
-    -- \
-    "$@")
-ret="$?"
-if [ "$ret" -ne 0 ]
-then
-  exit_with_help
-fi
-
-eval set -- "$Opts"
-
-while true
-do
-  case "$1" in
-    -A|--age)
-      Age="$2"
-      shift 2
-      ;;
-    -c|--collection)
-      readonly BaseColl="$2"
-      shift 2
-      ;;
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -H|--host)
-      export PGHOST="$2"
-      shift 2
-      ;;
-    -m|--multiplier)
-      readonly ProcMult="$2"
-      shift 2
-      ;;
-    -P|--port)
-      readonly PGPORT="$2"
-      shift 2
-      ;;
-    -r|--resource)
-      readonly SrcRes="$2"
-      shift 2
-      ;;
-    -s|--serial)
-      export SERIAL=true
-      shift
-      ;;
-    -u|--until)
-      readonly Until="$2"
-      shift 2
-      ;;
-    -U|--user)
-      export PGUSER="$2"
-      shift 2
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      exit_with_help
-      ;;
-  esac
-done
-
-if [ "$#" -lt 1 ]
-then
-  exit_with_help
-fi
-
-export DEST_RESC="$1"
-
-if [ -n "$ProcMult" ]
-then
-  if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
-  then
-    printf 'The -m option value must be a positive number. The given value was %s.\n' "$ProcMult" \
-      >&2
-    exit 1
-  fi
-else
-  readonly ProcMult=1
-fi
-
-if [ -n "$Until" ]
-then
-  export UNTIL_TS
-  if ! UNTIL_TS=$(date --date="$Until" '+%s')
-  then
-    printf '%s is not a valid date format\n' "$Until"
-    exit 1
-  fi
-fi
-
-# Redirect stdout to FD 3 to use as a logging channel
-readonly Log=3
-eval "exec $Log>&1"
-
-
 CHECK_TIME()
 {
   if [ -n "$UNTIL_TS" ] && [ "$(date '+%s')" -ge "$UNTIL_TS" ]
@@ -408,6 +297,116 @@ select_cohort()
   rm --force "$cohortList"
 }
 
+
+set -e
+
+Age=1
+
+readonly Opts=$( \
+  getopt \
+    --name "$ExecName" \
+    --longoptions \
+      age:,collection:,help,host:,multiplier:,port:,resource:,serial,until:,user:,version \
+    --options A:c:hH:m:P:r:su:U:v \
+    -- \
+    "$@")
+ret="$?"
+if [ "$ret" -ne 0 ]
+then
+  exit_with_help
+fi
+
+eval set -- "$Opts"
+
+while true
+do
+  case "$1" in
+    -A|--age)
+      Age="$2"
+      shift 2
+      ;;
+    -c|--collection)
+      readonly BaseColl="$2"
+      shift 2
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -H|--host)
+      export PGHOST="$2"
+      shift 2
+      ;;
+    -m|--multiplier)
+      readonly ProcMult="$2"
+      shift 2
+      ;;
+    -P|--port)
+      readonly PGPORT="$2"
+      shift 2
+      ;;
+    -r|--resource)
+      readonly SrcRes="$2"
+      shift 2
+      ;;
+    -s|--serial)
+      export SERIAL=true
+      shift
+      ;;
+    -u|--until)
+      readonly Until="$2"
+      shift 2
+      ;;
+    -U|--user)
+      export PGUSER="$2"
+      shift 2
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      exit_with_help
+      ;;
+  esac
+done
+
+if [ "$#" -lt 1 ]
+then
+  exit_with_help
+fi
+
+export DEST_RESC="$1"
+
+if [ -n "$ProcMult" ]
+then
+  if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
+  then
+    printf 'The -m option value must be a positive number. The given value was %s.\n' "$ProcMult" \
+      >&2
+    exit 1
+  fi
+else
+  readonly ProcMult=1
+fi
+
+if [ -n "$Until" ]
+then
+  export UNTIL_TS
+  if ! UNTIL_TS=$(date --date="$Until" '+%s')
+  then
+    printf '%s is not a valid date format\n' "$Until"
+    exit 1
+  fi
+fi
+
+# Redirect stdout to FD 3 to use as a logging channel
+readonly Log=3
+eval "exec $Log>&1"
 
 readonly ObjectList=$(mktemp)
 
