@@ -7,7 +7,7 @@ readonly Version=1
 
 show_help()
 {
-  cat << EOF
+  cat <<EOF
 
 $ExecName version $Version
 
