@@ -102,6 +102,54 @@ main()
 }
 
 
+mk_report()
+{
+  local timeRestriction="$1"
+
+  psql --quiet ICAT <<EOSQL
+    \\pset footer off
+    $(inject_debug_stmt \\timing on)
+    $(inject_debug_quiet off)
+
+    BEGIN;
+
+    $(inject_debug_msg Gathering unreplicated data)
+    CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) AS
+    SELECT resc_name, resc_hier, data_size
+    FROM r_data_main
+    WHERE data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
+    AND coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/iplant/home/%')
+    AND $(inject_time_restriction "$timeRestriction");
+
+    CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
+    CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
+
+    \\echo
+
+    $(inject_debug_newline)
+    $(inject_set_title Unreplicated in Storage Resources)
+    SELECT
+      SUBSTRING(store_resc FROM '(%;)*#"%#"' FOR '#')  AS "storage resource",
+      COUNT(*)                                         AS count,
+      SUM(size) / 2 ^ 40                               AS "volume (TiB)"
+    FROM unreplicated_data
+    GROUP BY store_resc
+    ORDER BY 1;
+
+    $(inject_debug_newline)
+    $(inject_set_title Unreplicated in Root Resources)
+    SELECT root_resc AS "root resource", COUNT(*) AS count, SUM(size) / 2 ^ 40 AS "volume (TiB)"
+    FROM unreplicated_data
+    GROUP BY root_resc
+    ORDER BY root_resc;
+
+    $(inject_debug_newline)
+    $(inject_debug_newline)
+    ROLLBACK;
+EOSQL
+}
+
+
 inject_debug_msg()
 {
   local msg="$*"
@@ -158,54 +206,6 @@ inject_time_restriction()
     supCreateTs=$(date --date "$(date --iso-8601 --date yesterday)" '+%s')
     printf 'create_ts < '\''0%s'\' "$supCreateTs"
   fi
-}
-
-
-mk_report()
-{
-  local timeRestriction="$1"
-
-  psql --quiet ICAT <<EOSQL
-    \\pset footer off
-    $(inject_debug_stmt \\timing on)
-    $(inject_debug_quiet off)
-
-    BEGIN;
-
-    $(inject_debug_msg Gathering unreplicated data)
-    CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) AS
-    SELECT resc_name, resc_hier, data_size
-    FROM r_data_main
-    WHERE data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
-    AND coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/iplant/home/%')
-    AND $(inject_time_restriction "$timeRestriction");
-
-    CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
-    CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
-
-    \\echo
-
-    $(inject_debug_newline)
-    $(inject_set_title Unreplicated in Storage Resources)
-    SELECT
-      SUBSTRING(store_resc FROM '(%;)*#"%#"' FOR '#')  AS "storage resource",
-      COUNT(*)                                         AS count,
-      SUM(size) / 2 ^ 40                               AS "volume (TiB)"
-    FROM unreplicated_data
-    GROUP BY store_resc
-    ORDER BY 1;
-
-    $(inject_debug_newline)
-    $(inject_set_title Unreplicated in Root Resources)
-    SELECT root_resc AS "root resource", COUNT(*) AS count, SUM(size) / 2 ^ 40 AS "volume (TiB)"
-    FROM unreplicated_data
-    GROUP BY root_resc
-    ORDER BY root_resc;
-
-    $(inject_debug_newline)
-    $(inject_debug_newline)
-    ROLLBACK;
-EOSQL
 }
 
 
