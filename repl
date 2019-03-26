@@ -55,6 +55,11 @@ EOF
 }
 
 
+readonly Log=3
+
+ProcMult=1
+
+
 show_version()
 {
   printf '%s\n' "$Version"
@@ -338,7 +343,7 @@ do
       shift 2
       ;;
     -m|--multiplier)
-      readonly ProcMult="$2"
+      ProcMult="$2"
       shift 2
       ;;
     -P|--port)
@@ -390,8 +395,6 @@ then
       >&2
     exit 1
   fi
-else
-  readonly ProcMult=1
 fi
 
 if [ -n "$Until" ]
@@ -405,7 +408,6 @@ then
 fi
 
 # Redirect stdout to FD 3 to use as a logging channel
-readonly Log=3
 eval "exec $Log>&1"
 
 readonly ObjectList=$(mktemp)
