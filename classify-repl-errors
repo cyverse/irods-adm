@@ -287,7 +287,8 @@ display_error_count()
 filter_errors ()
 {
   sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
-    | sed '/connectToRhost: readVersion to data.cyverse.org failed, msg=/d' \
+    | sed '/connectToRhost: readVersion to .* failed, msg=/d' \
+    | sed '/^cliReconnManager: .*, status = -305111/d' \
     | sort
 }
 
