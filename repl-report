@@ -1,9 +1,5 @@
 #!/bin/bash
 
-readonly ExecName=$(basename "$0")
-readonly Version=4
-
-
 show_help()
 {
   cat <<EOF
@@ -35,6 +31,9 @@ Options:
 EOF
 }
 
+
+readonly Version=4
+readonly ExecName=$(basename "$0")
 
 Debug=false
 
