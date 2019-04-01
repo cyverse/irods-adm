@@ -1,10 +1,5 @@
 #!/bin/bash
 
-readonly ExecAbsPath=$(readlink --canonicalize "$0")
-readonly ExecName=$(basename "$ExecAbsPath")
-readonly Version=1
-
-
 show_help()
 {
   cat <<EOF
@@ -60,6 +55,10 @@ couldn't be classified at all.
 EOF
 }
 
+
+readonly Version=1
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
 
 declare -a TempFiles
 
