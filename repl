@@ -1,9 +1,5 @@
 #!/bin/bash
 
-readonly ExecName=$(basename "$0")
-readonly Version=2
-
-
 show_help()
 {
 # shellcheck disable=SC2006
@@ -55,7 +51,9 @@ EOF
 }
 
 
+readonly Version=2
 readonly Log=3
+readonly ExecName=$(basename "$0")
 
 ProcMult=1
 
