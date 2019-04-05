@@ -22,6 +22,8 @@ Options:
                     the PostgreSQL default
  -p, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
                     instead of the PostgreSQL default
+ -U, --user <user>  authorize the DBMS connection as <user> instead of the
+                    PostgreSQL default
 
  -d, --debug    display progress and query time information
  -h, --help     display help text and exit
@@ -36,9 +38,9 @@ Debug=false
 main()
 {
   local opts
-  opts=$(getopt --longoptions debug,help,host:,port:,version \
+  opts=$(getopt --longoptions debug,help,host:,port:,user:,version \
                 --name "$ExecName" \
-                --options dhH:p:v \
+                --options dhH:p:U:v \
                 -- \
                 "$@")
   local ret="$?"
@@ -69,6 +71,10 @@ main()
         export PGPORT="$2"
         shift 2
         ;;
+      -U|--user)
+        export PGUSER="$2"
+        shift 2
+        ;;
       -v|--version)
         show_version
         return 0
@@ -87,7 +93,7 @@ main()
   local cutOff_s
   cutOff_s=$(date --date "$(date --iso-8601 --date '1 month ago')" '+%s')
 
-  mk_trash_report "$cutOff_s" | psql --quiet ICAT icat_reader
+  mk_trash_report "$cutOff_s" | psql --quiet ICAT
 }
 
 
