@@ -127,7 +127,7 @@ process_input()
   errCnt=$(wc --lines < "$errorsFile")
 
   display_error_count errors "$errCnt" "$errCnt"
-  classify_errors "$errorsFile" "$errCnt"
+  classify_errors "$errorsFile" "$errCnt" "$logBase"
 }
 
 
@@ -144,6 +144,7 @@ classify_errors()
 {
   local errorsFile="$1"
   local errCnt="$2"
+  local logBase="$3"
 
   local iTCnt
   iTCnt=$(split_out_class "$errorsFile" \
@@ -185,6 +186,7 @@ classify_repl_errors()
 {
   local replErrorsFile="$1"
   local totErrCnt="$2"
+  local logBase="$3"
 
   local sHRLCnt
   sHRLCnt=$(split_out_repl_class "$replErrorsFile" \
