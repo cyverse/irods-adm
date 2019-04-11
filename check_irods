@@ -1,10 +1,5 @@
 #!/bin/bash
 
-readonly ExecAbsPath=$(readlink --canonicalize "$0")
-readonly ExecName=$(basename "$ExecAbsPath")
-readonly Version=1
-
-
 show_help()
 {
   cat <<EOF
@@ -43,6 +38,10 @@ Options:
 EOF
 }
 
+
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
+readonly Version=1
 
 readonly ReqStore=$(mktemp)
 trap 'rm -rf "$ReqStore"' EXIT
