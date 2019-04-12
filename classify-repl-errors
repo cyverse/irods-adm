@@ -168,7 +168,7 @@ classify_errors()
 
   split_out_class "$errorsFile" '^replUtil: repl error for ' '' "$replErrorsFile" > /dev/null
   sort --output "$replErrorsFile" "$replErrorsFile"
-  classify_repl_errors "$replErrorsFile" "$errCnt"
+  classify_repl_errors "$replErrorsFile" "$errCnt" "$logBase"
 
   local unclassifiedErrCnt
   unclassifiedErrCnt=$(wc --lines < "$errorsFile")
