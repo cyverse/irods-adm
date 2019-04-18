@@ -23,42 +23,42 @@
 # DEBUG is any value that, if present, will cause the script to generate
 # describing what it is doing. It is not present by default.
 
-if [ "$#" -ge 1 ]
-then
-  readonly HOST="$1"
-else
-  readonly HOST=localhost
-fi
-
-if [ "$#" -ge 2 ]
-then
-  readonly PORT="$2"
-else
-  readonly PORT=5432
-fi
-
-if [ "$#" -ge 3 ]
-then
-  readonly USER="$3"
-else
-  readonly USER=irods
-fi
-
-if [ "$#" -ge 4 ]
-then
-  readonly CUTOFF_TIME="$4"
-else
-  readonly CUTOFF_TIME=$(date -I --date=today)
-fi
-
-if [ "$#" -ge 5 ]
-then
-  readonly DEBUG=1
-fi
-
 
 main()
 {
+  if [ "$#" -ge 1 ]
+  then
+    readonly HOST="$1"
+  else
+    readonly HOST=localhost
+  fi
+
+  if [ "$#" -ge 2 ]
+  then
+    readonly PORT="$2"
+  else
+    readonly PORT=5432
+  fi
+
+  if [ "$#" -ge 3 ]
+  then
+    readonly USER="$3"
+  else
+    readonly USER=irods
+  fi
+
+  if [ "$#" -ge 4 ]
+  then
+    readonly CUTOFF_TIME="$4"
+  else
+    readonly CUTOFF_TIME=$(date -I --date=today)
+  fi
+
+  if [ "$#" -ge 5 ]
+  then
+    readonly DEBUG=1
+  fi
+
   readonly ErrorLog=$(mktemp)
 
   display_problems | strip_noise | fix_problems 2>"$ErrorLog"
