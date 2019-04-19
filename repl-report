@@ -32,7 +32,7 @@ EOF
 }
 
 
-readonly Version=4
+readonly Version=5
 readonly ExecName=$(basename "$0")
 
 Debug=false
@@ -128,16 +128,19 @@ mk_report()
     $(inject_debug_newline)
     $(inject_set_title Unreplicated in Storage Resources)
     SELECT
-      SUBSTRING(store_resc FROM '(%;)*#"%#"' FOR '#')  AS "storage resource",
-      COUNT(*)                                         AS count,
-      SUM(size) / 2 ^ 40                               AS "volume (TiB)"
+      SUBSTRING(store_resc FROM '(%;)*#"%#"' FOR '#')  AS "Storage Resource",
+      COUNT(*)                                         AS "Count",
+      ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)    AS "Volume (TiB)"
     FROM unreplicated_data
     GROUP BY store_resc
     ORDER BY 1;
 
     $(inject_debug_newline)
     $(inject_set_title Unreplicated in Root Resources)
-    SELECT root_resc AS "root resource", COUNT(*) AS count, SUM(size) / 2 ^ 40 AS "volume (TiB)"
+    SELECT
+      root_resc                                      AS "Root Resource",
+      COUNT(*)                                       AS "Count",
+      ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)  AS "Volume (TiB)"
     FROM unreplicated_data
     GROUP BY root_resc
     ORDER BY root_resc;
