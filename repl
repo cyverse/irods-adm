@@ -52,6 +52,9 @@ EOF
 
 
 readonly Version=2
+
+set -e
+
 readonly Log=3
 readonly ExecName=$(basename "$0")
 
@@ -300,8 +303,6 @@ select_cohort()
   rm --force "$cohortList"
 }
 
-
-set -e
 
 Age=1
 
