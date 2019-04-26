@@ -53,7 +53,10 @@ EOF
 
 readonly Version=2
 
-set -e
+set -e -u
+
+export SERIAL=
+export UNTIL_TS=
 
 readonly Log=3
 readonly ExecName=$(basename "$0")
@@ -148,9 +151,10 @@ partition()
 {
   local minSizeB="$1"
 
+  local maxSizeB=
   if [ "$#" -ge 2 ]
   then
-    local maxSizeB="$2"
+    maxSizeB="$2"
   fi
 
   if [ -n "$maxSizeB" ]
@@ -249,9 +253,10 @@ select_cohort()
   local maxArgs="$4"
   local minThreads="$5"
 
+  local maxThreads=
   if [ "$#" -ge 6 ]
   then
-    local maxThreads="$6"
+    maxThreads="$6"
   fi
 
   if ! CHECK_TIME
@@ -265,9 +270,11 @@ select_cohort()
   local cohortList
   cohortList=$(mktemp)
 
+  local maxSizeMiB=
   if [ -n "$maxThreads" ]
   then
-    local maxSizeMiB=$((maxThreads * 32))
+    maxSizeMiB=$((maxThreads * 32))
+
     local maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
 
     partition "$minSizeB" "$maxSizeB"
@@ -322,6 +329,10 @@ fi
 
 eval set -- "$Opts"
 
+BaseColl=
+SrcRes=
+Until=
+
 while true
 do
   case "$1" in
@@ -330,7 +341,7 @@ do
       shift 2
       ;;
     -c|--collection)
-      readonly BaseColl="$2"
+      BaseColl="$2"
       shift 2
       ;;
     -h|--help)
@@ -346,19 +357,19 @@ do
       shift 2
       ;;
     -P|--port)
-      readonly PGPORT="$2"
+      export PGPORT="$2"
       shift 2
       ;;
     -r|--resource)
-      readonly SrcRes="$2"
+      SrcRes="$2"
       shift 2
       ;;
     -s|--serial)
-      export SERIAL=true
+      SERIAL=true
       shift
       ;;
     -u|--until)
-      readonly Until="$2"
+      Until="$2"
       shift 2
       ;;
     -U|--user)
@@ -398,7 +409,6 @@ fi
 
 if [ -n "$Until" ]
 then
-  export UNTIL_TS
   if ! UNTIL_TS=$(date --date="$Until" '+%s')
   then
     printf '%s is not a valid date format\n' "$Until"
