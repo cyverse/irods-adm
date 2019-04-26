@@ -151,9 +151,10 @@ partition()
 {
   local minSizeB="$1"
 
+  local maxSizeB=
   if [ "$#" -ge 2 ]
   then
-    local maxSizeB="$2"
+    maxSizeB="$2"
   fi
 
   if [ -n "$maxSizeB" ]
