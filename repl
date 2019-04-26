@@ -252,9 +252,10 @@ select_cohort()
   local maxArgs="$4"
   local minThreads="$5"
 
+  local maxThreads=
   if [ "$#" -ge 6 ]
   then
-    local maxThreads="$6"
+    maxThreads="$6"
   fi
 
   if ! CHECK_TIME
