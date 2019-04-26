@@ -270,9 +270,11 @@ select_cohort()
   local cohortList
   cohortList=$(mktemp)
 
+  local maxSizeMiB=
   if [ -n "$maxThreads" ]
   then
-    local maxSizeMiB=$((maxThreads * 32))
+    maxSizeMiB=$((maxThreads * 32))
+
     local maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
 
     partition "$minSizeB" "$maxSizeB"
