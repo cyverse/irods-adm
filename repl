@@ -64,6 +64,189 @@ readonly ExecName=$(basename "$0")
 ProcMult=1
 
 
+main()
+{
+  Age=1
+
+  readonly Opts=$( \
+    getopt \
+      --name "$ExecName" \
+      --longoptions \
+        age:,collection:,help,host:,multiplier:,port:,resource:,serial,until:,user:,version \
+      --options A:c:hH:m:P:r:su:U:v \
+      -- \
+      "$@")
+  ret="$?"
+  if [ "$ret" -ne 0 ]
+  then
+    exit_with_help
+  fi
+
+  eval set -- "$Opts"
+
+  BaseColl=
+  SrcRes=
+  Until=
+
+  while true
+  do
+    case "$1" in
+      -A|--age)
+        Age="$2"
+        shift 2
+        ;;
+      -c|--collection)
+        BaseColl="$2"
+        shift 2
+        ;;
+      -h|--help)
+        show_help
+        exit 0
+        ;;
+      -H|--host)
+        export PGHOST="$2"
+        shift 2
+        ;;
+      -m|--multiplier)
+        ProcMult="$2"
+        shift 2
+        ;;
+      -P|--port)
+        export PGPORT="$2"
+        shift 2
+        ;;
+      -r|--resource)
+        SrcRes="$2"
+        shift 2
+        ;;
+      -s|--serial)
+        SERIAL=true
+        shift
+        ;;
+      -u|--until)
+        Until="$2"
+        shift 2
+        ;;
+      -U|--user)
+        export PGUSER="$2"
+        shift 2
+        ;;
+      -v|--version)
+        show_version
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        exit_with_help
+        ;;
+    esac
+  done
+
+  if [ "$#" -lt 1 ]
+  then
+    exit_with_help
+  fi
+
+  export DEST_RESC="$1"
+
+  if [ -n "$ProcMult" ]
+  then
+    if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
+    then
+      printf \
+          'The -m option value must be a positive number. The given value was %s.\n' \
+          "$ProcMult" \
+        >&2
+      exit 1
+    fi
+  fi
+
+  if [ -n "$Until" ]
+  then
+    if ! UNTIL_TS=$(date --date="$Until" '+%s')
+    then
+      printf '%s is not a valid date format\n' "$Until"
+      exit 1
+    fi
+  fi
+
+  # Redirect stdout to FD 3 to use as a logging channel
+  eval "exec $Log>&1"
+
+  readonly ObjectList=$(mktemp)
+
+  trap 'finish "$ObjectList"' EXIT
+
+  if ! iadmin lz &> /dev/null
+  then
+    printf "aren't authenticated as a rodsadmin user\n" >&2
+    exit 1
+  fi
+
+  if ! psql ICAT <<<'' &> /dev/null
+  then
+    printf "aren't able to connect to the ICAT DB without a password\n" >&2
+    exit 1
+  fi
+
+  if ! CHECK_TIME
+  then
+   printf 'Stop time is in the past\n' >&2
+   exit 1
+  fi
+
+  printf 'Retrieving data objects to replicate...\n' >&2
+
+  readonly MaxCreateDate=$(date --iso-8601 --date "$Age days ago")
+  readonly MaxCreateTime=$(date --date "$MaxCreateDate" '+%s')
+
+  if [ -n "$SrcRes" ]
+  then
+    readonly ResCond="d.resc_name = '$SrcRes'"
+  else
+    readonly ResCond="d.resc_name != '$DEST_RESC'"
+  fi
+
+  if [ -n "$BaseColl" ]
+  then
+    readonly BaseCond="c.coll_name = '$BaseColl' OR c.coll_name LIKE '$BaseColl/%'"
+  else
+    readonly BaseCond=TRUE
+  fi
+
+  readonly ReplQuery=$(mk_repl_query "$MaxCreateTime" "$BaseCond" "$ResCond")
+
+  psql \
+      --no-align --tuples-only --record-separator-zero \
+      --command "$ReplQuery" --field-separator ' ' \
+      ICAT \
+    > "$ObjectList"
+
+  readonly Tot=$(count < "$ObjectList")
+  printf '%d data objects to replicate\n' "$Tot" >&2
+
+  if [ "$Tot" -gt 0 ]
+  then
+    if [ -z "$SERIAL" ]
+    then
+      cnt=0
+      cnt=$(select_cohort "$cnt" "$Tot"  1   2 15    < "$ObjectList")  # 1 16-threaded
+      cnt=$(select_cohort "$cnt" "$Tot"  2   8  7 15 < "$ObjectList")  # 2 8--15-threaded
+      cnt=$(select_cohort "$cnt" "$Tot"  3  18  5  7 < "$ObjectList")  # 3 6--7-threaded
+      cnt=$(select_cohort "$cnt" "$Tot"  4  32  3  5 < "$ObjectList")  # 4 4--5-threaded
+      cnt=$(select_cohort "$cnt" "$Tot"  6  72  2  3 < "$ObjectList")  # 6 3-threaded
+      cnt=$(select_cohort "$cnt" "$Tot"  8 128  1  2 < "$ObjectList")  # 8 2-threaded
+      cnt=$(select_cohort "$cnt" "$Tot" 16 512  0  1 < "$ObjectList")  # 16 1-threaded transfers
+    else
+      select_cohort 0 "$Tot" 16 2 0 < "$ObjectList" > /dev/null
+    fi
+  fi
+}
+
+
 show_version()
 {
   printf '%s\n' "$Version"
@@ -311,178 +494,4 @@ select_cohort()
 }
 
 
-Age=1
-
-readonly Opts=$( \
-  getopt \
-    --name "$ExecName" \
-    --longoptions \
-      age:,collection:,help,host:,multiplier:,port:,resource:,serial,until:,user:,version \
-    --options A:c:hH:m:P:r:su:U:v \
-    -- \
-    "$@")
-ret="$?"
-if [ "$ret" -ne 0 ]
-then
-  exit_with_help
-fi
-
-eval set -- "$Opts"
-
-BaseColl=
-SrcRes=
-Until=
-
-while true
-do
-  case "$1" in
-    -A|--age)
-      Age="$2"
-      shift 2
-      ;;
-    -c|--collection)
-      BaseColl="$2"
-      shift 2
-      ;;
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -H|--host)
-      export PGHOST="$2"
-      shift 2
-      ;;
-    -m|--multiplier)
-      ProcMult="$2"
-      shift 2
-      ;;
-    -P|--port)
-      export PGPORT="$2"
-      shift 2
-      ;;
-    -r|--resource)
-      SrcRes="$2"
-      shift 2
-      ;;
-    -s|--serial)
-      SERIAL=true
-      shift
-      ;;
-    -u|--until)
-      Until="$2"
-      shift 2
-      ;;
-    -U|--user)
-      export PGUSER="$2"
-      shift 2
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      exit_with_help
-      ;;
-  esac
-done
-
-if [ "$#" -lt 1 ]
-then
-  exit_with_help
-fi
-
-export DEST_RESC="$1"
-
-if [ -n "$ProcMult" ]
-then
-  if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
-  then
-    printf 'The -m option value must be a positive number. The given value was %s.\n' "$ProcMult" \
-      >&2
-    exit 1
-  fi
-fi
-
-if [ -n "$Until" ]
-then
-  if ! UNTIL_TS=$(date --date="$Until" '+%s')
-  then
-    printf '%s is not a valid date format\n' "$Until"
-    exit 1
-  fi
-fi
-
-# Redirect stdout to FD 3 to use as a logging channel
-eval "exec $Log>&1"
-
-readonly ObjectList=$(mktemp)
-
-trap 'finish "$ObjectList"' EXIT
-
-if ! iadmin lz &> /dev/null
-then
-  printf "aren't authenticated as a rodsadmin user\n" >&2
-  exit 1
-fi
-
-if ! psql ICAT <<<'' &> /dev/null
-then
-  printf "aren't able to connect to the ICAT DB without a password\n" >&2
-  exit 1
-fi
-
-if ! CHECK_TIME
-then
- printf 'Stop time is in the past\n' >&2
- exit 1
-fi
-
-printf 'Retrieving data objects to replicate...\n' >&2
-
-readonly MaxCreateDate=$(date --iso-8601 --date "$Age days ago")
-readonly MaxCreateTime=$(date --date "$MaxCreateDate" '+%s')
-
-if [ -n "$SrcRes" ]
-then
-  readonly ResCond="d.resc_name = '$SrcRes'"
-else
-  readonly ResCond="d.resc_name != '$DEST_RESC'"
-fi
-
-if [ -n "$BaseColl" ]
-then
-  readonly BaseCond="c.coll_name = '$BaseColl' OR c.coll_name LIKE '$BaseColl/%'"
-else
-  readonly BaseCond=TRUE
-fi
-
-readonly ReplQuery=$(mk_repl_query "$MaxCreateTime" "$BaseCond" "$ResCond")
-
-psql \
-    --no-align --tuples-only --record-separator-zero --command "$ReplQuery" --field-separator ' ' \
-    ICAT \
-  > "$ObjectList"
-
-readonly Tot=$(count < "$ObjectList")
-printf '%d data objects to replicate\n' "$Tot" >&2
-
-if [ "$Tot" -gt 0 ]
-then
-  if [ -z "$SERIAL" ]
-  then
-    cnt=0
-    cnt=$(select_cohort "$cnt" "$Tot"  1   2 15    < "$ObjectList")  # 1 16-threaded
-    cnt=$(select_cohort "$cnt" "$Tot"  2   8  7 15 < "$ObjectList")  # 2 8--15-threaded
-    cnt=$(select_cohort "$cnt" "$Tot"  3  18  5  7 < "$ObjectList")  # 3 6--7-threaded
-    cnt=$(select_cohort "$cnt" "$Tot"  4  32  3  5 < "$ObjectList")  # 4 4--5-threaded
-    cnt=$(select_cohort "$cnt" "$Tot"  6  72  2  3 < "$ObjectList")  # 6 3-threaded
-    cnt=$(select_cohort "$cnt" "$Tot"  8 128  1  2 < "$ObjectList")  # 8 2-threaded
-    cnt=$(select_cohort "$cnt" "$Tot" 16 512  0  1 < "$ObjectList")  # 16 1-threaded transfers
-  else
-    select_cohort 0 "$Tot" 16 2 0 < "$ObjectList" > /dev/null
-  fi
-fi
+main "$@"
