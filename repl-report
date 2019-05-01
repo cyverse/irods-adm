@@ -32,6 +32,8 @@ EOF
 }
 
 
+set -u
+
 readonly Version=5
 readonly ExecName=$(basename "$0")
 
