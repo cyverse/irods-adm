@@ -10,12 +10,14 @@ Usage:
  $ExecName [options]
 
 This program generates a report on the data objects in /iplant/home that need to
-be replicated. An object needs to be replicated if it was created before
-yesterday and has no replica yet. The report lists the number of unreplicated
-data objects and their volume broken down by the storage resource holding the
-corresponding files.
+be replicated. An object needs to be replicated if it was created before a given
+day at midnight and has no replica yet. The report lists the number of
+unreplicated data objects and their volume broken down by the storage resource
+holding the corresponding files.
 
 Options:
+ -A, --age <age>    how many days old a data object must be to be replicated.
+                    a negative number means no time restriction. default: 1
  -H, --host <host>  connect to the ICAT's DBMS on the host <host> instead of
                     the PostgreSQL default
  -P, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
@@ -24,8 +26,6 @@ Options:
                     default.
 
  -d, --debug    display progress and query time information
- -f, --full     include all unreplicated objects, not just the ones created
-                before yesterday
  -h, --help     display help text and exit
  -v, --version  display version and exit
 EOF
@@ -34,8 +34,9 @@ EOF
 
 set -u
 
-readonly Version=5
 readonly ExecName=$(basename "$0")
+readonly Version=6
+readonly DefaultAge=1
 
 Debug=false
 
@@ -43,13 +44,7 @@ Debug=false
 main()
 {
   local opts
-  opts=$(getopt --longoptions debug,full,help,host:,port:,user:,version \
-                --name "$ExecName" \
-                --options dfhH:P:U:v \
-                -- \
-                "$@")
-  local ret="$?"
-  if [[ "$ret" != 0 ]]
+  if ! opts=$(prep_opts "$@")
   then
     show_help >&2
     return 1
@@ -57,15 +52,17 @@ main()
 
   eval set -- "$opts"
 
+  local age="$DefaultAge"
+
   while true
   do
     case "$1" in
+      -A|--age)
+        age="$2"
+        shift 2
+        ;;
       -d|--debug)
         Debug=true
-        shift
-        ;;
-      -f|--full)
-        local timeRestriction=false
         shift
         ;;
       -h|--help)
@@ -99,13 +96,13 @@ main()
     esac
   done
 
-  mk_report "${timeRestriction-true}"
+  mk_report "$age"
 }
 
 
 mk_report()
 {
-  local timeRestriction="$1"
+  local age="$1"
 
   psql --quiet ICAT <<EOSQL
     \\pset footer off
@@ -120,7 +117,7 @@ mk_report()
     FROM r_data_main
     WHERE data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
     AND coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/iplant/home/%')
-    AND $(inject_time_restriction "$timeRestriction");
+    AND $(inject_time_restriction "$age");
 
     CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
     CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
@@ -200,16 +197,34 @@ inject_set_title()
 
 inject_time_restriction()
 {
-  local timeRestriction="$1"
+  local age="$1"
 
-  if [[ "$timeRestriction" == false ]]
+  if [[ "$age" -lt 0 ]]
   then
+    # No time restriction
+
     printf TRUE
   else
+    # Determine the midnight of the desired day.
+
+    local supCreateDate
+    supCreateDate=$(date --iso-8601 --date "$age days ago")
+
     local supCreateTs
-    supCreateTs=$(date --date "$(date --iso-8601 --date yesterday)" '+%s')
+    supCreateTs=$(date --date "$supCreateDate" '+%s')
     printf 'create_ts < '\''0%s'\' "$supCreateTs"
   fi
+}
+
+
+prep_opts()
+{
+  getopt \
+    --longoptions age:,debug,help,host:,port:,user:,version \
+    --options A:dhH:P:U:v \
+    --name "$ExecName" \
+    -- \
+    "$@"
 }
 
 
