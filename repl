@@ -51,15 +51,14 @@ EOF
 }
 
 
-readonly Version=2
-
 set -e -u
 
 export SERIAL=
 export UNTIL_TS=
 
-readonly Log=3
 readonly ExecName=$(basename "$0")
+readonly Version=2
+readonly Log=3
 
 ProcMult=1
 
