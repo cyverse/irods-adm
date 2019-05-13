@@ -2,6 +2,8 @@
 #
 # This script deletes the trash older than one month. It deletes the oldest trash first.
 
+set -u
+
 
 main()
 {
