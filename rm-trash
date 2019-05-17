@@ -140,4 +140,4 @@ truncate_by_time()
 }
 
 
-main
+main "$@"
