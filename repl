@@ -51,7 +51,7 @@ EOF
 }
 
 
-set -e -u
+set -o nounset
 
 export SERIAL=
 export UNTIL_TS=
