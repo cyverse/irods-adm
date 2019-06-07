@@ -34,7 +34,8 @@ EOF
 
 set -o nounset
 
-readonly ExecName=$(basename "$0")
+readonly ExecPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecPath")
 readonly Version=6
 readonly DefaultAge=1
 
