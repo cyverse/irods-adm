@@ -56,7 +56,8 @@ set -o nounset
 export SERIAL=
 export UNTIL_TS=
 
-readonly ExecName=$(basename "$0")
+readonly ExecPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecPath")
 readonly Version=2
 readonly Log=3
 
