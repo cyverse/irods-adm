@@ -20,8 +20,8 @@ Requirements:
  1) iCommands need to be installed.
  2) Need the iRODS environment set up and authenticated for the iCommands, i.e.,
     iinit needs to have been called.
- 3) Need passwordless access to root@ares.iplantcollaborative.org, e.g., shared
-    public key without passphrase.
+ 3) Need passwordless root access to the IES, e.g., shared public key without
+    passphrase.
  4) Need passwordless access to root@davos.cyverse.org.
 EOF
 }
