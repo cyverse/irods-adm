@@ -222,7 +222,7 @@ BEGIN {
 }
 
 
-/^  backend=(irods_single_conn|irods_extra_conn)/ {
+/^  backend=irods_direct/ {
   if (source != "") {
     patsplit(\$4, terms, "[^=:]+");
 
