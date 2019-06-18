@@ -100,7 +100,7 @@ format_report() {
 generate_report()
 {
   local irodsHost
-  irodsHost=$(ienv | sed --quiet 's/NOTICE: irods_host - //p')
+  irodsHost=$(ienv | sed --quiet 's/^.*irods_host - //p')
 
   if [ -z "$irodsHost" ]
   then
