@@ -1,11 +1,5 @@
 #!/bin/bash
 
-set -e
-
-readonly ExecName=$(basename "$0")
-readonly Version=2
-
-
 show_help()
 {
   cat <<EOF
@@ -26,11 +20,17 @@ Requirements:
  1) iCommands need to be installed.
  2) Need the iRODS environment set up and authenticated for the iCommands, i.e.,
     iinit needs to have been called.
- 3) Need passwordless access to root@ares.iplantcollaborative.org, e.g., shared 
+ 3) Need passwordless access to root@ares.iplantcollaborative.org, e.g., shared
     public key without passphrase.
  4) Need passwordless access to root@davos.cyverse.org.
 EOF
 }
+
+
+set -e
+
+readonly ExecName=$(basename "$0")
+readonly Version=2
 
 
 main()
