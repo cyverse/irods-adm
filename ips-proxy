@@ -30,7 +30,7 @@ EOF
 set -o nounset -o errexit
 
 readonly ExecName=$(basename "$0")
-readonly Version=2
+readonly Version=3
 
 
 main()
