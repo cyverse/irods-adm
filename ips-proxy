@@ -27,10 +27,10 @@ EOF
 }
 
 
-set -o errexit
+set -o nounset -o errexit
 
 readonly ExecName=$(basename "$0")
-readonly Version=2
+readonly Version=3
 
 
 main()
@@ -254,7 +254,7 @@ resolve_name()
 {
   local cname="$1"
 
-  local name
+  local name=
   while [ -z "$name" ]
   do
     name=$(host "$cname" | sed --quiet "s/$cname is an alias for \(.*\)\./\1/p")
