@@ -27,7 +27,7 @@ EOF
 }
 
 
-set -e
+set -o errexit
 
 readonly ExecName=$(basename "$0")
 readonly Version=2
