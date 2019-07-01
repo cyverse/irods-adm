@@ -56,7 +56,7 @@ EOF
 }
 
 
-set -u
+set -o nounset
 
 readonly Version=1
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
