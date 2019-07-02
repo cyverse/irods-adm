@@ -101,6 +101,23 @@ main()
 }
 
 
+prep_opts()
+{
+  getopt \
+    --longoptions age:,debug,help,host:,port:,user:,version \
+    --options A:dhH:P:U:v \
+    --name "$ExecName" \
+    -- \
+    "$@"
+}
+
+
+show_version()
+{
+  printf '%s\n' "$Version"
+}
+
+
 mk_report()
 {
   local age="$1"
@@ -215,23 +232,6 @@ inject_time_restriction()
     supCreateTs=$(date --date "$supCreateDate" '+%s')
     printf 'create_ts < '\''0%s'\' "$supCreateTs"
   fi
-}
-
-
-prep_opts()
-{
-  getopt \
-    --longoptions age:,debug,help,host:,port:,user:,version \
-    --options A:dhH:P:U:v \
-    --name "$ExecName" \
-    -- \
-    "$@"
-}
-
-
-show_version()
-{
-  printf '%s\n' "$Version"
 }
 
 
