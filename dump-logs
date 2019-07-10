@@ -102,7 +102,6 @@ for svr in "$Ies" $RS
 do
   printf '\rdumping logs from %s\n' "$svr" >&2
   out=logs/"$svr".sessions
-  rm --force "$out"
 
   "$ExecDir"/gather-logs "$svr" "$LogExt" | get_sessions | count_sessions > "$UnsortedSessions"
   "$ExecDir"/order-sessions < "$UnsortedSessions" >> "$out"
