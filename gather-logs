@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o nounset
+
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecDir=$(dirname "$ExecAbsPath")
 
@@ -12,7 +14,7 @@ main()
   local host="$1"
   local logExtPat="$2"
 
-  local password
+  local password=
   if [ "$#" -ge 3 ]
   then
     password="$3"
