@@ -4,7 +4,6 @@ set -o nounset
 
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecDir=$(dirname "$ExecAbsPath")
-readonly LogDir=/var/lib/irods/iRODS/server/log
 readonly LogBase=rodsLog
 
 
@@ -19,8 +18,10 @@ main()
     password="$3"
   fi
 
+  local namePat="$LogBase"."$logExtPat"
+
   local log
-  for log in $(list_logs "$host" "$password" "$LogBase"."$logExtPat")
+  for log in $("$ExecDir"/list-rods-logs --name-pattern "$namePat" --password "$password" "$host")
   do
     local logName
     logName=$(basename "$log")
@@ -30,19 +31,6 @@ main()
 
     printf 'gather_logs:  finished processing %s\n' "$logName" >&2
   done
-}
-
-
-list_logs()
-{
-  local host="$1"
-  local password="$2"
-  local logNamePat="$3"
-
-  #shellcheck disable=SC2087
-  ssh -q -t "$host" <<EOF 2> /dev/null
-printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name "$logNamePat" -type f | sort
-EOF
 }
 
 

@@ -84,6 +84,9 @@ arbitrary SQL query for byte-based sizes.
 The program `ips-proxy` can be used to generate a report similar to ips, but
 when the IES behind a proxy.
 
+The program `list-rods-logs` can be used to list the iRODS log files on a given
+server.
+
 The program `resource-report` generates a report on the size of the root
 resources.
 
