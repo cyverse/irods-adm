@@ -4,13 +4,12 @@ set -o nounset
 
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecDir=$(dirname "$ExecAbsPath")
-
 readonly LogDir=/var/lib/irods/iRODS/server/log
 readonly LogBase=rodsLog
 
+
 main()
 {
-
   local host="$1"
   local logExtPat="$2"
 
