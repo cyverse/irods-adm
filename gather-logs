@@ -38,6 +38,7 @@ list_logs()
   local password="$2"
   local logNamePat="$3"
 
+  #shellcheck disable=SC2087
   ssh -q -t "$host" <<EOF 2> /dev/null
 printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name "$logNamePat" -type f | sort
 EOF
@@ -50,6 +51,7 @@ rcat_log()
   local password="$2"
   local log="$3"
 
+  #shellcheck disable=SC2087
   ssh -q -t "$host" <<EOF 2> /dev/null
 printf '%s\n' "$password" | sudo -S cat "$log"
 EOF
