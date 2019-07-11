@@ -73,9 +73,14 @@ count_sessions()
 
   while IFS= read -r -d§
   do
-    printf '§%s' "${REPLY:1}"
-    (( cnt++ ))
-    printf '\r    %d' "$cnt" >&2
+    local session="${REPLY:1}"
+
+    if [[ -n "$session" ]]
+    then
+      printf '§%s' "$session"
+      (( cnt++ ))
+      printf '\r    %d' "$cnt" >&2
+    fi
   done
 
   printf '\n' >&2
@@ -103,6 +108,12 @@ do
   printf '\rdumping logs from %s\n' "$svr" >&2
   out=logs/"$svr".sessions
 
-  "$ExecDir"/gather-logs "$svr" "$LogExt" | get_sessions | count_sessions > "$UnsortedSessions"
-  "$ExecDir"/order-sessions < "$UnsortedSessions" >> "$out"
+  for log in $("$ExecDir"/list-rods-logs --name-pattern "$LogBase"."$LogExt" "$svr")
+  do
+    logName=$(basename "$log")
+    logExt="${logName#*.}"
+
+    "$ExecDir"/gather-logs "$svr" "$logExt" | get_sessions | count_sessions > "$UnsortedSessions"
+    "$ExecDir"/order-sessions < "$UnsortedSessions" >> "$out"
+  done
 done
