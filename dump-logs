@@ -66,6 +66,25 @@ filter_day()
 }
 
 
+count_entries()
+{
+  local cnt=0
+  printf '  %d\r' "$cnt" >&2
+
+  while IFS= read -r
+  do
+    if [[ -n "$REPLY" ]]
+    then
+      printf '%s\n' "$REPLY"
+      (( cnt++ ))
+      printf '  %d\r' "$cnt" >&2
+    fi
+  done
+
+  printf '%d entries\n' "$cnt" >&2
+}
+
+
 count_sessions()
 {
   local cnt=0
@@ -108,8 +127,9 @@ mkdir --parents logs
 readonly Ies=$(ienv | sed --quiet 's/NOTICE: irods_host - //p')
 readonly RS=$(get_servers)
 
+readonly Entries=$(mktemp)
 readonly UnsortedSessions=$(mktemp)
-trap 'rm --force "$UnsortedSessions"' EXIT
+trap 'rm --force "$Entries" "$UnsortedSessions"' EXIT
 
 for svr in "$Ies" $RS
 do
@@ -121,7 +141,8 @@ do
     logName=$(basename "$log")
     logExt="${logName#*.}"
 
-    "$ExecDir"/gather-logs "$svr" "$logExt" | get_sessions | count_sessions > "$UnsortedSessions"
+    "$ExecDir"/gather-logs "$svr" "$logExt" | count_entries > "$Entries"
+    get_sessions < "$Entries" | count_sessions > "$UnsortedSessions"
     "$ExecDir"/order-sessions < "$UnsortedSessions" >> "$out"
   done
 done
