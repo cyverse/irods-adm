@@ -1,0 +1,121 @@
+#!/bin/bash
+
+show_help() {
+  cat <<EOF
+
+$ExecName version $Version
+
+Usage:
+$ExecName [options] HOST
+
+Lists the absolute paths to a set of iRODS log files that are on a given server.
+
+Parameters:
+ HOST  The name of the iRODS server to dump the logs from
+
+Options:
+ -N, --name-pattern  A wildcard expression describing the name of the log files to list, default is
+                     "*".
+ -P, --password      A password needed to connect to the server
+
+ -h, --help     show help and exit
+ -v, --version  show version and exit
+EOF
+}
+
+
+set -o nounset
+
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
+readonly Version=1
+readonly LogDir=/var/lib/irods/iRODS/server/log
+
+
+main()
+{
+  local opts
+  if ! opts=$(format_opts "$@")
+  then
+    show_help >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  local password=
+  local namePattern=*
+
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      -N|--name-pattern)
+        namePattern="$2"
+        shift 2
+        ;;
+      -P|--password)
+        password="$2"
+        shift 2
+        ;;
+      -v|--version)
+        show_version
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
+  if [[ "$#" -lt 1 ]]
+  then
+    show_help >&2
+    return 1
+  fi
+
+  local host="$1"
+
+  list_logs "$host" "$password" "$namePattern"
+}
+
+
+format_opts()
+{
+  getopt \
+    --longoptions help,name-pattern:,password:,version \
+    --options hN:P:v \
+    --name "$ExecName" \
+    -- "$@"
+}
+
+
+show_version()
+{
+  printf '%s\n' "$Version"
+}
+
+
+list_logs()
+{
+  local host="$1"
+  local password="$2"
+  local namePattern="$3"
+
+  #shellcheck disable=SC2087
+  ssh -q -t "$host" 2> /dev/null \
+<<EOF
+  printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name "$namePattern" -type f | sort
+EOF
+}
+
+
+main "$@"
