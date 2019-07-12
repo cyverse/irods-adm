@@ -66,25 +66,6 @@ filter_day()
 }
 
 
-count_entries()
-{
-  local cnt=0
-  printf '  %d\r' "$cnt" >&2
-
-  while IFS= read -r
-  do
-    if [[ -n "$REPLY" ]]
-    then
-      printf '%s\n' "$REPLY"
-      (( cnt++ ))
-      printf '  %d\r' "$cnt" >&2
-    fi
-  done
-
-  printf '%d entries\n' "$cnt" >&2
-}
-
-
 count_sessions()
 {
   local cnt=0
@@ -106,17 +87,24 @@ count_sessions()
 }
 
 
-get_sessions()
-{
-  "$ExecDir"/group-log-by-pid | filter_day
-}
-
-
 get_servers()
 {
   iquest \
     '%s' \
     "select order(RESC_LOC) where RESC_NAME != 'bundleResc' and RESC_LOC != 'EMPTY_RESC_HOST'"
+}
+
+
+dump_log()
+{
+  local svr="$1"
+  local logExt="$2"
+
+  "$ExecDir"/gather-logs --extension-pattern "$logExt" "$svr" \
+    | "$ExecDir"/group-log-by-pid \
+    | filter_day \
+    | count_sessions \
+    | "$ExecDir"/order-sessions
 }
 
 
@@ -127,10 +115,6 @@ mkdir --parents logs
 readonly Ies=$(ienv | sed --quiet 's/NOTICE: irods_host - //p')
 readonly RS=$(get_servers)
 
-readonly Entries=$(mktemp)
-readonly UnsortedSessions=$(mktemp)
-trap 'rm --force "$Entries" "$UnsortedSessions"' EXIT
-
 for svr in "$Ies" $RS
 do
   printf '\rdumping logs from %s\n' "$svr" >&2
@@ -139,10 +123,7 @@ do
   for log in $("$ExecDir"/list-rods-logs --name-pattern "$LogBase"."$LogExt" "$svr")
   do
     logName=$(basename "$log")
-    logExt="${logName#*.}"
 
-    "$ExecDir"/gather-logs "$svr" "$logExt" | count_entries > "$Entries"
-    get_sessions < "$Entries" | count_sessions > "$UnsortedSessions"
-    "$ExecDir"/order-sessions < "$UnsortedSessions" >> "$out"
+    dump_log "$svr" "${logName#*.}" >> "$out"
   done
 done
