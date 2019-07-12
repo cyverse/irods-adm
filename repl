@@ -61,8 +61,6 @@ readonly ExecName=$(basename "$ExecPath")
 readonly Version=2
 readonly Log=3
 
-ProcMult=1
-
 
 main()
 {
@@ -88,6 +86,8 @@ main()
   SrcRes=
   Until=
 
+  local procMult=1
+
   while true
   do
     case "$1" in
@@ -108,7 +108,7 @@ main()
         shift 2
         ;;
       -m|--multiplier)
-        ProcMult="$2"
+        procMult="$2"
         shift 2
         ;;
       -P|--port)
@@ -152,13 +152,13 @@ main()
 
   export DEST_RESC="$1"
 
-  if [ -n "$ProcMult" ]
+  if [ -n "$procMult" ]
   then
-    if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
+    if ! [[ "$procMult" =~ ^[1-9][0-9]* ]]
     then
       printf \
           'The -m option value must be a positive number. The given value was %s.\n' \
-          "$ProcMult" \
+          "$procMult" \
         >&2
       exit 1
     fi
@@ -233,13 +233,13 @@ main()
     if [ -z "$SERIAL" ]
     then
       cnt=0
-      cnt=$(select_cohort "$cnt" "$Tot"  1   2 15    < "$ObjectList")  # 1 16-threaded
-      cnt=$(select_cohort "$cnt" "$Tot"  2   8  7 15 < "$ObjectList")  # 2 8--15-threaded
-      cnt=$(select_cohort "$cnt" "$Tot"  3  18  5  7 < "$ObjectList")  # 3 6--7-threaded
-      cnt=$(select_cohort "$cnt" "$Tot"  4  32  3  5 < "$ObjectList")  # 4 4--5-threaded
-      cnt=$(select_cohort "$cnt" "$Tot"  6  72  2  3 < "$ObjectList")  # 6 3-threaded
-      cnt=$(select_cohort "$cnt" "$Tot"  8 128  1  2 < "$ObjectList")  # 8 2-threaded
-      cnt=$(select_cohort "$cnt" "$Tot" 16 512  0  1 < "$ObjectList")  # 16 1-threaded transfers
+      cnt=$(select_cohort "$cnt" "$Tot" "$procMult"  1   2 15    < "$ObjectList")  # 1 16-threaded
+      cnt=$(select_cohort "$cnt" "$Tot" "$procMult"  2   8  7 15 < "$ObjectList")  # 2 8--15-threaded
+      cnt=$(select_cohort "$cnt" "$Tot" "$procMult"  3  18  5  7 < "$ObjectList")  # 3 6--7-threaded
+      cnt=$(select_cohort "$cnt" "$Tot" "$procMult"  4  32  3  5 < "$ObjectList")  # 4 4--5-threaded
+      cnt=$(select_cohort "$cnt" "$Tot" "$procMult"  6  72  2  3 < "$ObjectList")  # 6 3-threaded
+      cnt=$(select_cohort "$cnt" "$Tot" "$procMult"  8 128  1  2 < "$ObjectList")  # 8 2-threaded
+      cnt=$(select_cohort "$cnt" "$Tot" "$procMult" 16 512  0  1 < "$ObjectList")  # 16 1-threaded transfers
     else
       select_cohort 0 "$Tot" 16 2 0 < "$ObjectList" > /dev/null
     fi
@@ -432,14 +432,15 @@ select_cohort()
 {
   local cnt="$1"
   local tot="$2"
-  local maxProcs="$3"
-  local maxArgs="$4"
-  local minThreads="$5"
+  local procMult="$3"
+  local maxProcs="$4"
+  local maxArgs="$5"
+  local minThreads="$6"
 
   local maxThreads=
-  if [ "$#" -ge 6 ]
+  if [ "$#" -ge 7 ]
   then
-    maxThreads="$6"
+    maxThreads="$7"
   fi
 
   if ! CHECK_TIME
@@ -479,7 +480,7 @@ select_cohort()
 
   if [ "$subTotal" -gt 0 ]
   then
-    maxProcs=$((maxProcs * ProcMult))
+    maxProcs=$((maxProcs * procMult))
 
     parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" REPL_BATCH \
         < "$cohortList" \
