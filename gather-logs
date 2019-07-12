@@ -3,22 +3,56 @@
 set -o nounset
 
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
 readonly ExecDir=$(dirname "$ExecAbsPath")
 readonly LogBase=rodsLog
 
 
 main()
 {
-  local host="$1"
-  local logExtPat="$2"
-
-  local password=
-  if [ "$#" -ge 3 ]
+  local opts
+  if ! opts=$(format_opts "$@")
   then
-    password="$3"
+    printf 'failed to parse options\n' >&2
+    return 1
   fi
 
-  local namePat="$LogBase"."$logExtPat"
+  eval set -- "$opts"
+
+  local extPat='*'
+  local password=
+
+  while true
+  do
+    case "$1" in
+      -E|--extension-pattern)
+        extPat="$2"
+        shift 2
+        ;;
+      -P|--password)
+        password="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        printf 'unknown option, %s\n' "$1" >&2
+        return 1
+        ;;
+    esac
+  done
+
+  if [[ "$#" -lt 1 ]]
+  then
+    printf 'The name of the iRODS server is required\n' >&2
+    return 1
+  fi
+
+  local host="$1"
+
+  local namePat="$LogBase"."$extPat"
 
   local log
   for log in $("$ExecDir"/list-rods-logs --name-pattern "$namePat" --password "$password" "$host")
@@ -31,6 +65,12 @@ main()
 
     printf 'gather_logs:  finished processing %s\n' "$logName" >&2
   done
+}
+
+
+format_opts()
+{
+  getopt --longoptions extension-pattern:,password: --options E:P: --name "$ExecName" -- "$@"
 }
 
 

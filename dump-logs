@@ -141,7 +141,7 @@ do
     logName=$(basename "$log")
     logExt="${logName#*.}"
 
-    "$ExecDir"/gather-logs "$svr" "$logExt" | count_entries > "$Entries"
+    "$ExecDir"/gather-logs --extension-pattern "$logExt" "$svr" | count_entries > "$Entries"
     get_sessions < "$Entries" | count_sessions > "$UnsortedSessions"
     "$ExecDir"/order-sessions < "$UnsortedSessions" >> "$out"
   done
