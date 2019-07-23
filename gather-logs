@@ -1,7 +1,9 @@
 #!/bin/bash
 
+
 set -o nounset
 
+readonly Version=1
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 readonly ExecDir=$(dirname "$ExecAbsPath")
@@ -33,6 +35,10 @@ main()
         password="$2"
         shift 2
         ;;
+      -v|--version)
+        printf '%s' "$Version"
+        return 0
+        ;;
       --)
         shift
         break
@@ -52,6 +58,23 @@ main()
 
   local host="$1"
 
+  gather_logs "$host" "$password" "$extPat"
+}
+
+
+format_opts()
+{
+  getopt --longoptions extension-pattern:,password:,version --options E:P:v --name "$ExecName" -- \
+    "$@"
+}
+
+
+gather_logs()
+{
+  local host="$1"
+  local password="$2"
+  local extPat="$3"
+
   local namePat="$LogBase"."$extPat"
 
   local log
@@ -65,12 +88,6 @@ main()
 
     printf 'gather_logs:  finished processing %s\n' "$logName" >&2
   done
-}
-
-
-format_opts()
-{
-  getopt --longoptions extension-pattern:,password: --options E:P: --name "$ExecName" -- "$@"
 }
 
 
