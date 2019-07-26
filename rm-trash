@@ -11,6 +11,7 @@ EOF
 
 set -o nounset
 
+readonly Version=1
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 
@@ -18,7 +19,7 @@ readonly ExecName=$(basename "$ExecAbsPath")
 main()
 {
   local opts
-  if ! opts=$(getopt --longoptions help --options h --name "$ExecName" -- "$@")
+  if ! opts=$(getopt --longoptions help,version --options hv --name "$ExecName" -- "$@")
   then
     show_help >&2
     return 1
@@ -31,6 +32,10 @@ main()
     case "$1" in
       -h|--help)
         show_help
+        return 0
+        ;;
+      -v|--version)
+        printf '%s' "$Version"
         return 0
         ;;
       --)
@@ -57,7 +62,7 @@ main()
 dump_logs()
 {
   local trashTempFiles="$1"
-  
+
   local upperBound
   upperBound=$(date --date "$(date --iso-8601 --date '1 month ago')" '+%s')
 
