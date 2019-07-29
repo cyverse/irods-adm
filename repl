@@ -53,12 +53,13 @@ EOF
 
 set -o nounset
 
+readonly Version=2
+
 export SERIAL=
 export UNTIL_TS=
 
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
-readonly Version=2
 readonly Log=3
 
 
