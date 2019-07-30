@@ -55,6 +55,11 @@ set -o nounset
 
 readonly Version=2
 
+# Ensure these are declared for PostgreSQL
+export PGHOST
+export PGPORT
+export PGUSER
+
 export SERIAL=
 export UNTIL_TS=
 
@@ -105,7 +110,7 @@ main()
         exit 0
         ;;
       -H|--host)
-        export PGHOST="$2"
+        PGHOST="$2"
         shift 2
         ;;
       -m|--multiplier)
@@ -113,7 +118,7 @@ main()
         shift 2
         ;;
       -P|--port)
-        export PGPORT="$2"
+        PGPORT="$2"
         shift 2
         ;;
       -r|--resource)
@@ -129,7 +134,7 @@ main()
         shift 2
         ;;
       -U|--user)
-        export PGUSER="$2"
+        PGUSER="$2"
         shift 2
         ;;
       -v|--version)
