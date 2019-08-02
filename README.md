@@ -90,6 +90,9 @@ server.
 The program `resource-report` generates a report on the size of the root
 resources.
 
+The program `sharing-report` generates a report on the amount of user data that
+has been shared.
+
 The program `trash-report` can be used to generate a report on how much trash
 there is.
 

@@ -1,0 +1,264 @@
+#!/bin/bash
+
+show_help()
+{
+  cat <<EOF
+
+$ExecName version $Version
+
+Usage:
+  $ExecName [options]
+
+This program computes the total volume in bytes of all of the data objects in
+user home and trash folders that are accessible by another user.
+
+Options:
+ -H, --host <host>  connect to the ICAT's DBMS on the host <host> instead of
+                    the PostgreSQL default
+ -P, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
+                    instead of the PostgreSQL default
+ -U, --user <user>  authorize the DBMS connection as user <user> instead of the
+                    default.
+
+ -d, --debug    display progress and query time information
+ -h, --help     display help and exit
+ -v, --version  display version and exit
+EOF
+}
+
+
+set -o nounset
+
+export PGHOST
+export PGPORT
+export PGUSER
+
+readonly Version=1
+readonly ExecPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecPath")
+readonly LdapHost=ldap.iplantcollaborative.org
+
+Debug=false
+
+
+main()
+{
+  local opts
+  if ! opts=$(prep_opts "$@")
+  then
+    show_help >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -d|--debug)
+        Debug=true
+        shift
+        ;;
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      -H|--host)
+        PGHOST="$2"
+        shift 2
+        ;;
+      -P|--port)
+        PGPORT="$2"
+        shift 2
+        ;;
+      -U|--user)
+        PGUSER="$2"
+        shift 2
+        ;;
+      -v|--version)
+        show_version
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
+  report_total
+}
+
+
+prep_opts()
+{
+  getopt \
+    --longoptions debug,help,host:,port:,user:,version \
+    --options dhH:P:U:v \
+    --name "$ExecName" \
+    -- \
+    "$@"
+}
+
+
+show_version()
+{
+  printf '%s\n' "$Version"
+}
+
+
+report_total()
+{
+  psql --quiet ICAT \
+<<SQL
+  \\pset footer off
+  $(inject_debug_stmt \\timing on)
+  $(inject_debug_quiet off)
+
+  BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+  $(inject_debug_msg identifying users)
+  CREATE TEMPORARY TABLE users(id, home_coll, trash_coll) ON COMMIT DROP AS
+  SELECT user_id, '/iplant/home/' || user_name, '/iplant/trash/home/' || user_name
+    FROM r_user_main
+    WHERE user_name NOT IN ($(inject_staff))
+      AND user_name NOT IN ('anonymous', 'bisque', 'coge', 'sernec')
+      AND user_type_name = 'rodsuser';
+
+  CREATE INDEX users_id ON users(id);
+  CREATE INDEX users_home ON users(home_coll);
+  CREATE INDEX users_trash ON users(trash_coll);
+
+  $(inject_debug_msg identifying user collections)
+  CREATE TEMPORARY TABLE colls(coll_id, owner_id) ON COMMIT DROP AS
+  WITH RECURSIVE user_colls(coll_id, coll_name, owner_id) AS (
+    SELECT c.coll_id, c.coll_name, u.id
+      FROM r_coll_main AS c
+        JOIN users AS u ON u.home_coll = c.coll_name OR u.trash_coll = c.coll_name
+    UNION SELECT c.coll_id, c.coll_name, p.owner_id
+      FROM r_coll_main AS c JOIN user_colls AS p ON c.parent_coll_name = p.coll_name)
+  SELECT coll_id, owner_id FROM user_colls;
+
+  CREATE INDEX colls_id ON colls(coll_id);
+  CREATE INDEX colls_owner ON colls(owner_id);
+
+  $(inject_debug_msg identifying user data objects)
+  CREATE TEMPORARY TABLE files(data_id, owner_id, size) ON COMMIT DROP AS
+  SELECT d.data_id, c.owner_id, AVG(d.data_size)
+    FROM colls AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
+    GROUP BY d.data_id, c.owner_id;
+
+  CREATE INDEX files_id ON files(data_id);
+  CREATE INDEX files_owner ON files(owner_id);
+
+  $(inject_debug_msg collecting all user permissions)
+  CREATE TEMPORARY TABLE access(object_id, user_id) ON COMMIT DROP AS
+  SELECT DISTINCT o.object_id, o.user_id
+    FROM r_objt_access AS o JOIN users AS u ON u.id = o.user_id
+  UNION SELECT DISTINCT o.object_id, o.user_id
+    FROM r_objt_access AS o JOIN r_user_main AS u ON u.user_id = o.user_id
+    WHERE u.user_name IN ('anonymous', 'public');
+
+  CREATE INDEX access_object_id ON access(object_id);
+  CREATE INDEX access_user_id ON access(user_id);
+
+  $(inject_debug_msg identifying shared user data objects)
+  CREATE TEMPORARY TABLE shared_files(data_id, size) ON COMMIT DROP AS
+  SELECT DISTINCT f.data_id, f.size
+    FROM files AS f JOIN access AS a ON a.object_id = f.data_id
+    WHERE a.user_id != f.owner_id;
+
+  \\echo
+
+  $(inject_debug_newline)
+  $(inject_set_title User Shared Data Objects)
+  SELECT COUNT(*) AS "Count", ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3) AS "Volume (TiB)"
+    FROM shared_files;
+
+  $(inject_debug_newline)
+  $(inject_debug_newline)
+  ROLLBACK;
+SQL
+}
+
+
+inject_debug_msg()
+{
+  local msg="$*"
+
+  inject_debug_newline
+  inject_debug_stmt "\echo '$msg'"
+}
+
+
+inject_debug_newline()
+{
+  inject_debug_stmt \\echo
+}
+
+
+inject_debug_quiet()
+{
+  local state="$1"
+
+  inject_debug_stmt \\set QUIET "$state"
+}
+
+
+inject_debug_stmt()
+{
+  local stmt="$*"
+
+  if [[ "$Debug" == true ]]
+  then
+    printf '%s\n' "$stmt"
+  fi
+}
+
+
+inject_set_title()
+{
+  local title="$*"
+
+  inject_debug_quiet on
+  printf '\pset title '\''%s'\''\n' "$title"
+  inject_debug_quiet off
+}
+
+
+inject_staff()
+{
+  local search_base="ou=Groups,dc=iplantcollaborative,dc=org"
+  local search_term="(|(cn=staff)(cn=tracker-devuser)(cn=dev))"
+
+  ldapsearch -s sub -xh "$LdapHost" -b "$search_base" "$search_term" | format_staff
+}
+
+
+format_staff()
+{
+  awk --file - <(cat) \
+<<'EOF'
+  BEGIN {
+    ORS="";
+    count=0;
+  }
+
+
+  $1 == "memberUid:" {
+    if (count > 0) {
+      printf ","
+    }
+
+    printf "'%s'", $2;
+    count++;
+  }
+EOF
+}
+
+
+main "$@"
