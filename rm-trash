@@ -81,7 +81,6 @@ dump_logs()
     > "$trashList"
 
   local delTot
-
   delTot=$(wc --lines < "$trashList")
   printf '%d data objects to delete\n' "$delTot"
 
@@ -89,8 +88,10 @@ dump_logs()
 
   # Remove the empty trash collections
   printf 'Retrieving home collections to prune...\n'
+
   quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/home'" > "$trashList"
   quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/iplant/trash/orphan'" >> "$trashList"
+
   delTot=$(wc --lines < "$trashList")
   printf '%d home collections to prune\n' "$delTot"
 
@@ -119,6 +120,7 @@ prune_children()
 
   local childList
   childList=$(mk_temp "$trashTempFiles")
+
   quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '$parent'" > "$childList"
 
   while read -r collection
