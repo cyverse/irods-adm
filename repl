@@ -82,7 +82,7 @@ main()
       -- \
       "$@")
   local ret="$?"
-  if [ "$ret" -ne 0 ]
+  if [[ "$ret" -ne 0 ]]
   then
     exit_with_help
   fi
@@ -152,14 +152,14 @@ main()
     esac
   done
 
-  if [ "$#" -lt 1 ]
+  if [[ "$#" -lt 1 ]]
   then
     exit_with_help
   fi
 
   DEST_RESC="$1"
 
-  if [ -n "$procMult" ]
+  if [[ -n "$procMult" ]]
   then
     if ! [[ "$procMult" =~ ^[1-9][0-9]* ]]
     then
@@ -171,7 +171,7 @@ main()
     fi
   fi
 
-  if [ -n "$stopTime" ]
+  if [[ -n "$stopTime" ]]
   then
     if ! UNTIL_TS=$(date --date="$stopTime" '+%s')
     then
@@ -216,7 +216,7 @@ main()
   maxCreateTime=$(date --date "$maxCreateDate" '+%s')
 
   local resCond
-  if [ -n "$srcRes" ]
+  if [[ -n "$srcRes" ]]
   then
     resCond="d.resc_name = '$srcRes'"
   else
@@ -224,7 +224,7 @@ main()
   fi
 
   local baseCond
-  if [ -n "$baseColl" ]
+  if [[ -n "$baseColl" ]]
   then
     baseCond="c.coll_name = '$baseColl' OR c.coll_name LIKE '$baseColl/%'"
   else
@@ -244,9 +244,9 @@ main()
   tot=$(count < "$objList")
   printf '%d data objects to replicate\n' "$tot" >&2
 
-  if [ "$tot" -gt 0 ]
+  if [[ "$tot" -gt 0 ]]
   then
-    if [ -z "$SERIAL" ]
+    if [[ -z "$SERIAL" ]]
     then
       local cnt=0
       cnt=$(select_cohort "$cnt" "$tot" "$procMult"  1   2 15    < "$objList")  # 1 16-threaded
@@ -278,7 +278,7 @@ exit_with_help()
 
 CHECK_TIME()
 {
-  if [ -n "$UNTIL_TS" ] && [ "$(date '+%s')" -ge "$UNTIL_TS" ]
+  if [[ -n "$UNTIL_TS" ]] && [[ "$(date '+%s')" -ge "$UNTIL_TS" ]]
   then
     return 1
   fi
@@ -295,7 +295,7 @@ REPL_BATCH()
 
   local maxThreads=16
 
-  if [ "$SERIAL" ]
+  if [[ "$SERIAL" ]]
   then
     maxThreads=0
   fi
@@ -309,7 +309,7 @@ REPL_BATCH()
 # TODO: Once this is confirmed, if this status is returned, this function should
 # wait for a bit and try again.
   local replStatus="$?"
-  if [ "$replStatus" -ne 0 ]
+  if [[ "$replStatus" -ne 0 ]]
   then
     printf 'repl: irepl exited with status %d\n' "$replStatus" >&2
   fi
@@ -351,12 +351,12 @@ partition()
   local minSizeB="$1"
 
   local maxSizeB=
-  if [ "$#" -ge 2 ]
+  if [[ "$#" -ge 2 ]]
   then
     maxSizeB="$2"
   fi
 
-  if [ -n "$maxSizeB" ]
+  if [[ -n "$maxSizeB" ]]
   then
     awk --assign min="$minSizeB" --assign max="$maxSizeB" \
         'BEGIN {
@@ -454,7 +454,7 @@ select_cohort()
   local minThreads="$6"
 
   local maxThreads=
-  if [ "$#" -ge 7 ]
+  if [[ "$#" -ge 7 ]]
   then
     maxThreads="$7"
   fi
@@ -471,7 +471,7 @@ select_cohort()
   cohortList=$(mktemp)
 
   local maxSizeMiB=
-  if [ -n "$maxThreads" ]
+  if [[ -n "$maxThreads" ]]
   then
     maxSizeMiB=$((maxThreads * 32))
 
@@ -485,7 +485,7 @@ select_cohort()
   local subTotal
   subTotal=$(count <"$cohortList")
 
-  if [ -n "$maxSizeMiB" ]
+  if [[ -n "$maxSizeMiB" ]]
   then
     printf 'Replicating %s files with size in [%s, %s) MiB\n' \
            "$subTotal" "$minSizeMiB" "$maxSizeMiB" \
@@ -494,7 +494,7 @@ select_cohort()
     printf 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
   fi
 
-  if [ "$subTotal" -gt 0 ]
+  if [[ "$subTotal" -gt 0 ]]
   then
     maxProcs=$((maxProcs * procMult))
 
