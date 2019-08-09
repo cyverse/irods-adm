@@ -1,5 +1,42 @@
 #!/bin/bash
 
+show_help()
+{
+  # shellcheck disable=SC2006
+  cat \
+<<EOF
+
+$ExecName version $Version
+
+Usage:
+ $ExecName [options] <irods_server>
+
+Downloads iRODS log entries from <irods_server>
+
+Parameters:
+ <irods_server>  the iRODS server containing the log files
+
+Options:
+ -E, --extension-pattern  A globbing pattern applied to the log files'
+                          extension. Only entries from the matching files will
+                          be downloaded.
+ -P, --password           A password, if any, the user needs to execute sudo on
+                          <irods_server>.
+
+ -h, --help     show help and exit
+ -v, --version  show version and exit
+
+Summary:
+This program downloads all of the log entries from <irods_server>. The set of
+log files may be restricted to those with certain file extensions. Each entry is
+formatted by `format-log-entries`.
+
+The program first connects to the server as the current user. Once on the server,
+it uses sudo to inspect the log file. If sudo will request a password, it should
+be provided using the appropriate command line option.
+EOF
+}
+
 
 set -o nounset
 
@@ -15,7 +52,7 @@ main()
   local opts
   if ! opts=$(format_opts "$@")
   then
-    printf 'failed to parse options\n' >&2
+    show_help >&2
     return 1
   fi
 
@@ -31,6 +68,10 @@ main()
         extPat="$2"
         shift 2
         ;;
+      -h|--help)
+        show_help
+        return 0
+        ;;
       -P|--password)
         password="$2"
         shift 2
@@ -44,7 +85,7 @@ main()
         break
         ;;
       *)
-        printf 'unknown option, %s\n' "$1" >&2
+        show_help >&2
         return 1
         ;;
     esac
@@ -52,7 +93,7 @@ main()
 
   if [[ "$#" -lt 1 ]]
   then
-    printf 'The name of the iRODS server is required\n' >&2
+    show_help >&2
     return 1
   fi
 
@@ -64,7 +105,11 @@ main()
 
 format_opts()
 {
-  getopt --longoptions extension-pattern:,password:,version --options E:P:v --name "$ExecName" -- \
+  getopt \
+    --longoptions extension-pattern:help,password:,version \
+    --options E:hP:v \
+    --name "$ExecName" \
+    -- \
     "$@"
 }
 
