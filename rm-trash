@@ -98,6 +98,7 @@ dump_logs()
   delTot=$(wc --lines < "$trashList")
   printf '%d home collections to prune\n' "$delTot"
 
+  local parent
   while read -r parent
   do
     printf 'Pruning %s...\n' "$parent"
@@ -126,6 +127,7 @@ prune_children()
 
   quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '$parent'" > "$childList"
 
+  local collection
   while read -r collection
   do
     prune_collection "$trashTempFiles" "$collection"
@@ -183,6 +185,8 @@ truncate_by_time()
 {
   local upperBound="$1"
 
+  local dataObj
+  local modifyTs
   while read -r modifyTs dataObj
   do
     if [ "$modifyTs" -ge "$upperBound" ]
