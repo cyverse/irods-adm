@@ -1,0 +1,317 @@
+#!/bin/bash
+# TODO document
+
+export PGHOST
+export PGUSER
+
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
+
+declare -a TmpFiles
+
+
+main()
+{
+  local opts
+  if ! opts=$(getopt --name "$ExecName" --longoptions host:,user: --options H:U: -- "$@")
+  then
+    printf 'failed to parse command line\n' >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  trap rm_temp_files EXIT
+
+  while true
+  do
+    case "$1" in
+      -H|--host)
+        PGHOST="$2"
+        shift 2
+        ;;
+      -U|--user)
+        PGUSER="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        printf 'Unknown option %s\n' "$1" >&2
+        return 1
+        ;;
+    esac
+  done
+
+  local msgs
+  msgs=$(mk_temp)
+  filter_msgs > "$msgs"
+
+  local addModMsgs
+  addModMsgs=$(mk_temp)
+  extract_addmod_msgs < "$msgs" | compact_addmod_msgs > "$addModMsgs"
+
+  local openMsgs
+  openMsgs=$(mk_temp)
+  extract_open_msgs < "$msgs" | csv_open_msgs > "$openMsgs"
+
+  local sizeMap
+  sizeMap=$(mk_temp)
+  csv_entity_size_map "$(date '+%Y-%m-%d %H:%M:%S')" < "$addModMsgs" > "$sizeMap"
+
+  mkfifo downloads
+  mkfifo uploads
+  TmpFiles+=(downloads uploads)
+
+  mk_uploads < "$addModMsgs" > uploads &
+  mk_downloads "$sizeMap" "$openMsgs" > downloads &
+  paste --delimiters=, uploads downloads | sponge /dev/stdout
+}
+
+
+mk_temp()
+{
+  TmpFiles+=($(mktemp))
+  printf '%s' "${TmpFiles[${#TmpFiles[@]} - 1]}"
+}
+
+
+rm_temp_files()
+{
+  xargs --no-run-if-empty rm --force <<<"${TmpFiles[@]}"
+}
+
+
+extract_addmod_msgs()
+{
+  awk --file - <(cat) \
+<<'EOF'
+  /"data-object\.(add|mod)"/ {
+    timestamp = $1 "." $2;
+
+    # Remove through message type, two blanks, and the leading quote
+    match($0, /"data-object\.(add|mod)"/);
+    offset = RSTART + RLENGTH + 3;
+    msg = gensub(/\\("|')/, "\\1", "g", substr($0, offset));
+
+    msg = substr(msg, 1, length(msg) - 1);  # remove trailing quote
+    msg = gensub(/\r/, "\\r", "g", msg);    # escape carriage returns
+
+    # Add timestamp to start of message and record separator before
+    print "\x1e{\"timestamp\":\"" timestamp "\"," substr(msg, 2);
+  }
+EOF
+
+  printf 'extract_addmod_msgs:  done\n' >&2
+}
+
+
+extract_open_msgs()
+{
+  awk --file - <(cat) \
+<<'EOF'
+  /"data-object\.open"/ {
+    # Remove through "data-object.open"m two blanks, and the leading quote
+    match($0, /"data-object\.open"/);
+    offset = RSTART + RLENGTH + 3;
+    msg = gensub(/\\("|')/, "\\1", "g", substr($0, offset));
+
+    # remove trailing quote
+    msg = substr(msg, 1, length(msg) - 1);
+
+    # escape carriage returns and prefix with record sep
+    printf "\x1e%s\n", gensub(/\r/, "\\r", "g", msg);
+  }
+EOF
+
+  printf 'extract_open_msgs:  done\n' >&2
+}
+
+
+filter_msgs()
+{
+  awk --file - <(cat) \
+<<'EOF'
+  $4 == "NOTICE:" && $5 == "execCmd:cmd/amqptopicsend.py" {
+    msg = gensub($3 " " $4 " ", "", 1, $0);
+
+    # Remove potential trailing garabage
+    print gensub(/[^\r]\\n.*/, "", 1, msg);
+  }
+EOF
+
+  printf 'filter_msgs:  done\n' >&2
+}
+
+
+compact_addmod_msgs()
+{
+  jq --compact-output --seq --from-file \
+<(cat <<'JQ'
+  if (.timestamp | not) or (.entity | not) or (.size | not) then
+    empty
+  else
+    { entity: .entity, timestamp: (.timestamp | split(".") | join(" ")),  size: .size }
+  end
+JQ
+)
+}
+
+
+csv_open_msgs()
+{
+  jq --raw-output --slurp --from-file \
+<(cat <<'JQ'
+  .[] |
+  if (.timestamp | not) or (.entity | not) then
+    empty
+  else
+    [ .entity, (.timestamp | split(".") | join(" ")) ]
+  end |
+  @csv
+JQ
+)
+}
+
+
+csv_entity_size_map()
+{
+  local lastStopTs="$1"
+
+  jq --raw-output --slurp --arg LAST_STOP_TS "$lastStopTs" --from-file \
+<(cat <<'JQ'
+  # removes all of the leading objects that have a size of s from an array
+  def ltrim_size(s):
+    def trim_rec: if .[0].size != s then . else (.[1:] | trim_rec) end;
+    if (length == 0) then [] else trim_rec end;
+
+  # removes all objects that have the same size as the previous object in
+  # an array
+  def del_seq_sizes:
+    def emit_keepers:
+      if (length == 0) then
+        empty
+      else
+        (first as $f |
+         ($f,
+          (.[1:] | ltrim_size($f.size) | emit_keepers)))
+      end;
+    [ emit_keepers ];
+
+  # Transforms size entry to to intervaled size entry
+  def to_interval(stop_ts):
+    { obj: .entity, start_ts: .timestamp, stop_ts: stop_ts, size: .size };
+
+  # Converts a size map to an intervaled size map
+  def intervals:
+    def emit_intervals(first_stop_ts):
+      if (length == 0) then
+        empty
+      else
+        ((first | to_interval(first_stop_ts)) as $f |
+         ($f,
+          (.[1:] | emit_intervals($f.start_ts))))
+      end;
+    reverse | [ emit_intervals($LAST_STOP_TS) ] | reverse;
+
+  group_by(.entity) |
+  map(sort_by(.timestamp) | del_seq_sizes | intervals) |
+  flatten |
+  .[] |
+  [ .obj, .start_ts, .stop_ts, .size ] |
+  @csv
+JQ
+)
+}
+
+
+mk_uploads()
+{
+  jq --raw-output --slurp --from-file \
+<(cat <<'JQ'
+  [ .[] | if (.size | not) then empty else .size end ] |
+  [ (. | length | tostring), (. | add | tostring) ] |
+  "Upload Count,Upload Volume(B)\n" + join(",")
+JQ
+)
+
+  printf 'mk_uploads:  done\n' >&2
+}
+
+
+mk_downloads()
+{
+  local sizeMapFile="$1"
+  local downloadsFile="$2"
+
+  printf 'Download Count,Download Volume(B)\n'
+  summarize_downloads "$sizeMapFile" "$downloadsFile"
+
+  printf 'mk_downloads:  done\n' >&2
+}
+
+
+summarize_downloads()
+{
+  local sizeMapFile="$1"
+  local downloadsFile="$2"
+
+  psql --quiet ICAT \
+<<SQL
+BEGIN;
+
+CREATE TEMPORARY TABLE size_map(
+    data_uuid CHAR(37),
+    start_time TIMESTAMP,
+    stop_time TIMESTAMP,
+    size BIGINT)
+  ON COMMIT DROP;
+
+COPY size_map FROM STDIN WITH (FORMAT CSV);
+$(cat "$sizeMapFile")
+\\.
+
+CREATE INDEX idx_size_map_data_uuid_time ON size_map(data_uuid, start_time, stop_time);
+
+
+CREATE TEMPORARY TABLE downloads(data_uuid CHAR(37), time TIMESTAMP) ON COMMIT DROP;
+
+COPY downloads FROM STDIN WITH (FORMAT CSV);
+$(cat "$downloadsFile")
+\\.
+
+CREATE INDEX idx_downloads_data_all ON downloads(data_uuid, time);
+
+
+CREATE TEMPORARY TABLE sized_downloads(data_uuid, time, size) ON COMMIT DROP AS
+SELECT d.data_uuid, d.time, s.size
+FROM downloads AS d
+  LEFT JOIN size_map AS s
+    ON s.data_uuid = d.data_uuid AND s.start_time <= d.time AND d.time < s.stop_time;
+
+
+CREATE TEMPORARY TABLE resolved_downloads(data_uuid, time, size) ON COMMIT DROP AS
+SELECT d.data_uuid, d.time, COALESCE(d.size, AVG(dm.data_size), 0)
+FROM sized_downloads AS d
+  LEFT JOIN r_meta_main AS mm
+    ON mm.meta_attr_name = 'ipc_UUID' AND mm.meta_attr_value = d.data_uuid
+  LEFT JOIN r_objt_metamap AS om ON om.meta_id = mm.meta_id
+  LEFT JOIN r_data_main AS dm ON dm.data_id = om.object_id
+GROUP BY d.data_uuid, d.time, d.size;
+
+
+COPY (SELECT COUNT(*), CAST(SUM(size) AS BIGINT) FROM resolved_downloads)
+TO STDOUT
+WITH (FORMAT CSV);
+
+
+ROLLBACK;
+SQL
+
+printf 'summarize_downloads:  done\n' >&2
+}
+
+
+main "$@"
