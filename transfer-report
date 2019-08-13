@@ -43,6 +43,7 @@ main()
     esac
   done
 
+
   make_report
 }
 
@@ -52,42 +53,42 @@ make_report()
   local msgs=tr-msg-entries
   if ! [[ -e "$msgs" ]]
   then
-    filter_msgs > "$msgs".tmp
+    track_call filter_msgs > "$msgs".tmp
     mv "$msgs".tmp "$msgs"
   fi
 
   local addModMsgs=tr-add-mod.json
   if ! [[ -e "$addModMsgs" ]]
   then
-    extract_addmod_msgs < "$msgs" | compact_addmod_msgs > "$addModMsgs".tmp
+    track_call extract_addmod_msgs < "$msgs" | compact_addmod_msgs > "$addModMsgs".tmp
     mv "$addModMsgs".tmp "$addModMsgs"
   fi
 
   local openMsgs=tr-opens.csv
   if ! [[ -e "$openMsgs" ]]
   then
-    extract_open_msgs < "$msgs" | csv_open_msgs > "$openMsgs".tmp
+    track_call extract_open_msgs < "$msgs" | csv_open_msgs > "$openMsgs".tmp
     mv "$openMsgs".tmp "$openMsgs"
   fi
 
   local sizeMap=tr-size-map.csv
   if ! [[ -e "$sizeMap" ]]
   then
-    csv_entity_size_map "$(date '+%Y-%m-%d %H:%M:%S')" < "$addModMsgs" > "$sizeMap".tmp
+    track_call csv_entity_size_map "$(date '+%Y-%m-%d %H:%M:%S')" < "$addModMsgs" > "$sizeMap".tmp
     mv "$sizeMap".tmp "$sizeMap"
   fi
 
   local uploads=tr-uploads.csv
   if ! [[ -e "$uploads" ]]
   then
-    mk_uploads < "$addModMsgs" > "$uploads".tmp
+    track_call mk_uploads < "$addModMsgs" > "$uploads".tmp
     mv "$uploads".tmp "$uploads"
   fi
 
   local downloads=tr-downloads.csv
   if ! [[ -e "$downloads" ]]
   then
-    mk_downloads "$sizeMap" "$openMsgs" > "$downloads".tmp
+    track_call mk_downloads "$sizeMap" "$openMsgs" > "$downloads".tmp
     mv "$downloads".tmp "$downloads"
   fi
 
@@ -99,6 +100,17 @@ make_report()
   fi
 
   cat "$report"
+}
+
+
+track_call()
+{
+  local func="$1"
+  local cmd="$*"
+
+  disp_begin_func "$func"
+  eval "$cmd"
+  disp_end_func "$func"
 }
 
 
@@ -121,8 +133,6 @@ extract_addmod_msgs()
     print "\x1e{\"timestamp\":\"" timestamp "\"," substr(msg, 2);
   }
 EOF
-
-  printf 'extract_addmod_msgs:  done\n' >&2
 }
 
 
@@ -143,8 +153,6 @@ extract_open_msgs()
     printf "\x1e%s\n", gensub(/\r/, "\\r", "g", msg);
   }
 EOF
-
-  printf 'extract_open_msgs:  done\n' >&2
 }
 
 
@@ -162,8 +170,6 @@ filter_msgs()
     print gensub(/\\x/, "\\u00", "g", msg);
   }
 EOF
-
-  printf 'filter_msgs: done\n' >&2
 }
 
 
@@ -180,8 +186,6 @@ compact_addmod_msgs()
   end
 JQ
       )
-
-  printf 'compact_addmod_msgs: done\n' >&2
 }
 
 
@@ -199,8 +203,6 @@ csv_open_msgs()
   @csv
 JQ
       )
-
-  printf 'csv_open_msgs: done\n' >&2
 }
 
 
@@ -255,8 +257,6 @@ csv_entity_size_map()
   @csv
 JQ
       )
-
-  printf 'csv_entity_size_map: done\n' >&2
 }
 
 
@@ -271,8 +271,6 @@ mk_uploads()
   "Upload Count,Upload Volume(B)\n" + join(",")
 JQ
       )
-
-  printf 'mk_uploads:  done\n' >&2
 }
 
 
@@ -282,9 +280,9 @@ mk_downloads()
   local downloadsFile="$2"
 
   printf 'Download Count,Download Volume(B)\n'
-  summarize_downloads "$sizeMapFile" "$downloadsFile" | tee >(tail --lines 4 | head --lines 1) >&2
-
-  printf 'mk_downloads:  done\n' >&2
+  summarize_downloads "$sizeMapFile" "$downloadsFile" \
+    | tee >(tail --lines 4 | head --lines 1) >(disp_dbms_prog) \
+    > /dev/null
 }
 
 
@@ -354,9 +352,68 @@ WITH (FORMAT CSV);
 
 ROLLBACK;
 SQL
-
-printf 'summarize_downloads:  done\n' >&2
 }
 
 
-main "$@"
+disp_begin_func()
+{
+  local func="$1"
+
+  printf '\e[32m%s: \e[1mbegin\e[0m' "$func" >&3
+}
+
+
+disp_end_func()
+{
+  local func="$1"
+
+  printf '\033[1K\r\e[32m%s: \e[1mdone\e[0m\n' "$func" >&3
+}
+
+
+disp_dbms_prog()
+{
+  printf '\n' >&3
+
+  while IFS= read -r
+  do
+    printf '  \e[32m%s\e[0m\n' "$REPLY" >&3
+  done
+}
+
+
+disp_error()
+{
+  while IFS= read -r
+  do
+    if [[ "$(get_cursor_col)" -gt 0 ]]
+    then
+      printf '\n'
+    fi
+
+    printf '\e[31m%s\e[0m\n' "$REPLY"
+  done >&2
+}
+
+
+get_cursor_col()
+{
+  # based on a script from http://invisible-island.net/xterm/xterm.faq.html
+  exec < /dev/tty
+
+  local oldStty
+  oldStty=$(stty -g)
+  stty raw -echo min 0
+
+  local pos
+  tput u7 > /dev/tty    # when TERM=xterm (and relatives)
+  IFS=';' read -r -d R -a pos
+
+  stty "$oldStty"
+
+  # change from one-based to zero based so they work with: tput cup $row $col
+  printf '%s' "$((pos[1] - 1))"
+}
+
+
+(main "$@" 3>&4 2>&1 1>&4 | disp_error) 4>&1
