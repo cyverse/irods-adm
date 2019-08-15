@@ -1,13 +1,12 @@
 #!/bin/bash
-# TODO document
+
+set -o errexit -o nounset -o pipefail
 
 export PGHOST
 export PGUSER
 
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
-
-declare -a TmpFiles
 
 
 main()
@@ -20,8 +19,6 @@ main()
   fi
 
   eval set -- "$opts"
-
-  trap rm_temp_files EXIT
 
   while true
   do
@@ -45,46 +42,100 @@ main()
     esac
   done
 
-  local msgs
-  msgs=$(mk_temp)
-  filter_msgs > "$msgs"
-
-  local addModMsgs
-  addModMsgs=$(mk_temp)
-  extract_addmod_msgs < "$msgs" | compact_addmod_msgs > "$addModMsgs"
-
-  local openMsgs
-  openMsgs=$(mk_temp)
-  extract_open_msgs < "$msgs" | csv_open_msgs > "$openMsgs"
-
-  local sizeMap
-  sizeMap=$(mk_temp)
-  csv_entity_size_map "$(date '+%Y-%m-%d %H:%M:%S')" < "$addModMsgs" > "$sizeMap"
-
-  mkfifo downloads
-  mkfifo uploads
-  TmpFiles+=(downloads uploads)
-
-  mk_uploads < "$addModMsgs" > uploads &
-  mk_downloads "$sizeMap" "$openMsgs" > downloads &
-  paste --delimiters=, uploads downloads | sponge /dev/stdout
+  make_report
 }
 
 
-mk_temp()
+make_report()
 {
-  TmpFiles+=($(mktemp))
-  printf '%s' "${TmpFiles[${#TmpFiles[@]} - 1]}"
+  local msgs=tr-msg-entries
+  ensure "$msgs" filter_msgs
+
+  local openMsgs=tr-opens.csv
+  ensure "$openMsgs" extract_open_msgs_csv < "$msgs"
+
+  local addModMsgs=tr-add-mod.json
+  ensure "$addModMsgs" extract_addmod_msgs < "$msgs"
+
+  local addModMsgDir=tr-add-mod
+  if ! [[ -e "$addModMsgDir" ]]
+  then
+    track_call bin_addmod_msgs "$addModMsgDir".tmp < "$addModMsgs"
+    mv "$addModMsgDir".tmp "$addModMsgDir"
+  fi
+
+  local sizeMap=tr-size-map.csv
+  ensure "$sizeMap" csv_entity_size_map_binned "$(date '+%Y-%m-%d %H:%M:%S')" "$addModMsgDir"
+
+  local uploads=tr-uploads.csv
+  ensure "$uploads" mk_uploads < "$addModMsgs"
+
+  local downloadsQuery=tr-downloads-query.sql
+  ensure "$downloadsQuery" mk_downloads_query "$sizeMap" "$openMsgs"
+
+  local downloads=tr-downloads.csv
+  ensure "$downloads" mk_downloads < "$downloadsQuery"
+
+  local report=tr-report.csv
+  ensure "$report" combine_reports "$uploads" "$downloads"
+
+  cat "$report"
 }
 
 
-rm_temp_files()
+ensure()
 {
-  xargs --no-run-if-empty rm --force <<<"${TmpFiles[@]}"
+  local product="$1"
+  shift
+
+  if ! [[ -e "$product" ]]
+  then
+    track_call "$@" > "$product".tmp
+    mv "$product".tmp "$product"
+  fi
+}
+
+
+track_call()
+{
+  local func="$1"
+
+  disp_begin_func "$func"
+  "$@"
+  disp_end_func "$func"
 }
 
 
 extract_addmod_msgs()
+{
+  filter_addmod_msgs | compact_addmod_msgs
+}
+
+
+extract_open_msgs_csv()
+{
+  filter_open_msgs | csv_open_msgs
+}
+
+
+filter_msgs()
+{
+  awk --file - <(cat) \
+<<'EOF'
+  $4 == "NOTICE:" && $5 == "execCmd:cmd/amqptopicsend.py" {
+    msg = gensub($3 " " $4 " ", "", 1, $0);
+
+    # Remove potential trailing garabage
+    msg = gensub(/[^\r]\\n.*/, "", 1, msg);
+
+    # switch to unicode escapes
+    print gensub(/\\\\x/, "\\\\\\\\u00", "g", msg);
+  }
+EOF
+}
+
+
+filter_addmod_msgs()
 {
   awk --file - <(cat) \
 <<'EOF'
@@ -103,12 +154,10 @@ extract_addmod_msgs()
     print "\x1e{\"timestamp\":\"" timestamp "\"," substr(msg, 2);
   }
 EOF
-
-  printf 'extract_addmod_msgs:  done\n' >&2
 }
 
 
-extract_open_msgs()
+filter_open_msgs()
 {
   awk --file - <(cat) \
 <<'EOF'
@@ -125,46 +174,43 @@ extract_open_msgs()
     printf "\x1e%s\n", gensub(/\r/, "\\r", "g", msg);
   }
 EOF
-
-  printf 'extract_open_msgs:  done\n' >&2
 }
 
 
-filter_msgs()
+bin_addmod_msgs()
 {
-  awk --file - <(cat) \
-<<'EOF'
-  $4 == "NOTICE:" && $5 == "execCmd:cmd/amqptopicsend.py" {
-    msg = gensub($3 " " $4 " ", "", 1, $0);
+  local binDir="$1"
 
-    # Remove potential trailing garabage
-    print gensub(/[^\r]\\n.*/, "", 1, msg);
-  }
-EOF
+  rm --force "$binDir"/*
+  mkdir --parents "$binDir"
 
-  printf 'filter_msgs:  done\n' >&2
+  local entry
+  while IFS= read -r entry
+  do
+    printf '%s\n' "$entry" >> "$addModMsgDir".tmp/"${entry:12:1}".json
+  done
 }
 
 
-compact_addmod_msgs()
+csv_entity_size_map_binned()
 {
-  jq --compact-output --seq --from-file \
-<(cat <<'JQ'
-  if (.timestamp | not) or (.entity | not) or (.size | not) then
-    empty
-  else
-    { entity: .entity, timestamp: (.timestamp | split(".") | join(" ")),  size: .size }
-  end
-JQ
-)
+  local endDate="$1"
+  local binDir="$2"
+
+  local part
+  for part in $(ls "$binDir"/*)
+  do
+    csv_entity_size_map "$endDate" < "$part"
+  done
 }
 
 
 csv_open_msgs()
 {
-  jq --raw-output --slurp --from-file \
-<(cat <<'JQ'
-  .[] |
+  jq \
+    --raw-output \
+    --from-file <(cat \
+<<'JQ'
   if (.timestamp | not) or (.entity | not) then
     empty
   else
@@ -172,7 +218,7 @@ csv_open_msgs()
   end |
   @csv
 JQ
-)
+      )
 }
 
 
@@ -180,8 +226,11 @@ csv_entity_size_map()
 {
   local lastStopTs="$1"
 
-  jq --raw-output --slurp --arg LAST_STOP_TS "$lastStopTs" --from-file \
-<(cat <<'JQ'
+  jq \
+    --raw-output --slurp \
+    --arg LAST_STOP_TS "$lastStopTs" \
+    --from-file <(cat \
+<<'JQ'
   # removes all of the leading objects that have a size of s from an array
   def ltrim_size(s):
     def trim_rec: if .[0].size != s then . else (.[1:] | trim_rec) end;
@@ -223,95 +272,179 @@ csv_entity_size_map()
   [ .obj, .start_ts, .stop_ts, .size ] |
   @csv
 JQ
-)
+      )
+}
+
+
+compact_addmod_msgs()
+{
+  jq \
+    --compact-output --seq \
+    --from-file <(cat \
+<<'JQ'
+  if (.timestamp | not) or (.entity | not) or (.size | not) then
+    empty
+  else
+    { entity: .entity, timestamp: (.timestamp | split(".") | join(" ")),  size: .size }
+  end
+JQ
+      )
+}
+
+
+mk_downloads_query()
+{
+  local sizeMapFile="$1"
+  local downloadsFile="$2"
+
+  cat \
+<<'SQL'
+  \timing on
+  BEGIN;
+
+  \echo 'Importing size mappings'
+  CREATE TEMPORARY TABLE size_map(
+      data_uuid CHAR(37),
+      start_time TIMESTAMP,
+      stop_time TIMESTAMP,
+      size BIGINT)
+    ON COMMIT DROP;
+
+  COPY size_map FROM STDIN WITH (FORMAT CSV);
+SQL
+
+  cat "$sizeMapFile"
+  echo '\.'
+
+  cat \
+<<'SQL'
+  CREATE INDEX idx_size_map_data_uuid_time ON size_map(data_uuid, start_time, stop_time);
+
+  \echo 'Importing download events'
+  CREATE TEMPORARY TABLE downloads(data_uuid CHAR(37), time TIMESTAMP) ON COMMIT DROP;
+
+  COPY downloads FROM STDIN WITH (FORMAT CSV);
+SQL
+
+  cat "$downloadsFile"
+  echo '\.'
+
+  cat \
+<<'SQL'
+  CREATE INDEX idx_downloads_data_all ON downloads(data_uuid, time);
+
+  \echo 'Resolving download sizes using size mappings'
+  CREATE TEMPORARY TABLE sized_downloads(data_uuid, count, size) ON COMMIT DROP AS
+  SELECT d.data_uuid, COUNT(*), s.size
+  FROM downloads AS d
+    LEFT JOIN size_map AS s
+      ON s.data_uuid = d.data_uuid AND s.start_time <= d.time AND d.time < s.stop_time
+  GROUP BY d.data_uuid, s.size;
+
+  CREATE INDEX idx_sized_downloads_uuid ON sized_downloads(data_uuid);
+  CREATE INDEX idx_sized_downloads_all ON sized_downloads(data_uuid, count, size);
+
+  \echo 'Resolving remaining download sizes using ICAT'
+  CREATE TEMPORARY TABLE resolved_downloads(data_uuid, count, size) ON COMMIT DROP AS
+  SELECT d.data_uuid, d.count, COALESCE(d.size, AVG(dm.data_size), 0)
+  FROM sized_downloads AS d
+    LEFT JOIN r_meta_main AS mm
+      ON mm.meta_attr_name = 'ipc_UUID' AND mm.meta_attr_value = d.data_uuid
+    LEFT JOIN r_objt_metamap AS om ON om.meta_id = mm.meta_id
+    LEFT JOIN r_data_main AS dm ON dm.data_id = om.object_id
+  GROUP BY d.data_uuid, d.count, d.size;
+
+  \echo 'Exporting summary'
+  COPY (SELECT SUM(count), CAST(SUM(count * size) AS BIGINT) FROM resolved_downloads)
+  TO STDOUT
+  WITH (FORMAT CSV);
+
+  ROLLBACK;
+SQL
 }
 
 
 mk_uploads()
 {
-  jq --raw-output --slurp --from-file \
-<(cat <<'JQ'
-  [ .[] | if (.size | not) then empty else .size end ] |
-  [ (. | length | tostring), (. | add | tostring) ] |
-  "Upload Count,Upload Volume(B)\n" + join(",")
-JQ
-)
-
-  printf 'mk_uploads:  done\n' >&2
+  printf 'Upload Count,Upload Volume(B)\n'
+  jq --raw-output '.size' | awk '{ c++; v+=$1 } END { printf "%d,%d\n", c, v }'
 }
 
 
 mk_downloads()
 {
-  local sizeMapFile="$1"
-  local downloadsFile="$2"
-
   printf 'Download Count,Download Volume(B)\n'
-  summarize_downloads "$sizeMapFile" "$downloadsFile"
-
-  printf 'mk_downloads:  done\n' >&2
+  psql ICAT | tee >(tail --lines 4 | head --lines 1) >(disp_dbms_prog) > /dev/null
 }
 
 
-summarize_downloads()
+combine_reports()
 {
-  local sizeMapFile="$1"
-  local downloadsFile="$2"
+  local uploads="$1"
+  local downloads="$2"
 
-  psql --quiet ICAT \
-<<SQL
-BEGIN;
-
-CREATE TEMPORARY TABLE size_map(
-    data_uuid CHAR(37),
-    start_time TIMESTAMP,
-    stop_time TIMESTAMP,
-    size BIGINT)
-  ON COMMIT DROP;
-
-COPY size_map FROM STDIN WITH (FORMAT CSV);
-$(cat "$sizeMapFile")
-\\.
-
-CREATE INDEX idx_size_map_data_uuid_time ON size_map(data_uuid, start_time, stop_time);
-
-
-CREATE TEMPORARY TABLE downloads(data_uuid CHAR(37), time TIMESTAMP) ON COMMIT DROP;
-
-COPY downloads FROM STDIN WITH (FORMAT CSV);
-$(cat "$downloadsFile")
-\\.
-
-CREATE INDEX idx_downloads_data_all ON downloads(data_uuid, time);
-
-
-CREATE TEMPORARY TABLE sized_downloads(data_uuid, time, size) ON COMMIT DROP AS
-SELECT d.data_uuid, d.time, s.size
-FROM downloads AS d
-  LEFT JOIN size_map AS s
-    ON s.data_uuid = d.data_uuid AND s.start_time <= d.time AND d.time < s.stop_time;
-
-
-CREATE TEMPORARY TABLE resolved_downloads(data_uuid, time, size) ON COMMIT DROP AS
-SELECT d.data_uuid, d.time, COALESCE(d.size, AVG(dm.data_size), 0)
-FROM sized_downloads AS d
-  LEFT JOIN r_meta_main AS mm
-    ON mm.meta_attr_name = 'ipc_UUID' AND mm.meta_attr_value = d.data_uuid
-  LEFT JOIN r_objt_metamap AS om ON om.meta_id = mm.meta_id
-  LEFT JOIN r_data_main AS dm ON dm.data_id = om.object_id
-GROUP BY d.data_uuid, d.time, d.size;
-
-
-COPY (SELECT COUNT(*), CAST(SUM(size) AS BIGINT) FROM resolved_downloads)
-TO STDOUT
-WITH (FORMAT CSV);
-
-
-ROLLBACK;
-SQL
-
-printf 'summarize_downloads:  done\n' >&2
+  paste --delimiters=, "$uploads" "$downloads"
 }
 
 
-main "$@"
+disp_begin_func()
+{
+  local func="$1"
+
+  printf '\e[32m%s: \e[1mbegin\e[0m' "$func" >&3
+}
+
+
+disp_end_func()
+{
+  local func="$1"
+
+  printf '\033[1K\r\e[32m%s: \e[1mdone\e[0m\n' "$func" >&3
+}
+
+
+disp_dbms_prog()
+{
+  printf '\n' >&3
+
+  while IFS= read -r
+  do
+    printf '  \e[32m%s\e[0m\n' "$REPLY" >&3
+  done
+}
+
+
+disp_error()
+{
+  while IFS= read -r
+  do
+    if [[ "$(get_cursor_col)" -gt 0 ]]
+    then
+      printf '\n'
+    fi
+
+    printf '\e[31m%s\e[0m\n' "$REPLY"
+  done >&2
+}
+
+
+get_cursor_col()
+{
+  # based on a script from http://invisible-island.net/xterm/xterm.faq.html
+  exec < /dev/tty
+
+  local oldStty
+  oldStty=$(stty -g)
+  stty raw -echo min 0
+
+  local col
+  echo -en "\033[6n" > /dev/tty
+  IFS=';' read -r -d R _ col
+
+  stty "$oldStty"
+
+  printf '%s' "$((col - 1))"
+}
+
+
+(main "$@" 3>&4 2>&1 1>&4 | disp_error) 4>&1

@@ -96,6 +96,9 @@ has been shared.
 The program `trash-report` can be used to generate a report on how much trash
 there is.
 
+The program `transfer-report` generates a report summarizing the amount of data
+uploaded and downloaded over a time period.
+
 
 ## Resources
 

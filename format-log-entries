@@ -2,6 +2,9 @@
 #
 # This program parses the lines from a iRODS log file into log entries.
 #
+# PARAMETERS:
+#  YEAR: The four digit year the log entries where recorded in
+#
 # This program reads from standard input and writes to standard output.
 #
 # Here's an example entry:

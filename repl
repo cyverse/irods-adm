@@ -201,7 +201,7 @@ main()
     exit 1
   fi
 
-  if ! CHECK_TIME
+  if ! CHECK_TIME "$UNTIL_TS"
   then
    printf 'Stop time is in the past\n' >&2
    exit 1
@@ -280,7 +280,7 @@ finish()
 {
   local objList="$1"
 
-  if ! CHECK_TIME
+  if ! CHECK_TIME "$UNTIL_TS"
   then
     printf 'out of time\n' >&2
   fi
@@ -416,7 +416,7 @@ select_cohort()
     maxThreads="$7"
   fi
 
-  if ! CHECK_TIME
+  if ! CHECK_TIME "$UNTIL_TS"
   then
     exit 0
   fi
@@ -455,7 +455,8 @@ select_cohort()
   then
     maxProcs=$((maxProcs * procMult))
 
-    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" REPL_BATCH \
+    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+          REPL_BATCH "$DEST_RESC" \
         < "$cohortList" \
         2>&"$Log" \
       | tee >(cat >&"$Log") \
@@ -470,7 +471,9 @@ select_cohort()
 
 CHECK_TIME()
 {
-  if [[ -n "$UNTIL_TS" ]] && [[ "$(date '+%s')" -ge "$UNTIL_TS" ]]
+  local untilTS="$1"
+
+  if [[ -n "$untilTS" ]] && [[ "$(date '+%s')" -ge "$untilTS" ]]
   then
     return 1
   fi
@@ -480,7 +483,10 @@ export -f CHECK_TIME
 
 REPL_BATCH()
 {
-  if ! CHECK_TIME
+  local destResc="$1"
+  shift
+
+  if ! CHECK_TIME "$UNTIL_TS"
   then
     exit 1
   fi
@@ -492,7 +498,7 @@ REPL_BATCH()
     maxThreads=0
   fi
 
-  irepl -B -M -T -v -N "$maxThreads" -R "$DEST_RESC" "$@"
+  irepl -B -M -T -v -N "$maxThreads" -R "$destResc" "$@"
 
 # XXX: Trying to figure out the irepl error code for when irepl logs a
 # '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably
