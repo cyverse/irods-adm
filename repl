@@ -455,7 +455,8 @@ select_cohort()
   then
     maxProcs=$((maxProcs * procMult))
 
-    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" REPL_BATCH \
+    parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+          REPL_BATCH "$DEST_RESC" \
         < "$cohortList" \
         2>&"$Log" \
       | tee >(cat >&"$Log") \
@@ -482,6 +483,9 @@ export -f CHECK_TIME
 
 REPL_BATCH()
 {
+  local destResc="$1"
+  shift
+
   if ! CHECK_TIME "$UNTIL_TS"
   then
     exit 1
@@ -494,7 +498,7 @@ REPL_BATCH()
     maxThreads=0
   fi
 
-  irepl -B -M -T -v -N "$maxThreads" -R "$DEST_RESC" "$@"
+  irepl -B -M -T -v -N "$maxThreads" -R "$destResc" "$@"
 
 # XXX: Trying to figure out the irepl error code for when irepl logs a
 # '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably
