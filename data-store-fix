@@ -24,6 +24,9 @@
 # describing what it is doing. It is not present by default.
 
 
+set -o pipefail
+
+
 main()
 {
   if [ "$#" -ge 1 ]
@@ -328,10 +331,70 @@ process_uuid_issue()
       printf '%s  ' "$uuidCntField"
       ;;
     *)
-      printf '%s✗ ' "$uuidCntField"
-      printf 'MULTIPLE UUIDS!! - %s\n' "$entity" >&2
+      if get_meta_id_uuid_map "$entityType" "$entity" | rm_extra_uuids "$entityType" "$entity"
+      then
+        printf '%s✓ ' "$uuidCntField"
+      else
+        printf '%s✗ ' "$uuidCntField"
+        printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
+      fi
       ;;
    esac
+}
+
+
+# Retrieve UUIDs for an entity sorted by the metdata's DB Ids
+get_meta_id_uuid_map()
+{
+  local entityType="$1"
+  local entityPath="$1"
+
+  local query
+  if [[ "$entityType" = coll ]]
+  then
+    query="select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
+           where META_COLL_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$entityPath'"
+  else
+    local collPath
+    collPath=$(dirname "$entityPath")
+
+    local objName
+    objName=$(basename "$entityPath")
+
+    query="select order(META_DATA_ATTR_ID), META_DATA_ATTR_VALUE
+           where META_DATA_ATTR_NAME = 'ipc_UUID'
+             and COLL_NAME = '$collPath'
+             and DATA_NAME = '$objName'"
+  fi
+
+  iquest --no-page '%s %s' "$query"
+}
+
+
+rm_extra_uuids()
+{
+  local entityType="$1"
+  local entityPath="$1"
+
+  local flag
+  if [ "$entityType" = coll ]
+  then
+    flag=-c
+  else
+    flag=-d
+  fi
+
+  local cnt=0
+
+  local uuid
+  while read -r _ uuid
+  do
+    # The first UUID created will have the first DB Id
+    if [[ $((++cnt)) -gt 1 ]]
+    then
+      imeta rm "$flag" "$entityPath" ipc_UUID "$uuid"
+    fi
+  done
 }
 
 
