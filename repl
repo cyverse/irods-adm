@@ -410,7 +410,7 @@ select_cohort()
   local minThreads="$7"
 
   local maxThreads=
-  if [[ "$#" -ge 7 ]]
+  if [[ "$#" -ge 8 ]]
   then
     maxThreads="$8"
   fi
