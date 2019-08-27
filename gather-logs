@@ -106,7 +106,7 @@ main()
 format_opts()
 {
   getopt \
-    --longoptions extension-pattern:help,password:,version \
+    --longoptions extension-pattern:,help,password:,version \
     --options E:hP:v \
     --name "$ExecName" \
     -- \
