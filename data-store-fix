@@ -24,7 +24,7 @@
 # describing what it is doing. It is not present by default.
 
 
-set -o pipefail
+set -o nounset -o pipefail
 
 
 main()
@@ -60,6 +60,8 @@ main()
   if [ "$#" -ge 5 ]
   then
     readonly DEBUG=1
+  else
+    readonly DEBUG=
   fi
 
   readonly ErrorLog=$(mktemp)
@@ -347,7 +349,7 @@ process_uuid_issue()
 get_meta_id_uuid_map()
 {
   local entityType="$1"
-  local entityPath="$1"
+  local entityPath="$2"
 
   local query
   if [[ "$entityType" = coll ]]
@@ -374,7 +376,7 @@ get_meta_id_uuid_map()
 rm_extra_uuids()
 {
   local entityType="$1"
-  local entityPath="$1"
+  local entityPath="$2"
 
   local flag
   if [ "$entityType" = coll ]
