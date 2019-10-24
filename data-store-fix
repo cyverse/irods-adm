@@ -349,7 +349,7 @@ process_uuid_issue()
 get_meta_id_uuid_map()
 {
   local entityType="$1"
-  local entityPath="$1"
+  local entityPath="$2"
 
   local query
   if [[ "$entityType" = coll ]]
@@ -376,7 +376,7 @@ get_meta_id_uuid_map()
 rm_extra_uuids()
 {
   local entityType="$1"
-  local entityPath="$1"
+  local entityPath="$2"
 
   local flag
   if [ "$entityType" = coll ]
