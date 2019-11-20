@@ -7,7 +7,7 @@ show_help()
 $ExecName version $Version
 
 Usage:
- $ExecName [options] SRC_FILE DEST_COLL
+ $ExecName [options] DEST-COLL
 
 This script measures upload throughput from the client running this script to
 the CyVerse Data Store. It uploads a 10 GiB file twenty times in a row, with
@@ -15,21 +15,22 @@ each upload being to a new data object. It generates the same output as
 \`iput -v\` would. The test results are written to stdout, while errors and
 status messages are written to stderr.
 
-Caution should be taken when choosing the name of the test file and the
-collection where the objects are uploaded. To ensure that the file to upload is
-10 GiB, it generates the file. If the file already exists, it overwrites the
-file. Likewise, to ensure that no overwrites occur in iRODS, the script deletes
-any files that would be overwritten before it performs the test.
+Caution should be taken when choosing the name of the the collection where the
+objects are uploaded. To ensure that no overwrites occur in iRODS, the script
+deletes any files that would be overwritten before it performs the test.
 
 It does its best to clean up after itself. It attempts to delete anything it
 creates with one caveat. If a parent collection has to be created during the
 creation of the destination collection, the parent collection is not deleted.
 
 Parameters:
- SRC_FILE   The name to use for the 10 GiB test file
- DEST_COLL  The name of the collection where the test file will be uploaded
+ DEST-COLL  The name of the collection where the test file will be uploaded
 
 Options:
+ -S, --src-dir SRC-DIR  the directory where the 10 GiB temporary test file will
+                        be generated. Defaults to the system default temporary
+                        directory.
+
  -h, --help     show help and exit
  -v, --version  show version and exit
 
@@ -52,16 +53,16 @@ set -o errexit -o nounset -o pipefail
 
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
-readonly Version=1
+readonly Version=2
 
 readonly ObjBase=upload
-readonly NumRuns=20
+readonly NumRuns=2
 
 
 main()
 {
   local opts
-  if ! opts=$(getopt --name "$ExecName" --longoptions help,version --options hv -- "$@")
+  if ! opts=$(getopt --name "$ExecName" --longoptions help,src-dir:,version --options hS:v -- "$@")
   then
     show_help >&2
     return 1
@@ -69,6 +70,7 @@ main()
 
   eval set -- "$opts"
 
+  local srcDir="$TMPDIR"
   local versionReq=0
   while true
   do
@@ -76,6 +78,10 @@ main()
       -h|--help)
         show_help
         return 0
+        ;;
+      -S|--src-dir)
+        srcDir="$2"
+        shift 2
         ;;
       -v|--version)
         versionReq=1
@@ -98,23 +104,27 @@ main()
     return 0
   fi
 
-  if [[ "$#" -lt 2 ]]
+  if [[ "$#" -lt 1 ]]
   then
-    # shellcheck disable=SC2016
     show_help >&2
     return 1
   fi
 
-  local testFile="$1"
-  local coll="$2"
-  do_test "$testFile" "$coll"
+  local coll="$1"
+  do_test "$srcDir" "$coll"
 }
 
 
 do_test()
 {
-  local testFile="$1"
+  local tmpDir="$1"
   local coll="$2"
+
+  local testFile
+  testFile=$(TMPDIR="$tmpDir" mktemp)
+
+  # shellcheck disable=SC2064
+  trap "rm --force '$testFile'" EXIT
 
   printf 'Ensuring 10 GiB test file %s exists\n' "$testFile" >&2
   if ! truncate --size 10GiB "$testFile"
@@ -123,9 +133,6 @@ do_test()
     printf 'Cannot continue test\n' >&2
     return 1
   fi
-
-  # shellcheck disable=SC2064
-  trap "rm --force '$testFile'" EXIT
 
   printf 'Ensuring destination collection %s exists\n' "$coll" >&2
   local createdColl
