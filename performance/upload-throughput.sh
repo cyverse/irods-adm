@@ -30,7 +30,8 @@ Parameters:
  DEST_COLL  The name of the collection where the test file will be uploaded
 
 Options:
- -h, --help  show help and exit
+ -h, --help     show help and exit
+ -v, --version  show version and exit
 
 Example:
 The following example uses a local file \`testFile\` that is temporarily stored
@@ -60,7 +61,7 @@ readonly NumRuns=20
 main()
 {
   local opts
-  if ! opts=$(getopt --name "$ExecName" --longoptions help --options h -- "$@")
+  if ! opts=$(getopt --name "$ExecName" --longoptions help,version --options hv -- "$@")
   then
     show_help >&2
     return 1
@@ -68,12 +69,17 @@ main()
 
   eval set -- "$opts"
 
+  local versionReq=0
   while true
   do
     case "$1" in
       -h|--help)
         show_help
         return 0
+        ;;
+      -v|--version)
+        versionReq=1
+        shift
         ;;
       --)
         shift
@@ -86,6 +92,12 @@ main()
     esac
   done
 
+  if [[ "$versionReq" -eq 1 ]]
+  then
+    printf '%s\n' "$Version"
+    return 0
+  fi
+
   if [[ "$#" -lt 2 ]]
   then
     # shellcheck disable=SC2016
@@ -93,6 +105,14 @@ main()
     return 1
   fi
 
+  local testFile="$1"
+  local coll="$2"
+  do_test "$testFile" "$coll"
+}
+
+
+do_test()
+{
   local testFile="$1"
   local coll="$2"
 
@@ -129,7 +149,14 @@ main()
   fi
 
   printf 'Beginning test\n' >&2
-  do_test "$testFile" "$coll"
+  local attempt
+  for attempt in $(seq "$NumRuns")
+  do
+    local obj
+    obj=$(mk_obj_path "$coll" "$attempt")
+
+    iput -v "$testFile" "$obj"
+  done
 
   printf 'Removing uploaded test data objects\n' >&2
   ensure_clean "$coll" >&2
@@ -139,24 +166,6 @@ main()
     printf 'Removing destination collection %s\n' "$coll" >&2
     irm -f -r "$coll" >&2
   fi
-
-  return 0
-}
-
-
-do_test()
-{
-  local testFile="$1"
-  local coll="$2"
-
-  local attempt
-  for attempt in $(seq "$NumRuns")
-  do
-    local obj
-    obj=$(mk_obj_path "$coll" "$attempt")
-
-    iput -v "$testFile" "$obj"
-  done
 }
 
 
