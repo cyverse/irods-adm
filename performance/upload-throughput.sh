@@ -47,7 +47,7 @@ EOF
 }
 
 
-set -o nounset 
+set -o errexit -o nounset -o pipefail
 
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
