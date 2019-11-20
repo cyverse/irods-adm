@@ -7,7 +7,7 @@ show_help()
 $ExecName version $Version
 
 Usage:
- $ExecName SRC_FILE DEST_COLL
+ $ExecName [options] SRC_FILE DEST_COLL
 
 This script measures upload throughput from the client running this script to
 the CyVerse Data Store. It uploads a 10 GiB file twenty times in a row, with
@@ -29,6 +29,9 @@ Parameters:
  SRC_FILE   The name to use for the 10 GiB test file
  DEST_COLL  The name of the collection where the test file will be uploaded
 
+Options:
+ -h, --help  show help and exit
+
 Example:
 The following example uses a local file \`testFile\` that is temporarily stored
 in the user's home folder. It uploads the file into the collection
@@ -44,7 +47,7 @@ EOF
 }
 
 
-set -o nounset
+set -o nounset 
 
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
@@ -56,6 +59,33 @@ readonly NumRuns=20
 
 main()
 {
+  local opts
+  if ! opts=$(getopt --name "$ExecName" --longoptions help --options h -- "$@")
+  then
+    show_help >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
   if [[ "$#" -lt 2 ]]
   then
     # shellcheck disable=SC2016
