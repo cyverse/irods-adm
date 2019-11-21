@@ -11,9 +11,8 @@ Usage:
 
 This script measures upload throughput from the client running this script to
 the CyVerse Data Store. It uploads a 10 GiB file twenty times in a row, with
-each upload being to a new data object. It generates the same output as
-\`iput -v\` would. The test results are written to stdout, while errors and
-status messages are written to stderr.
+each upload being to a new data object. The test results are written to stdout,
+while errors and status messages are written to stderr.
 
 Options:
  -D, --dest-coll DEST-COLL  the name of the temporary collection where the test
@@ -26,6 +25,14 @@ Options:
  -h, --help     show help and exit
  -v, --version  show version and exit
 
+Output:
+It generates a TSV style output where each line has the following form.
+
+<run>\t10 GiB\t<duration> s\t<throughput> MiB/s
+
+Here "<run>" is the upload ordinal, "<duration>" is how the upload took in
+seconds, and "<throughput>" is the transfer rate in mebibytes per second.
+
 Example:
 The following example uses a local file \`testFile\` that is temporarily stored
 in the user's home folder. It uploads the file into the collection
@@ -35,7 +42,7 @@ file named \`upload-results\` stored in the user's home folder.
 
  iinit
  icd
- $ExecName | tee /dev/stderr > "\$HOME"/upload-results
+ $ExecName > "\$HOME"/upload-results
 EOF
 }
 
@@ -99,7 +106,7 @@ main()
     return 0
   fi
 
-  do_test "$srcDir" "$destColl"
+  do_test "$srcDir" "$destColl" | tee /dev/stderr | gen_report
 }
 
 
@@ -196,6 +203,22 @@ ensure_irods_sess()
       return 1
     fi
   fi
+}
+
+
+gen_report()
+{
+  local report=
+  local run=0
+
+  local size duration rate
+  while IFS=' |' read -r _ _ _ duration _ _ _ rate _
+  do
+    (( run++ ))
+    printf -v report '%s%d\t10 GiB\t%s s\t%s MiB/s\n' "$report" "$run" "$duration" "$rate"
+  done
+
+  printf '%s' "$report"
 }
 
 
