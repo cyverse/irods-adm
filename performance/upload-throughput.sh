@@ -99,13 +99,6 @@ main()
     return 0
   fi
 
-  # TODO verify iRODS session is initialized
-
-  if [[ -z "$destColl" ]]
-  then
-    destColl="$(ipwd)/upload-throughput-$(date --utc --iso-8601=seconds)"
-  fi
-
   do_test "$srcDir" "$destColl"
 }
 
@@ -121,6 +114,17 @@ do_test()
   local srcDir="$1"
   local destColl="$2"
 
+  if ! ensure_irods_sess
+  then
+    printf 'iRODS session not initialized\n' >&2
+    return 1
+  fi
+
+  if [[ -z "$destColl" ]]
+  then
+    destColl="$(ipwd)/upload-throughput-$(date --utc --iso-8601=seconds)"
+  fi
+
   local srcFile
   if ! srcFile=$(TMPDIR="$srcDir" mktemp)
   then
@@ -135,7 +139,6 @@ do_test()
   if ! truncate --size 10GiB "$srcFile"
   then
     printf 'Failed to create file\n' >&2
-    printf 'Cannot continue test\n' >&2
     return 1
   fi
 
@@ -143,7 +146,6 @@ do_test()
   if ! imkdir "$destColl"
   then
     printf 'Failed to create destination collection\n' >&2
-    printf 'Cannot continue test\n' >&2
     return 1
   fi
 
@@ -179,6 +181,21 @@ clean_up()
 
   printf 'Finished\n' >&2
   return 0
+}
+
+
+ensure_irods_sess()
+{
+  local authFile="$(ienv | sed --quiet 's/.*irods_authentication_file - //p')"
+
+  if [[ -z "$authFile" ]] || [[ ! -e "$authFile" ]]
+  then
+    if ! iinit
+    then
+      iexit full
+      return 1
+    fi
+  fi
 }
 
 
