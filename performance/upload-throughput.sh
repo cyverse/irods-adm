@@ -53,7 +53,7 @@ readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 readonly Version=2
 
-readonly NumRuns=20
+readonly NumRuns=3
 
 
 main()
@@ -210,16 +210,29 @@ gen_report()
 {
   local report=
   local run=0
+  local max min
 
   local size duration rate
   while IFS=' |' read -r _ _ _ duration _ _ _ rate _
   do
     (( run++ ))
     printf -v report '%s%d\t10 GiB\t%s s\t%s MiB/s\n' "$report" "$run" "$duration" "$rate"
+
+    if [[ "$run" -eq 1 ]]
+    then
+      min="$rate"
+      max="$rate"
+    else
+      if [[ $(bc <<<"$rate < $min") -eq 1 ]]; then min="$rate"; fi
+      if [[ $(bc <<<"$rate > $max") -eq 1 ]]; then max="$rate"; fi
+    fi
   done
+
+  printf -v report '%s\nrange: [%s, %s] MiB/s\n' "$report" "$min" "$max"
 
   printf '%s' "$report"
 }
+
 
 
 main "$@"
