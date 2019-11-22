@@ -208,9 +208,11 @@ ensure_irods_sess()
 
 gen_report()
 {
-  local report=
   local run=0
-  local max min
+  local totLnRate=0
+  local maxRate minRate
+
+  local report=
 
   local size duration rate
   while IFS=' |' read -r _ _ _ duration _ _ _ rate _
@@ -220,15 +222,21 @@ gen_report()
 
     if [[ "$run" -eq 1 ]]
     then
-      min="$rate"
-      max="$rate"
+      minRate="$rate"
+      maxRate="$rate"
     else
-      if [[ $(bc <<<"$rate < $min") -eq 1 ]]; then min="$rate"; fi
-      if [[ $(bc <<<"$rate > $max") -eq 1 ]]; then max="$rate"; fi
+      if [[ $(bc <<<"$rate < $minRate") -eq 1 ]]; then minRate="$rate"; fi
+      if [[ $(bc <<<"$rate > $maxRate") -eq 1 ]]; then maxRate="$rate"; fi
     fi
+
+    totLnRate=$(bc --mathlib <<<"$totLnRate + l($rate)")
   done
 
-  printf -v report '%s\nrange: [%s, %s] MiB/s\n' "$report" "$min" "$max"
+  local geoMeanRate
+  geoMeanRate=$(bc --mathlib <<<"scale=3; e($totLnRate / $run)")
+
+  printf -v report '%s\nthrougput range: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
+  printf -v report '%sgeometric mean: %s MiB/s\n' "$report" "$geoMeanRate"
 
   printf '%s' "$report"
 }
