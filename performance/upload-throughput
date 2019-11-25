@@ -53,7 +53,8 @@ readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 readonly Version=2
 
-readonly NumRuns=3
+# TODO change to 30
+readonly NumRuns=20
 
 
 main()
@@ -206,41 +207,83 @@ ensure_irods_sess()
 }
 
 
+# TODO once report format is correct, document format in help
 gen_report()
 {
-  local run=0
-  local totLnRate=0
-  local maxRate minRate
+  local rates=()
 
+  # TODO add heading to runs table report
   local report=
+  local run=0
 
   local size duration rate
   while IFS=' |' read -r _ _ _ duration _ _ _ rate _
   do
     (( run++ ))
     printf -v report '%s%d\t10 GiB\t%s s\t%s MiB/s\n' "$report" "$run" "$duration" "$rate"
-
-    if [[ "$run" -eq 1 ]]
-    then
-      minRate="$rate"
-      maxRate="$rate"
-    else
-      if [[ $(bc <<<"$rate < $minRate") -eq 1 ]]; then minRate="$rate"; fi
-      if [[ $(bc <<<"$rate > $maxRate") -eq 1 ]]; then maxRate="$rate"; fi
-    fi
-
-    totLnRate=$(bc --mathlib <<<"$totLnRate + l($rate)")
+    rates=(${rates[*]} $rate)
   done
 
-  local geoMeanRate
-  geoMeanRate=$(bc --mathlib <<<"scale=3; e($totLnRate / $run)")
+  local maxRate minRate
+  maxRate=$(compute_max ${rates[*]})
+  minRate=$(compute_min ${rates[*]})
 
+  local confLB confUB geoMeanRate geoStdRate
+  geoMeanRate=$(compute_geomean ${rates[*]})
+  geoStdRate=$(compute_geostd "$geoMeanRate" ${rates[*]})
+  confLB=$(dc --expression "3k $geoMeanRate $geoStdRate /p")
+  confUB=$(dc --expression "3k $geoMeanRate $geoStdRate *1/p")
+
+  # TODO clarify that this bounds the observed throughput
   printf -v report '%s\nthrougput range: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
-  printf -v report '%sgeometric mean: %s MiB/s\n' "$report" "$geoMeanRate"
+
+  # TODO change to expected throughput
+  printf -v report '%sgeometric mean: %s MiB/s\n' "$report" $(dc --expression "3k $geoMeanRate 1/p")
+  printf -v report \
+    '%sthroughput within [%s, %s] MiB/s 2/3 of the time\n' "$report" "$confLB" "$confUB"
 
   printf '%s' "$report"
 }
 
+compute_geomean()
+{
+  awk --file - <(printf '%s\n' "$@") <<'  EOF'
+    BEGIN { totLn = 0.0; }
+    { totLn += log($0); }
+    END { print exp(totLn / NR); }
+  EOF
+}
+
+
+compute_geostd()
+{
+  local geoMean="$1"
+  shift
+
+  awk --assign GEOMEAN="$geoMean" --file - <(printf '%s\n' "$@") <<'  EOF'
+    BEGIN { totSqrLnScaled = 0.0; }
+    { totSqrLnScaled += log($0 / GEOMEAN)^2 }
+    END { print exp(sqrt(totSqrLnScaled / NR)); }
+  EOF
+}
+
+compute_max()
+{
+  awk --file - <(printf '%s\n' "$@") <<'  EOF'
+    NR == 1 { max = $0; }
+    { if ($0 > max) { max = $0; } }
+    END { print max; }
+  EOF
+}
+
+compute_min()
+{
+  awk --file - <(printf '%s\n' "$@") <<'  EOF'
+    NR == 1 { min = $0; }
+    { if ($0 < min) { min = $0; } }
+    END { print min; }
+  EOF
+}
 
 
 main "$@"
