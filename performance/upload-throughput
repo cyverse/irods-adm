@@ -10,7 +10,7 @@ Usage:
  $ExecName [options]
 
 This script measures upload throughput from the client running this script to
-the CyVerse Data Store. It uploads a 10 GiB file twenty times in a row, with
+the CyVerse Data Store. It uploads a 10 GiB file thirty times in a row, with
 each upload being to a new data object. The test results are written to stdout,
 while errors and status messages are written to stderr.
 
@@ -53,8 +53,7 @@ readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 readonly Version=2
 
-# TODO change to 30
-readonly NumRuns=20
+readonly NumRuns=30
 
 
 main()
