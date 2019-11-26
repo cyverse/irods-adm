@@ -193,7 +193,8 @@ clean_up()
 
 ensure_irods_sess()
 {
-  local authFile="$(ienv | sed --quiet 's/.*irods_authentication_file - //p')"
+  local authFile
+  authFile="$(ienv | sed --quiet 's/.*irods_authentication_file - //p')"
 
   if [[ -z "$authFile" ]] || [[ ! -e "$authFile" ]]
   then
@@ -215,7 +216,7 @@ gen_report()
   local report=
   local run=0
 
-  local size duration rate
+  local duration rate
   while IFS=' |' read -r _ _ _ duration _ _ _ rate _
   do
     (( run++ ))
@@ -224,33 +225,36 @@ gen_report()
   done
 
   local maxRate minRate
-  maxRate=$(compute_max ${rates[*]})
-  minRate=$(compute_min ${rates[*]})
+  maxRate=$(compute_max "${rates[@]}")
+  minRate=$(compute_min "${rates[@]}")
 
-  local confLB confUB geoMeanRate geoStdRate
-  geoMeanRate=$(compute_geomean ${rates[*]})
-  geoStdRate=$(compute_geostd "$geoMeanRate" ${rates[*]})
-  confLB=$(dc --expression "3k $geoMeanRate $geoStdRate /p")
-  confUB=$(dc --expression "3k $geoMeanRate $geoStdRate *1/p")
+  local geoMeanRate geoStdRate
+  geoMeanRate=$(compute_geomean "${rates[@]}")
+  geoStdRate=$(compute_geostd "$geoMeanRate" "${rates[@]}")
+
+  local expectedRate likelyLB likelyUB
+  expectedRate=$(dc --expression "3k $geoMeanRate 1/p")
+  likelyLB=$(dc --expression "3k $geoMeanRate $geoStdRate /p")
+  likelyUB=$(dc --expression "3k $geoMeanRate $geoStdRate *1/p")
 
   # TODO clarify that this bounds the observed throughput
   printf -v report '%s\nthrougput range: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
 
   # TODO change to expected throughput
-  printf -v report '%sgeometric mean: %s MiB/s\n' "$report" $(dc --expression "3k $geoMeanRate 1/p")
+  printf -v report '%sgeometric mean: %s MiB/s\n' "$report" "$expectedRate"
   printf -v report \
-    '%sthroughput within [%s, %s] MiB/s 2/3 of the time\n' "$report" "$confLB" "$confUB"
+    '%sthroughput within [%s, %s] MiB/s 2/3 of the time\n' "$report" "$likelyLB" "$likelyUB"
 
   printf '%s' "$report"
 }
 
 compute_geomean()
 {
-  awk --file - <(printf '%s\n' "$@") <<'  EOF'
+  awk --file - <(printf '%s\n' "$@") <<'EOF'
     BEGIN { totLn = 0.0; }
     { totLn += log($0); }
     END { print exp(totLn / NR); }
-  EOF
+EOF
 }
 
 
@@ -259,29 +263,29 @@ compute_geostd()
   local geoMean="$1"
   shift
 
-  awk --assign GEOMEAN="$geoMean" --file - <(printf '%s\n' "$@") <<'  EOF'
+  awk --assign GEOMEAN="$geoMean" --file - <(printf '%s\n' "$@") <<'EOF'
     BEGIN { totSqrLnScaled = 0.0; }
     { totSqrLnScaled += log($0 / GEOMEAN)^2 }
     END { print exp(sqrt(totSqrLnScaled / NR)); }
-  EOF
+EOF
 }
 
 compute_max()
 {
-  awk --file - <(printf '%s\n' "$@") <<'  EOF'
+  awk --file - <(printf '%s\n' "$@") <<'EOF'
     NR == 1 { max = $0; }
     { if ($0 > max) { max = $0; } }
     END { print max; }
-  EOF
+EOF
 }
 
 compute_min()
 {
-  awk --file - <(printf '%s\n' "$@") <<'  EOF'
+  awk --file - <(printf '%s\n' "$@") <<'EOF'
     NR == 1 { min = $0; }
     { if ($0 < min) { min = $0; } }
     END { print min; }
-  EOF
+EOF
 }
 
 
