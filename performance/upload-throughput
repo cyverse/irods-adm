@@ -1,5 +1,7 @@
 #!/bin/bash
 
+
+# TODO document report format in help
 show_help()
 {
   cat <<EOF
@@ -11,8 +13,8 @@ Usage:
 
 This script measures upload throughput from the client running this script to
 the CyVerse Data Store. It uploads a 10 GiB file thirty times in a row, with
-each upload being to a new data object. The test results are written to stdout,
-while errors and status messages are written to stderr.
+each upload being to a new data object. A report is written to stdout, while
+errors and status messages are written to stderr.
 
 Options:
  -D, --dest-coll DEST-COLL  the name of the temporary collection where the test
@@ -26,23 +28,26 @@ Options:
  -v, --version  show version and exit
 
 Output:
-It generates a TSV style output where each line has the following form.
+It generates a report similar to the following.
 
-<run>\t10 GiB\t<duration> s\t<throughput> MiB/s
+$(tput bold)Upload Throughput Report
 
-Here "<run>" is the upload ordinal, "<duration>" is how the upload took in
-seconds, and "<throughput>" is the transfer rate in mebibytes per second.
+Runs
 
-Example:
-The following example uses a local file \`testFile\` that is temporarily stored
-in the user's home folder. It uploads the file into the collection
-\`UploadPerf\` under the client user's home collection. To keep track of the
-upload progress, it splits stdout so that it is written both to stderr and a
-file named \`upload-results\` stored in the user's home folder.
+Run   Duration (s)   Throughput (MiB/s)
+ 01    120.022           85.316
+ 02    119.380           85.775
+.
+.
+.
+ 30    119.912           85.394
 
- iinit
- icd
- $ExecName > "\$HOME"/upload-results
+Summary
+
+Bounds on measurements: [82.116, 85.775] MiB/s
+
+Expected throuphput:    85.121 MiB/s
+67% confidence bounds:  [84.427, 85.819] MiB/s$(tput normal)
 EOF
 }
 
@@ -54,6 +59,7 @@ readonly ExecName=$(basename "$ExecAbsPath")
 readonly Version=2
 
 readonly NumRuns=30
+readonly Size=10GiB
 
 
 main()
@@ -143,7 +149,7 @@ do_test()
   trap "clean_up '$srcFile' '$destColl'" EXIT
 
   printf 'Creating 10 GiB test file %s\n' "$srcFile" >&2
-  if ! truncate --size 10GiB "$srcFile"
+  if ! truncate --size "$Size" "$srcFile"
   then
     printf 'Failed to create file\n' >&2
     return 1
@@ -207,20 +213,21 @@ ensure_irods_sess()
 }
 
 
-# TODO once report format is correct, document format in help
 gen_report()
 {
-  local rates=()
+  local report
+  printf -v report 'Upload Throughput Report\n'
+  printf -v report '%s\nRuns\n' "$report"
+  printf -v report '%s\nRun   Duration (s)   Throughput (MiB/s)\n' "$report"
 
-  # TODO add heading to runs table report
-  local report=
+  local rates=()
   local run=0
 
   local duration rate
   while IFS=' |' read -r _ _ _ duration _ _ _ rate _
   do
     (( run++ ))
-    printf -v report '%s%d\t10 GiB\t%s s\t%s MiB/s\n' "$report" "$run" "$duration" "$rate"
+    printf -v report '%s %02d   %8s       %10s\n' "$report" "$run" "$duration" "$rate"
     rates=(${rates[*]} $rate)
   done
 
@@ -228,25 +235,24 @@ gen_report()
   maxRate=$(compute_max "${rates[@]}")
   minRate=$(compute_min "${rates[@]}")
 
-  local geoMeanRate geoStdRate
+  local geoMeanRate geoStd
   geoMeanRate=$(compute_geomean "${rates[@]}")
-  geoStdRate=$(compute_geostd "$geoMeanRate" "${rates[@]}")
+  geoStd=$(compute_geostd "$geoMeanRate" "${rates[@]}")
 
   local expectedRate likelyLB likelyUB
-  expectedRate=$(dc --expression "3k $geoMeanRate 1/p")
-  likelyLB=$(dc --expression "3k $geoMeanRate $geoStdRate /p")
-  likelyUB=$(dc --expression "3k $geoMeanRate $geoStdRate *1/p")
+  expectedRate=$(dc --expression "3 k $geoMeanRate 1 / p")
+  likelyLB=$(dc --expression "3 k $geoMeanRate $geoStd / p")
+  likelyUB=$(dc --expression "3 k $geoMeanRate $geoStd * 1 / p")
 
-  # TODO clarify that this bounds the observed throughput
-  printf -v report '%s\nthrougput range: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
-
-  # TODO change to expected throughput
-  printf -v report '%sgeometric mean: %s MiB/s\n' "$report" "$expectedRate"
+  printf -v report '%s\nSummary\n' "$report"
+  printf -v report '%s\nBounds on measurements: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
+  printf -v report '%s\nExpected throuphput:    %s MiB/s\n' "$report" "${expectedRate/#./0.}"
   printf -v report \
-    '%sthroughput within [%s, %s] MiB/s 2/3 of the time\n' "$report" "$likelyLB" "$likelyUB"
+    '%s67%% confidence bounds:  [%s, %s] MiB/s\n' "$report" "${likelyLB/#./0.}" "${likelyUB/#./0.}"
 
   printf '%s' "$report"
 }
+
 
 compute_geomean()
 {
@@ -265,7 +271,8 @@ compute_geostd()
 
   awk --assign GEOMEAN="$geoMean" --file - <(printf '%s\n' "$@") <<'EOF'
     BEGIN { totSqrLnScaled = 0.0; }
-    { totSqrLnScaled += log($0 / GEOMEAN)^2 }
+    GEOMEAN == 0 { totSqrLnScaled = +inf }
+    GEOMEAN != 0 { totSqrLnScaled += log($0 / GEOMEAN)^2 }
     END { print exp(sqrt(totSqrLnScaled / NR)); }
 EOF
 }
