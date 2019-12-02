@@ -51,7 +51,7 @@ EOF
 }
 
 
-set -o nounset
+set -o nounset -o pipefail
 
 readonly Version=2
 
