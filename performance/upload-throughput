@@ -1,0 +1,299 @@
+#!/bin/bash
+
+
+# TODO document report format in help
+show_help()
+{
+  cat <<EOF
+
+$ExecName version $Version
+
+Usage:
+ $ExecName [options]
+
+This script measures upload throughput from the client running this script to
+the CyVerse Data Store. It uploads a 10 GiB file thirty times in a row, with
+each upload being to a new data object. A report is written to stdout, while
+errors and status messages are written to stderr.
+
+Options:
+ -D, --dest-coll DEST-COLL  the name of the temporary collection where the test
+                            file will be repeatedly uploaded. Defaults to
+                            \`ipwd\`/upload-throughput-\`date -u -Iseconds\`.
+ -S, --src-dir SRC-DIR      the directory where the 10 GiB temporary test file
+                            will be generated. Defaults to the system default
+                            temporary directory.
+
+ -h, --help     show help and exit
+ -v, --version  show version and exit
+
+Output:
+It generates a report similar to the following.
+
+$(tput bold)Upload Throughput Report
+
+Runs
+
+Run   Duration (s)   Throughput (MiB/s)
+ 01    120.022           85.316
+ 02    119.380           85.775
+.
+.
+.
+ 30    119.912           85.394
+
+Summary
+
+Bounds on measurements: [82.116, 85.775] MiB/s
+
+Expected throuphput:    85.121 MiB/s
+67% confidence bounds:  [84.427, 85.819] MiB/s$(tput normal)
+EOF
+}
+
+
+set -o nounset -o pipefail
+
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
+readonly Version=2
+
+readonly NumRuns=30
+readonly Size=10GiB
+
+
+main()
+{
+  local opts
+  if ! opts=$(fmt_opts "$@")
+  then
+    show_help >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  local destColl=
+  local srcDir="${TMPDIR:-}"
+  local versionReq=0
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      -v|--version)
+        versionReq=1
+        shift
+        ;;
+      -D|--dest-coll)
+        destColl="$2"
+        shift 2
+        ;;
+      -S|--src-dir)
+        srcDir="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
+  if [[ "$versionReq" -eq 1 ]]
+  then
+    printf '%s\n' "$Version"
+    return 0
+  fi
+
+  do_test "$srcDir" "$destColl" | tee /dev/stderr | gen_report
+}
+
+
+fmt_opts()
+{
+  getopt --name "$ExecName" --longoptions help,version,dest-coll:,src-dir: --options hvD:S: -- "$@"
+}
+
+
+do_test()
+{
+  local srcDir="$1"
+  local destColl="$2"
+
+  if ! ensure_irods_sess
+  then
+    printf 'iRODS session not initialized\n' >&2
+    return 1
+  fi
+
+  if [[ -z "$destColl" ]]
+  then
+    destColl="$(ipwd)/upload-throughput-$(date --utc --iso-8601=seconds)"
+  fi
+
+  local srcFile
+  if ! srcFile=$(TMPDIR="$srcDir" mktemp)
+  then
+    printf 'Cannot reserve temporary file\n' >&2
+    return 1
+  fi
+
+  # shellcheck disable=SC2064
+  trap "clean_up '$srcFile' '$destColl'" EXIT
+
+  printf 'Creating 10 GiB test file %s\n' "$srcFile" >&2
+  if ! truncate --size "$Size" "$srcFile"
+  then
+    printf 'Failed to create file\n' >&2
+    return 1
+  fi
+
+  printf 'Creating destination collection %s\n' "$destColl" >&2
+  if ! imkdir "$destColl"
+  then
+    printf 'Failed to create destination collection\n' >&2
+    return 1
+  fi
+
+  printf 'Beginning test\n' >&2
+
+  local attempt
+  for attempt in $(seq "$NumRuns")
+  do
+    printf 'Uploading %s\n' "$attempt" >&2
+
+    local obj
+    printf -v obj '%s/upload-%02d' "$destColl" "$attempt"
+    iput -v "$srcFile" "$obj"
+  done
+
+  printf 'Finished test\n' >&2
+}
+
+
+clean_up()
+{
+  local testFile="$1"
+  local destColl="$2"
+
+  if ils "$destColl" &> /dev/null
+  then
+    printf 'Deleting destination collection %s\n' "$destColl" >&2
+    irm -f -r "$destColl"
+  fi
+
+  printf 'Deleting test file %s\n' "$testFile" >&2
+  rm --force "$testFile"
+
+  printf 'Finished\n' >&2
+  return 0
+}
+
+
+ensure_irods_sess()
+{
+  local authFile
+  authFile="$(ienv | sed --quiet 's/.*irods_authentication_file - //p')"
+
+  if [[ -z "$authFile" ]] || [[ ! -e "$authFile" ]]
+  then
+    if ! iinit
+    then
+      iexit full
+      return 1
+    fi
+  fi
+}
+
+
+gen_report()
+{
+  local report
+  printf -v report 'Upload Throughput Report\n'
+  printf -v report '%s\nRuns\n' "$report"
+  printf -v report '%s\nRun   Duration (s)   Throughput (MiB/s)\n' "$report"
+
+  local rates=()
+  local run=0
+
+  local duration rate
+  while IFS=' |' read -r _ _ _ duration _ _ _ rate _
+  do
+    (( run++ ))
+    printf -v report '%s %02d   %8s       %10s\n' "$report" "$run" "$duration" "$rate"
+    rates=(${rates[*]} $rate)
+  done
+
+  local maxRate minRate
+  maxRate=$(compute_max "${rates[@]}")
+  minRate=$(compute_min "${rates[@]}")
+
+  local geoMeanRate geoStd
+  geoMeanRate=$(compute_geomean "${rates[@]}")
+  geoStd=$(compute_geostd "$geoMeanRate" "${rates[@]}")
+
+  local expectedRate likelyLB likelyUB
+  expectedRate=$(dc --expression "3 k $geoMeanRate 1 / p")
+  likelyLB=$(dc --expression "3 k $geoMeanRate $geoStd / p")
+  likelyUB=$(dc --expression "3 k $geoMeanRate $geoStd * 1 / p")
+
+  printf -v report '%s\nSummary\n' "$report"
+  printf -v report '%s\nBounds on measurements: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
+  printf -v report '%s\nExpected throuphput:    %s MiB/s\n' "$report" "${expectedRate/#./0.}"
+  printf -v report \
+    '%s67%% confidence bounds:  [%s, %s] MiB/s\n' "$report" "${likelyLB/#./0.}" "${likelyUB/#./0.}"
+
+  printf '%s' "$report"
+}
+
+
+compute_geomean()
+{
+  awk --file - <(printf '%s\n' "$@") <<'EOF'
+    BEGIN { totLn = 0.0; }
+    { totLn += log($0); }
+    END { print exp(totLn / NR); }
+EOF
+}
+
+
+compute_geostd()
+{
+  local geoMean="$1"
+  shift
+
+  awk --assign GEOMEAN="$geoMean" --file - <(printf '%s\n' "$@") <<'EOF'
+    BEGIN { totSqrLnScaled = 0.0; }
+    GEOMEAN == 0 { totSqrLnScaled = +inf }
+    GEOMEAN != 0 { totSqrLnScaled += log($0 / GEOMEAN)^2 }
+    END { print exp(sqrt(totSqrLnScaled / NR)); }
+EOF
+}
+
+compute_max()
+{
+  awk --file - <(printf '%s\n' "$@") <<'EOF'
+    NR == 1 { max = $0; }
+    { if ($0 > max) { max = $0; } }
+    END { print max; }
+EOF
+}
+
+compute_min()
+{
+  awk --file - <(printf '%s\n' "$@") <<'EOF'
+    NR == 1 { min = $0; }
+    { if ($0 < min) { min = $0; } }
+    END { print min; }
+EOF
+}
+
+
+main "$@"
