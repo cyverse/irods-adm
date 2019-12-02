@@ -28,18 +28,18 @@ Options:
 
 Output:
 It generates a report similar to the following.
-
-$(tput bold)Upload Throughput Report
+$(tput bold)
+Upload Throughput Report
 
 Runs
 
-Run   Duration (s)   Throughput (MiB/s)
- 01    120.022           85.316
- 02    119.380           85.775
+Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
+ 01   2019-12-02T22:47:14        120.022           85.316
+ 02   2019-12-02T22:49:15        119.380           85.775
 .
 .
 .
- 30    119.912           85.394
+ 30   2019-12-02T23:46:29        119.912           85.394
 
 Summary
 
@@ -123,7 +123,12 @@ main()
 
 fmt_opts()
 {
-  getopt --name "$ExecName" --longoptions help,verbose.version,dest-coll:,src-dir: --options hVvD:S: -- "$@"
+  getopt \
+    --name "$ExecName" \
+    --longoptions help,verbose.version,dest-coll:,src-dir: \
+    --options hVvD:S: \
+    -- \
+    "$@"
 }
 
 
@@ -176,10 +181,23 @@ do_test()
 
     local obj
     printf -v obj '%s/upload-%02d' "$destColl" "$attempt"
-    iput -v "$srcFile" "$obj" | tee "$StatusLog"
+    perform_upload "$attempt" "$srcFile" "$obj" | tee "$StatusLog"
   done
 
   printf 'Finished test\n' > "$StatusLog"
+}
+
+
+perform_upload()
+{
+  local run="$1"
+  local src="$2"
+  local dest="$3"
+
+  local startTime duration rate
+  startTime=$(date --utc --iso-8601=seconds)
+  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
+  printf '%02d   %s   %s s   %s MiB/s\n' "$run" "$startTime" "$duration" "$rate"
 }
 
 
@@ -200,7 +218,6 @@ clean_up()
   printf 'Finished\n' > "$StatusLog"
   return 0
 }
-
 
 ensure_irods_sess()
 {
@@ -223,16 +240,16 @@ gen_report()
   local report
   printf -v report 'Upload Throughput Report\n'
   printf -v report '%s\nRuns\n' "$report"
-  printf -v report '%s\nRun   Duration (s)   Throughput (MiB/s)\n' "$report"
+  printf -v report '%s\nRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$report"
 
   local rates=()
-  local run=0
 
-  local duration rate
-  while IFS=' |' read -r _ _ _ duration _ _ _ rate _
+  local duration rate run startTime
+  while IFS=' ' read -r run startTime duration _ rate _
   do
-    (( run++ ))
-    printf -v report '%s %02d   %8s       %10s\n' "$report" "$run" "$duration" "$rate"
+    startTime="${startTime%+*}"
+    printf -v report \
+      '%s %02d   %s   %12s   %14s\n' "$report" "$run" "$startTime" "$duration" "$rate"
     rates=(${rates[*]} $rate)
   done
 
