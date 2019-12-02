@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-# TODO document report format in help
 show_help()
 {
   cat <<EOF
@@ -25,7 +23,8 @@ Options:
                             temporary directory.
 
  -h, --help     show help and exit
- -v, --version  show version and exit
+ -v, --verbose  output status messages
+ -V, --version  show version and exit
 
 Output:
 It generates a report similar to the following.
@@ -61,6 +60,8 @@ readonly Version=2
 readonly NumRuns=30
 readonly Size=10GiB
 
+StatusLog=/dev/null
+
 
 main()
 {
@@ -83,8 +84,12 @@ main()
         show_help
         return 0
         ;;
-      -v|--version)
+      -V|--version)
         versionReq=1
+        shift
+        ;;
+      -v|--verbose)
+        StatusLog=/dev/stderr
         shift
         ;;
       -D|--dest-coll)
@@ -112,13 +117,13 @@ main()
     return 0
   fi
 
-  do_test "$srcDir" "$destColl" | tee /dev/stderr | gen_report
+  do_test "$srcDir" "$destColl" | gen_report
 }
 
 
 fmt_opts()
 {
-  getopt --name "$ExecName" --longoptions help,version,dest-coll:,src-dir: --options hvD:S: -- "$@"
+  getopt --name "$ExecName" --longoptions help,verbose.version,dest-coll:,src-dir: --options hVvD:S: -- "$@"
 }
 
 
@@ -148,33 +153,33 @@ do_test()
   # shellcheck disable=SC2064
   trap "clean_up '$srcFile' '$destColl'" EXIT
 
-  printf 'Creating 10 GiB test file %s\n' "$srcFile" >&2
+  printf 'Creating 10 GiB test file %s\n' "$srcFile" > "$StatusLog"
   if ! truncate --size "$Size" "$srcFile"
   then
     printf 'Failed to create file\n' >&2
     return 1
   fi
 
-  printf 'Creating destination collection %s\n' "$destColl" >&2
+  printf 'Creating destination collection %s\n' "$destColl" > "$StatusLog"
   if ! imkdir "$destColl"
   then
     printf 'Failed to create destination collection\n' >&2
     return 1
   fi
 
-  printf 'Beginning test\n' >&2
+  printf 'Beginning test\n' > "$StatusLog"
 
   local attempt
   for attempt in $(seq "$NumRuns")
   do
-    printf 'Uploading %s\n' "$attempt" >&2
+    printf 'Uploading %s\n' "$attempt" > "$StatusLog"
 
     local obj
     printf -v obj '%s/upload-%02d' "$destColl" "$attempt"
-    iput -v "$srcFile" "$obj"
+    iput -v "$srcFile" "$obj" | tee "$StatusLog"
   done
 
-  printf 'Finished test\n' >&2
+  printf 'Finished test\n' > "$StatusLog"
 }
 
 
@@ -185,14 +190,14 @@ clean_up()
 
   if ils "$destColl" &> /dev/null
   then
-    printf 'Deleting destination collection %s\n' "$destColl" >&2
+    printf 'Deleting destination collection %s\n' "$destColl" > "$StatusLog"
     irm -f -r "$destColl"
   fi
 
-  printf 'Deleting test file %s\n' "$testFile" >&2
+  printf 'Deleting test file %s\n' "$testFile" > "$StatusLog"
   rm --force "$testFile"
 
-  printf 'Finished\n' >&2
+  printf 'Finished\n' > "$StatusLog"
   return 0
 }
 
