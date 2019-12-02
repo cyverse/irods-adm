@@ -46,7 +46,7 @@ Summary
 Bounds on measurements: [82.116, 85.775] MiB/s
 
 Expected throuphput:    85.121 MiB/s
-67% confidence bounds:  [84.427, 85.819] MiB/s$(tput normal)
+67% confidence bounds:  [84.427, 85.819] MiB/s$(tput sgr0)
 EOF
 }
 
