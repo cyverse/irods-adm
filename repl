@@ -568,8 +568,7 @@ REPL_BATCH()
 {
   local destResc="$1"
   local maxThreads="$2"
-
-  shift
+  shift 2
 
   if ! CHECK_TIME "$UNTIL_TS"
   then
