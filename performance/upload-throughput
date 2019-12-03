@@ -10,22 +10,24 @@ Usage:
  $ExecName [options]
 
 This script measures upload throughput from the client running this script to
-the CyVerse Data Store. It uploads a 10 GiB file thirty times in a row, with
-each upload being to a new data object. A report is written to stdout, while
-errors and status messages are written to stderr.
+the CyVerse Data Store. It uploads a file thirty times in a row, with each
+upload being to a new data object. A report is written to stdout, while errors
+and status messages are written to stderr.
 
 Options:
+ -s, --size FILE-SIZE       the size of the file with units in the form accepted
+                            by \`truncate\`, e.g., 2MiB gives a 2 mebibyte file.
+                            The default is 1GiB.
  -D, --dest-coll DEST-COLL  the name of the temporary collection where the test
                             file will be repeatedly uploaded. Defaults to
                             \`ipwd\`/upload-throughput-\`date -u -Iseconds\`.
- -L, --log REPORT-FILE      write report to REPORT-FILE instead of stdout.
  -S, --src-dir SRC-DIR      the directory where the 10 GiB temporary test file
                             will be generated. Defaults to the system default
                             temporary directory.
-
- -h, --help     show help and exit
- -v, --verbose  output status messages
- -V, --version  show version and exit
+ -L, --log REPORT-FILE      write report to REPORT-FILE instead of stdout.
+ -h, --help                 show help and exit
+ -V, --version              show version and exit
+ -v, --verbose              output status messages
 
 Output:
 It generates a report similar to the following.
@@ -33,6 +35,8 @@ $(tput bold)
 UPLOAD THROUGHPUT REPORT
 
 Execution Time:         2019-12-02T22:47:13+00:00
+File Size:              10GiB
+
 Estimated Throuphput:   85.121 MiB/s
 67% Confidence Bounds:  [84.427, 85.819] MiB/s
 
@@ -66,7 +70,6 @@ readonly ExecName=$(basename "$ExecAbsPath")
 readonly Version=2
 
 readonly NumRuns=30
-readonly Size=10GiB
 
 StatusLog=/dev/null
 ReportLog=/dev/stdout
@@ -83,6 +86,7 @@ main()
 
   eval set -- "$opts"
 
+  local size=1GiB
   local destColl=
   local srcDir="${TMPDIR:-}"
   local versionReq=
@@ -113,6 +117,10 @@ main()
         srcDir="$2"
         shift 2
         ;;
+      -s|--size)
+        size="$2"
+        shift 2
+        ;;
       --)
         shift
         break
@@ -128,8 +136,7 @@ main()
   then
     printf '%s\n' "$Version"
   else
-    local curTime="$(date --utc --iso-8601=seconds)"
-    do_test "$curTime" "$srcDir" "$destColl" | gen_report "$curTime" > "$ReportLog"
+    do_test "$size" "$srcDir" "$destColl"
   fi
 }
 
@@ -138,8 +145,8 @@ fmt_opts()
 {
   getopt \
     --name "$ExecName" \
-    --longoptions help,verbose.version,dest-coll:,log:,src-dir: \
-    --options hVvD:L:S: \
+    --longoptions help,verbose.version,dest-coll:,log:,size:,src-dir: \
+    --options hVvD:L:S:s: \
     -- \
     "$@"
 }
@@ -147,7 +154,7 @@ fmt_opts()
 
 do_test()
 {
-  local curTime="$1"
+  local size="$1"
   local srcDir="$2"
   local destColl="$3"
 
@@ -157,9 +164,11 @@ do_test()
     return 1
   fi
 
+  local testTime="$(date --utc --iso-8601=seconds)"
+
   if [[ -z "$destColl" ]]
   then
-    destColl="$(ipwd)/upload-throughput-$curTime"
+    destColl="$(ipwd)/upload-throughput-$testTime"
   fi
 
   local srcFile
@@ -172,8 +181,8 @@ do_test()
   # shellcheck disable=SC2064
   trap "clean_up '$srcFile' '$destColl'" EXIT
 
-  printf 'Creating 10 GiB test file %s\n' "$srcFile" >> "$StatusLog"
-  if ! truncate --size "$Size" "$srcFile"
+  printf 'Creating test file %s\n' "$srcFile" >> "$StatusLog"
+  if ! truncate --size "$size" "$srcFile"
   then
     printf 'Failed to create file\n' >&2
     return 1
@@ -196,7 +205,7 @@ do_test()
     local obj
     printf -v obj '%s/upload-%02d' "$destColl" "$attempt"
     perform_upload "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
-  done
+  done | gen_report "$testTime" "$size" > "$ReportLog"
 
   printf 'Finished test\n' >> "$StatusLog"
 }
@@ -252,6 +261,7 @@ ensure_irods_sess()
 gen_report()
 {
   local reportTime="$1"
+  local size="$2"
 
   local rates=()
 
@@ -289,15 +299,19 @@ gen_report()
   totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
   irodsVer=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
 
+  local reportSize
+  reportSize=$(sed 's/^\([0-9]*\)/\1 /' <<<"$size")
+
   local report
   printf -v report 'UPLOAD THROUGHPUT REPORT\n\n'
 
   printf -v report '%sExecution Time:         %s\n' "$report" "$reportTime"
+  printf -v report '%sFile Size:              %s\n\n' "$report" "$reportSize"
   printf -v report '%sEstimated Throuphput:   %s MiB/s\n' "$report" "${expectedRate/#./0.}"
-  printf -v report \
-    '%s67%% Confidence Bounds:  [%s, %s] MiB/s\n' "$report" "${likelyLB/#./0.}" "${likelyUB/#./0.}"
+  printf -v report '%s67%% Confidence Bounds:  [%s, %s] MiB/s\n\n' \
+    "$report" "${likelyLB/#./0.}" "${likelyUB/#./0.}"
 
-  printf -v report '%s\nBounds on Measurements: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
+  printf -v report '%sBounds on Measurements: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
 
   printf -v report '%s\n\nClient Information\n\n' "$report"
   printf -v report '%siCommands:  %s\n' "$report" "$irodsVer"
