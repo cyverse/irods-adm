@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-# TODO document report format in help
 show_help()
 {
   cat <<EOF
@@ -20,34 +18,36 @@ Options:
  -D, --dest-coll DEST-COLL  the name of the temporary collection where the test
                             file will be repeatedly uploaded. Defaults to
                             \`ipwd\`/upload-throughput-\`date -u -Iseconds\`.
+ -L, --log REPORT-FILE      write report to REPORT-FILE instead of stdout.
  -S, --src-dir SRC-DIR      the directory where the 10 GiB temporary test file
                             will be generated. Defaults to the system default
                             temporary directory.
 
  -h, --help     show help and exit
- -v, --version  show version and exit
+ -v, --verbose  output status messages
+ -V, --version  show version and exit
 
 Output:
 It generates a report similar to the following.
-
-$(tput bold)Upload Throughput Report
+$(tput bold)
+Upload Throughput Report
 
 Runs
 
-Run   Duration (s)   Throughput (MiB/s)
- 01    120.022           85.316
- 02    119.380           85.775
+Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
+ 01   2019-12-02T22:47:14        120.022           85.316
+ 02   2019-12-02T22:49:15        119.380           85.775
 .
 .
 .
- 30    119.912           85.394
+ 30   2019-12-02T23:46:29        119.912           85.394
 
 Summary
 
 Bounds on measurements: [82.116, 85.775] MiB/s
 
 Expected throuphput:    85.121 MiB/s
-67% confidence bounds:  [84.427, 85.819] MiB/s$(tput normal)
+67% confidence bounds:  [84.427, 85.819] MiB/s$(tput sgr0)
 EOF
 }
 
@@ -60,6 +60,9 @@ readonly Version=2
 
 readonly NumRuns=30
 readonly Size=10GiB
+
+StatusLog=/dev/null
+ReportLog=/dev/stdout
 
 
 main()
@@ -83,12 +86,20 @@ main()
         show_help
         return 0
         ;;
-      -v|--version)
+      -V|--version)
         versionReq=1
+        shift
+        ;;
+      -v|--verbose)
+        StatusLog=/dev/stderr
         shift
         ;;
       -D|--dest-coll)
         destColl="$2"
+        shift 2
+        ;;
+      -L|--log)
+        ReportLog="$2"
         shift 2
         ;;
       -S|--src-dir)
@@ -112,13 +123,18 @@ main()
     return 0
   fi
 
-  do_test "$srcDir" "$destColl" | tee /dev/stderr | gen_report
+  do_test "$srcDir" "$destColl" | gen_report > "$ReportLog"
 }
 
 
 fmt_opts()
 {
-  getopt --name "$ExecName" --longoptions help,version,dest-coll:,src-dir: --options hvD:S: -- "$@"
+  getopt \
+    --name "$ExecName" \
+    --longoptions help,verbose.version,dest-coll:,log:,src-dir: \
+    --options hVvD:L:S: \
+    -- \
+    "$@"
 }
 
 
@@ -148,33 +164,46 @@ do_test()
   # shellcheck disable=SC2064
   trap "clean_up '$srcFile' '$destColl'" EXIT
 
-  printf 'Creating 10 GiB test file %s\n' "$srcFile" >&2
+  printf 'Creating 10 GiB test file %s\n' "$srcFile" >> "$StatusLog"
   if ! truncate --size "$Size" "$srcFile"
   then
     printf 'Failed to create file\n' >&2
     return 1
   fi
 
-  printf 'Creating destination collection %s\n' "$destColl" >&2
+  printf 'Creating destination collection %s\n' "$destColl" >> "$StatusLog"
   if ! imkdir "$destColl"
   then
     printf 'Failed to create destination collection\n' >&2
     return 1
   fi
 
-  printf 'Beginning test\n' >&2
+  printf 'Beginning test\n' >> "$StatusLog"
 
   local attempt
   for attempt in $(seq "$NumRuns")
   do
-    printf 'Uploading %s\n' "$attempt" >&2
+    printf 'Uploading %s\n' "$attempt" >> "$StatusLog"
 
     local obj
     printf -v obj '%s/upload-%02d' "$destColl" "$attempt"
-    iput -v "$srcFile" "$obj"
+    perform_upload "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
   done
 
-  printf 'Finished test\n' >&2
+  printf 'Finished test\n' >> "$StatusLog"
+}
+
+
+perform_upload()
+{
+  local run="$1"
+  local src="$2"
+  local dest="$3"
+
+  local startTime duration rate
+  startTime=$(date --utc --iso-8601=seconds)
+  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
+  printf '%02d   %s   %s s   %s MiB/s\n' "$run" "$startTime" "$duration" "$rate"
 }
 
 
@@ -185,17 +214,16 @@ clean_up()
 
   if ils "$destColl" &> /dev/null
   then
-    printf 'Deleting destination collection %s\n' "$destColl" >&2
+    printf 'Deleting destination collection %s\n' "$destColl" >> "$StatusLog"
     irm -f -r "$destColl"
   fi
 
-  printf 'Deleting test file %s\n' "$testFile" >&2
+  printf 'Deleting test file %s\n' "$testFile" >> "$StatusLog"
   rm --force "$testFile"
 
-  printf 'Finished\n' >&2
+  printf 'Finished\n' >> "$StatusLog"
   return 0
 }
-
 
 ensure_irods_sess()
 {
@@ -218,16 +246,16 @@ gen_report()
   local report
   printf -v report 'Upload Throughput Report\n'
   printf -v report '%s\nRuns\n' "$report"
-  printf -v report '%s\nRun   Duration (s)   Throughput (MiB/s)\n' "$report"
+  printf -v report '%s\nRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$report"
 
   local rates=()
-  local run=0
 
-  local duration rate
-  while IFS=' |' read -r _ _ _ duration _ _ _ rate _
+  local duration rate run startTime
+  while IFS=' ' read -r run startTime duration _ rate _
   do
-    (( run++ ))
-    printf -v report '%s %02d   %8s       %10s\n' "$report" "$run" "$duration" "$rate"
+    startTime="${startTime%+*}"
+    printf -v report \
+      '%s %02d   %s   %12s   %14s\n' "$report" "$run" "$startTime" "$duration" "$rate"
     rates=(${rates[*]} $rate)
   done
 

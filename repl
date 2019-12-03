@@ -247,13 +247,23 @@ main()
     if [[ -z "$SERIAL" ]]
     then
       local cnt=0
+
+      # Medium sized file transfers
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  8 128  1  2 < "$objList")  # 8 2-threaded
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  6  72  2  3 < "$objList")  # 6 3-threaded
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  4  32  3  5 < "$objList")  # 4 4--5-threaded
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  3  18  5  7 < "$objList")  # 3 6--7-threaded
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  2   8  7 15 < "$objList")  # 2 8--15-threaded
+
+      # Small file transfers
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512  0  1 < "$objList")  # 16 1-threaded transfers
-      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  1   2 15    < "$objList")  # 1 16-threaded
+
+      # Large file transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"    480   1024 < "$objList")  # [480, 1024) MiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"   1024   8192 < "$objList")  # [1, 8) GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"   8192  65536 < "$objList")  # [8, 64) GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"  65536 524288 < "$objList")  # [64, 512) GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" 524288        < "$objList")  # >= 512 GiB transfers
     else
       select_cohort 0 "$tot" "$destResc" 16 2 0 < "$objList" > /dev/null
     fi
@@ -409,8 +419,11 @@ select_cohort()
   local maxArgs="$6"
   local minThreads="$7"
 
-  local maxThreads=
-  if [[ "$#" -ge 8 ]]
+  local maxThreads=16
+  if [[ "$SERIAL" ]]
+  then
+    maxThreads=0
+  elif [[ "$#" -ge 8 ]]
   then
     maxThreads="$8"
   fi
@@ -455,7 +468,78 @@ select_cohort()
     maxProcs=$((maxProcs * procMult))
 
     parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
-          REPL_BATCH "$destResc" \
+          REPL_BATCH "$destResc" "$maxThreads" \
+        < "$cohortList" \
+        2>&"$Log" \
+      | tee >(cat >&"$Log") \
+      | track_prog "$cnt" "$tot" "$subTotal"
+  else
+    printf '%s\n' "$cnt"
+  fi
+
+  rm --force "$cohortList"
+}
+
+
+# This is intended for large files. irepl will be run on at most two files at a
+# time.
+select_cohort_by_size()
+{
+  local cnt="$1"
+  local tot="$2"
+  local destResc="$3"
+  local procMult="$4"
+  local minSizeMiB="$5"
+
+  local maxSizeMiB=
+  if [[ "$#" -ge 6 ]]
+  then
+    maxSizeMiB="$6"
+  fi
+
+  local maxThreads=16
+  if [[ "$SERIAL" ]]
+  then
+    maxThreads=0
+  fi
+
+  if ! CHECK_TIME "$UNTIL_TS"
+  then
+    exit 0
+  fi
+
+  local minSizeB=$((minSizeMiB * 1024 ** 2))
+  local maxSizeB=$((maxSizeMiB * 1024 ** 2))
+
+  local cohortList
+  cohortList=$(mktemp)
+
+  if [[ -n "$maxSizeMiB" ]]
+  then
+    local maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
+    partition "$minSizeB" "$maxSizeB"
+  else
+    partition "$minSizeB"
+  fi > "$cohortList"
+
+  local subTotal
+  subTotal=$(count < "$cohortList")
+
+  if [[ -n "$maxSizeMiB" ]]
+  then
+    printf 'Replicating %s files with size in [%s, %s) MiB\n' \
+           "$subTotal" "$minSizeMiB" "$maxSizeMiB" \
+      >&2
+  else
+    printf 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
+  fi
+
+  if [[ "$subTotal" -gt 0 ]]
+  then
+    local maxProcs=$((1 * procMult))
+
+    parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
+          REPL_BATCH "$destResc" "$maxThreads" \
         < "$cohortList" \
         2>&"$Log" \
       | tee >(cat >&"$Log") \
@@ -483,18 +567,13 @@ export -f CHECK_TIME
 REPL_BATCH()
 {
   local destResc="$1"
+  local maxThreads="$2"
+
   shift
 
   if ! CHECK_TIME "$UNTIL_TS"
   then
     exit 1
-  fi
-
-  local maxThreads=16
-
-  if [[ "$SERIAL" ]]
-  then
-    maxThreads=0
   fi
 
   irepl -B -M -T -v -N "$maxThreads" -R "$destResc" "$@"
