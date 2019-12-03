@@ -30,7 +30,21 @@ Options:
 Output:
 It generates a report similar to the following.
 $(tput bold)
-Upload Throughput Report
+UPLOAD THROUGHPUT REPORT
+
+Execution Time:         2019-12-02T22:47:13+00:00
+Estimated Throuphput:   85.121 MiB/s
+67% Confidence Bounds:  [84.427, 85.819] MiB/s
+
+Bounds on Measurements: [82.116, 85.775] MiB/s
+
+
+Client Information
+
+iCommands:  rods4.1.10
+Memory:     16172752 kB
+Cores:      8
+
 
 Runs
 
@@ -40,14 +54,7 @@ Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
 .
 .
 .
- 30   2019-12-02T23:46:29        119.912           85.394
-
-Summary
-
-Bounds on measurements: [82.116, 85.775] MiB/s
-
-Expected throuphput:    85.121 MiB/s
-67% confidence bounds:  [84.427, 85.819] MiB/s$(tput sgr0)
+ 30   2019-12-02T23:46:29        119.912           85.394  $(tput sgr0)
 EOF
 }
 
@@ -78,7 +85,7 @@ main()
 
   local destColl=
   local srcDir="${TMPDIR:-}"
-  local versionReq=0
+  local versionReq=
   while true
   do
     case "$1" in
@@ -117,13 +124,13 @@ main()
     esac
   done
 
-  if [[ "$versionReq" -eq 1 ]]
+  if [[ -n "$versionReq" ]]
   then
     printf '%s\n' "$Version"
-    return 0
+  else
+    local curTime="$(date --utc --iso-8601=seconds)"
+    do_test "$curTime" "$srcDir" "$destColl" | gen_report "$curTime" > "$ReportLog"
   fi
-
-  do_test "$srcDir" "$destColl" | gen_report > "$ReportLog"
 }
 
 
@@ -140,8 +147,9 @@ fmt_opts()
 
 do_test()
 {
-  local srcDir="$1"
-  local destColl="$2"
+  local curTime="$1"
+  local srcDir="$2"
+  local destColl="$3"
 
   if ! ensure_irods_sess
   then
@@ -151,7 +159,7 @@ do_test()
 
   if [[ -z "$destColl" ]]
   then
-    destColl="$(ipwd)/upload-throughput-$(date --utc --iso-8601=seconds)"
+    destColl="$(ipwd)/upload-throughput-$curTime"
   fi
 
   local srcFile
@@ -243,20 +251,24 @@ ensure_irods_sess()
 
 gen_report()
 {
-  local report
-  printf -v report 'Upload Throughput Report\n'
-  printf -v report '%s\nRuns\n' "$report"
-  printf -v report '%s\nRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$report"
+  local reportTime="$1"
 
   local rates=()
+
+  local runsReport
+  printf -v runsReport 'Runs\n\n'
+
+  printf -v runsReport \
+    '%sRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$runsReport"
 
   local duration rate run startTime
   while IFS=' ' read -r run startTime duration _ rate _
   do
-    startTime="${startTime%+*}"
-    printf -v report \
-      '%s %02d   %s   %12s   %14s\n' "$report" "$run" "$startTime" "$duration" "$rate"
     rates=(${rates[*]} $rate)
+    startTime="${startTime%+*}"
+
+    printf -v runsReport \
+      '%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "$startTime" "$duration" "$rate"
   done
 
   local maxRate minRate
@@ -272,13 +284,27 @@ gen_report()
   likelyLB=$(dc --expression "3 k $geoMeanRate $geoStd / p")
   likelyUB=$(dc --expression "3 k $geoMeanRate $geoStd * 1 / p")
 
-  printf -v report '%s\nSummary\n' "$report"
-  printf -v report '%s\nBounds on measurements: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
-  printf -v report '%s\nExpected throuphput:    %s MiB/s\n' "$report" "${expectedRate/#./0.}"
-  printf -v report \
-    '%s67%% confidence bounds:  [%s, %s] MiB/s\n' "$report" "${likelyLB/#./0.}" "${likelyUB/#./0.}"
+  local irodsVer numCores totMem
+  numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
+  totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
+  irodsVer=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
 
-  printf '%s' "$report"
+  local report
+  printf -v report 'UPLOAD THROUGHPUT REPORT\n\n'
+
+  printf -v report '%sExecution Time:         %s\n' "$report" "$reportTime"
+  printf -v report '%sEstimated Throuphput:   %s MiB/s\n' "$report" "${expectedRate/#./0.}"
+  printf -v report \
+    '%s67%% Confidence Bounds:  [%s, %s] MiB/s\n' "$report" "${likelyLB/#./0.}" "${likelyUB/#./0.}"
+
+  printf -v report '%s\nBounds on Measurements: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
+
+  printf -v report '%s\n\nClient Information\n\n' "$report"
+  printf -v report '%siCommands:  %s\n' "$report" "$irodsVer"
+  printf -v report '%sMemory:     %s\n' "$report" "$totMem"
+  printf -v report '%sCores:      %d\n' "$report" "$numCores"
+
+  printf '%s\n\n%s' "$report" "$runsReport"
 }
 
 
