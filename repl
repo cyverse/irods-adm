@@ -419,8 +419,11 @@ select_cohort()
   local maxArgs="$6"
   local minThreads="$7"
 
-  local maxThreads=
-  if [[ "$#" -ge 8 ]]
+  local maxThreads=16
+  if [[ "$SERIAL" ]]
+  then
+    maxThreads=0
+  elif [[ "$#" -ge 8 ]]
   then
     maxThreads="$8"
   fi
@@ -465,7 +468,7 @@ select_cohort()
     maxProcs=$((maxProcs * procMult))
 
     parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
-          REPL_BATCH "$destResc" \
+          REPL_BATCH "$destResc" "$maxThreads" \
         < "$cohortList" \
         2>&"$Log" \
       | tee >(cat >&"$Log") \
@@ -492,6 +495,12 @@ select_cohort_by_size()
   if [[ "$#" -ge 6 ]]
   then
     maxSizeMiB="$6"
+  fi
+
+  local maxThreads=16
+  if [[ "$SERIAL" ]]
+  then
+    maxThreads=0
   fi
 
   if ! CHECK_TIME "$UNTIL_TS"
@@ -530,7 +539,7 @@ select_cohort_by_size()
     local maxProcs=$((1 * procMult))
 
     parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
-          REPL_BATCH "$destResc" \
+          REPL_BATCH "$destResc" "$maxThreads" \
         < "$cohortList" \
         2>&"$Log" \
       | tee >(cat >&"$Log") \
@@ -558,18 +567,13 @@ export -f CHECK_TIME
 REPL_BATCH()
 {
   local destResc="$1"
+  local maxThreads="$2"
+
   shift
 
   if ! CHECK_TIME "$UNTIL_TS"
   then
     exit 1
-  fi
-
-  local maxThreads=16
-
-  if [[ "$SERIAL" ]]
-  then
-    maxThreads=0
   fi
 
   irepl -B -M -T -v -N "$maxThreads" -R "$destResc" "$@"
