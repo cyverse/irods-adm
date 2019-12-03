@@ -278,7 +278,7 @@ gen_report()
     startTime="${startTime%+*}"
 
     printf -v runsReport \
-      '%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "$startTime" "$duration" "$rate"
+      '%s %02d   %s   %12s   %14s\n' "$runsReport" "${run//0/}" "$startTime" "$duration" "$rate"
   done
 
   local maxRate minRate
