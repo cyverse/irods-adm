@@ -15,15 +15,15 @@ upload being to a new data object. A report is written to stdout, while errors
 and status messages are written to stderr.
 
 Options:
- -s, --size FILE-SIZE       the size of the file with units in the form accepted
+ -s, --size FILE-SIZE       the size of the file with units in a form accepted
                             by \`truncate\`, e.g., 2MiB gives a 2 mebibyte file.
                             The default is 1GiB.
  -D, --dest-coll DEST-COLL  the name of the temporary collection where the test
                             file will be repeatedly uploaded. Defaults to
                             \`ipwd\`/upload-throughput-\`date -u -Iseconds\`.
- -S, --src-dir SRC-DIR      the directory where the 10 GiB temporary test file
-                            will be generated. Defaults to the system default
-                            temporary directory.
+ -S, --src-dir SRC-DIR      the directory where the temporary test file will be
+                            generated. Defaults to the system default temporary
+                            directory.
  -L, --log REPORT-FILE      write report to REPORT-FILE instead of stdout.
  -h, --help                 show help and exit
  -V, --version              show version and exit
