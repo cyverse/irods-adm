@@ -440,11 +440,17 @@ select_cohort()
     minSizeB=0
     maxSizeMiB=0
     maxSizeB=1
+  elif [[ "$minThreads" -eq 0 ]]
+  then
+    minSizeMiB=0
+    minSizeB=1
+    maxSizeMiB=$((maxThreads * 32))
+    maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
   else
     minSizeMiB=$((minThreads * 32))
     minSizeB=$((minSizeMiB * ((1024 ** 2))))
     maxSizeMiB=$((maxThreads * 32))
-    maxSizeB=$((maxSizeMiB * ((1024 ** 2))))=
+    maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
   fi
 
   local cohortList
