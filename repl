@@ -453,10 +453,6 @@ select_cohort()
     maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
   fi
 
-  printf 'size in [%s, %s)\n' "$minSizeB" "$maxSizeB" >&2
-  printf '%s\n' "$cnt"
-  return
-
   local cohortList
   cohortList=$(mktemp)
 
@@ -488,9 +484,9 @@ select_cohort()
     parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
           REPL_BATCH "'$destResc'" "'$maxThreads'" "'$UNTIL_TS'" \
         < "$cohortList" \
-       2>&"$Log" \
-     | tee >(cat >&"$Log") \
-     | track_prog "$cnt" "$tot" "$subTotal"
+        2>&"$Log" \
+      | tee >(cat >&"$Log") \
+      | track_prog "$cnt" "$tot" "$subTotal"
   else
     printf '%s\n' "$cnt"
   fi
