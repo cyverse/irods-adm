@@ -26,9 +26,6 @@ The program reads the output of the \`repl\` command from standard in. It groups
 the data objects that failed to replicate into different files based on the
 error that occurred. Here's a breakdown of what each output file holds.
 
- <class_base>.invalid_types  holds the paths to data objects that caused \`irepl\`
- to generate "invalid repl objType 0" errors.
-
  <class_base>.src_path_errors holds the paths to data objects that have paths
  that cause \`irepl\` problems.
 
@@ -58,7 +55,7 @@ EOF
 
 set -o nounset -o pipefail
 
-readonly Version=1
+readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 
@@ -144,13 +141,8 @@ classify_errors()
   local errCnt="$2"
   local logBase="$3"
 
-  local iTCnt
-  iTCnt=$(split_out_class "$errorsFile" \
-                          '^replUtil: invalid repl objType 0 for ' \
-                          '' \
-                          "$logBase".invalid_types)
-
-  display_error_count 'invalid object types' "$iTCnt" "$errCnt"
+  # These are redundant
+  split_out_class "$errorsFile" '^replUtil: invalid repl objType 0 for ' '' /dev/null > /dev/null
 
   local sPECnt
   sPECnt=$(split_out_class "$errorsFile" \
