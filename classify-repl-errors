@@ -144,13 +144,8 @@ classify_errors()
   local errCnt="$2"
   local logBase="$3"
 
-  local iTCnt
-  iTCnt=$(split_out_class "$errorsFile" \
-                          '^replUtil: invalid repl objType 0 for ' \
-                          '' \
-                          "$logBase".invalid_types)
-
-  display_error_count 'invalid object types' "$iTCnt" "$errCnt"
+  # These are redundant
+  split_out_class "$errorsFile" '^replUtil: invalid repl objType 0 for ' '' /dev/null > /dev/null
 
   local sPECnt
   sPECnt=$(split_out_class "$errorsFile" \
