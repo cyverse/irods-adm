@@ -65,60 +65,99 @@ EOF
 
 set -o nounset -o pipefail
 
+readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
-readonly Version=2
-
 readonly NumRuns=30
 
-StatusLog=/dev/null
-ReportLog=/dev/stdout
+declare ReportLog
+declare StatusLog
 
 
 main()
 {
-  local opts
-  if ! opts=$(fmt_opts "$@")
+  declare -A optMap=(
+    [help]=
+    [version]=
+    [verbose]=
+    [dest-coll]=
+    [src-dir]="${TMPDIR:-$PWD}"
+    [size]=1GiB
+    [log]=/dev/stdout )
+
+  if ! map_opts optMap "$@"
   then
     show_help >&2
     return 1
   fi
 
+  if [[ -n "${optMap[help]}" ]]
+  then
+    show_help
+    return 0
+  fi
+
+  if [[ -n "${optMap[version]}" ]]
+  then
+    printf '%s\n' "$Version"
+    return 0
+  fi
+
+  if [[ -z "${optMap[verbose]}" ]]
+  then
+    StatusLog=/dev/null
+  else
+    StatusLog=/dev/stderr
+  fi
+
+  ReportLog="${optMap[log]}"
+
+  do_test "${optMap[size]}" "${optMap[src-dir]}" "${optMap[dest-coll]}"
+}
+
+
+map_opts()
+{
+  local mapVar="$1"
+  shift
+
+  local opts
+  if ! opts=$(fmt_opts "$@")
+  then
+    return 1
+  fi
+
   eval set -- "$opts"
 
-  local size=1GiB
-  local destColl=
-  local srcDir="${TMPDIR:-}"
-  local versionReq=
   while true
   do
     case "$1" in
       -h|--help)
-        show_help
-        return 0
+        eval $mapVar[help]=help
+        shift
         ;;
       -V|--version)
-        versionReq=1
+        eval $mapVar[version]=version
         shift
         ;;
       -v|--verbose)
-        StatusLog=/dev/stderr
+        eval $mapVar[verbose]=verbose
         shift
         ;;
       -D|--dest-coll)
-        destColl="$2"
+        eval $mapVar[dest-coll]="$2"
         shift 2
         ;;
       -L|--log)
-        ReportLog="$2"
+        eval $mapVar[log]="$2"
         shift 2
         ;;
       -S|--src-dir)
-        srcDir="$2"
+        eval $mapVar[src-dir]="$2"
         shift 2
         ;;
       -s|--size)
-        size="$2"
+        eval $mapVar[size]="$2"
         shift 2
         ;;
       --)
@@ -126,18 +165,10 @@ main()
         break
         ;;
       *)
-        show_help >&2
         return 1
         ;;
     esac
   done
-
-  if [[ -n "$versionReq" ]]
-  then
-    printf '%s\n' "$Version"
-  else
-    do_test "$size" "$srcDir" "$destColl"
-  fi
 }
 
 
@@ -220,7 +251,7 @@ perform_upload()
   local startTime duration rate
   startTime=$(date --utc --iso-8601=seconds)
   IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
-  printf '%02d   %s   %s s   %s MiB/s\n' "$run" "$startTime" "$duration" "$rate"
+  printf '%d %s %s %s\n' "$run" "$startTime" "$duration" "$rate"
 }
 
 
@@ -241,6 +272,7 @@ clean_up()
   printf 'Finished\n' >> "$StatusLog"
   return 0
 }
+
 
 ensure_irods_sess()
 {
@@ -272,13 +304,13 @@ gen_report()
     '%sRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$runsReport"
 
   local duration rate run startTime
-  while IFS=' ' read -r run startTime duration _ rate _
+  while IFS=' ' read -r run startTime duration rate
   do
     rates=(${rates[*]} $rate)
     startTime="${startTime%+*}"
 
     printf -v runsReport \
-      '%s %02d   %s   %12s   %14s\n' "$runsReport" "${run//0/}" "$startTime" "$duration" "$rate"
+      '%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "$startTime" "$duration" "$rate"
   done
 
   local maxRate minRate
@@ -294,13 +326,11 @@ gen_report()
   likelyLB=$(dc --expression "3 k $geoMeanRate $geoStd / p")
   likelyUB=$(dc --expression "3 k $geoMeanRate $geoStd * 1 / p")
 
-  local irodsVer numCores totMem
-  numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
-  totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
-  irodsVer=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
-
   local reportSize
   reportSize=$(sed 's/^\([0-9]*\)/\1 /' <<<"$size")
+
+  local clientReport
+  clientReport=$(gen_client_report)
 
   local report
   printf -v report 'UPLOAD THROUGHPUT REPORT\n\n'
@@ -313,12 +343,26 @@ gen_report()
 
   printf -v report '%sBounds on Measurements: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
 
-  printf -v report '%s\n\nClient Information\n\n' "$report"
+  printf -v report '%s\n\n%s\n\n\n%s' "$report" "$clientReport" "$runsReport"
+
+  printf '%s' "$report"
+}
+
+
+gen_client_report()
+{
+  local irodsVer numCores totMem
+  numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
+  totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
+  irodsVer=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
+
+  local report
+  printf -v report 'Client Information\n\n'
   printf -v report '%siCommands:  %s\n' "$report" "$irodsVer"
   printf -v report '%sMemory:     %s\n' "$report" "$totMem"
   printf -v report '%sCores:      %d\n' "$report" "$numCores"
 
-  printf '%s\n\n%s' "$report" "$runsReport"
+  printf '%s' "$report"
 }
 
 
