@@ -241,7 +241,7 @@ perform_download()
   local startTime duration rate
   startTime=$(date --utc --iso-8601=seconds)
   IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget -v "$src" "$dest")
-  printf '%02d   %s   %s s   %s MiB/s\n' "$run" "$startTime" "$duration" "$rate"
+  printf '%d %s %s %s\n' "$run" "$startTime" "$duration" "$rate"
 }
 
 
@@ -294,13 +294,13 @@ gen_report()
     '%sRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$runsReport"
 
   local duration rate run startTime
-  while IFS=' ' read -r run startTime duration _ rate _
+  while IFS=' ' read -r run startTime duration rate
   do
     rates=(${rates[*]} $rate)
     startTime="${startTime%+*}"
 
     printf -v runsReport \
-      '%s %02d   %s   %12s   %14s\n' "$runsReport" "${run//0/}" "$startTime" "$duration" "$rate"
+      '%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "$startTime" "$duration" "$rate"
   done
 
   local maxRate minRate
