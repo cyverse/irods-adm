@@ -128,8 +128,7 @@ gather_logs()
     local logName
     logName=$(basename "$log")
 
-    rcat_log "$host" "$password" "$log" \
-      | "$ExecDir"/format-log-entries --assign YEAR="${logName:8:4}"
+    rcat_log "$host" "$password" "$log" | "$ExecDir"/format-log-entries "${logName:8:4}"
 
     printf 'gather_logs:  finished processing %s\n' "$logName" >&2
   done
