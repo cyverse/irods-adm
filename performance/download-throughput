@@ -9,30 +9,31 @@ $ExecName version $Version
 Usage:
  $ExecName [options]
 
-This script measures upload throughput from the client running this script to
-the CyVerse Data Store. It uploads a file thirty times in a row, with each
-upload being to a new data object. A report is written to stdout, while errors
+This script measures download throughput from the client running this script to
+the CyVerse Data Store. It downloads a data object thirty times in a row, with
+each download being to a new file. A report is written to stdout, while errors
 and status messages are written to stderr.
 
 Options:
- -s, --size FILE-SIZE       the size of the file with units in a form accepted
-                            by \`truncate\`, e.g., 2MiB gives a 2 mebibyte file.
-                            The default is 1GiB.
- -D, --dest-coll DEST-COLL  the name of the temporary collection where the test
-                            file will be repeatedly uploaded. Defaults to
-                            \`ipwd\`/upload-throughput-\`date -u -Iseconds\`.
- -S, --src-dir SRC-DIR      the directory where the temporary test file will be
-                            generated. Defaults to the system default temporary
-                            directory.
- -L, --log REPORT-FILE      write report to REPORT-FILE instead of stdout.
- -h, --help                 show help and exit
- -V, --version              show version and exit
- -v, --verbose              output status messages
+ -s, --size OBJ-SIZE      the size of the data object with units in a form
+                          accepted by \`truncate\`, e.g., 2MiB gives a 2
+                          mebibyte file. The default is 1GiB.
+ -D, --dest-dir DEST-DIR  the name of the temporary directory where the test
+                          data object will be repeatedly downloaded. Defaults
+                          to
+                          \`\$TMPDIR/download-throughput-\`date -u -Iseconds\`.
+ -S, --src-coll SRC-COLL  the collection where the temporary test data object
+                          will be generated. Defaults to
+                          \`ipwd\`/download-throughput-\`date -u -Iseconds\`.
+ -L, --log REPORT-FILE    write report to REPORT-FILE instead of stdout.
+ -h, --help               show help and exit
+ -V, --version            show version and exit
+ -v, --verbose            output status messages
 
 Output:
 It generates a report similar to the following.
 $(tput bold)
-UPLOAD THROUGHPUT REPORT
+DOWNLOAD THROUGHPUT REPORT
 
 Execution Time:         2019-12-02T22:47:13+00:00
 File Size:              10GiB
@@ -65,99 +66,63 @@ EOF
 
 set -o nounset -o pipefail
 
-readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
+readonly Version=1
+
 readonly NumRuns=30
 
-declare ReportLog
-declare StatusLog
+StatusLog=/dev/null
+ReportLog=/dev/stdout
 
 
 main()
 {
-  declare -A optMap=(
-    [help]=
-    [version]=
-    [verbose]=
-    [dest-coll]=
-    [src-dir]="${TMPDIR:-$PWD}"
-    [size]=1GiB
-    [log]=/dev/stdout )
-
-  if ! map_opts optMap "$@"
+  local opts
+  if ! opts=$(fmt_opts "$@")
   then
     show_help >&2
     return 1
   fi
 
-  if [[ -n "${optMap[help]}" ]]
-  then
-    show_help
-    return 0
-  fi
-
-  if [[ -n "${optMap[version]}" ]]
-  then
-    printf '%s\n' "$Version"
-    return 0
-  fi
-
-  if [[ -z "${optMap[verbose]}" ]]
-  then
-    StatusLog=/dev/null
-  else
-    StatusLog=/dev/stderr
-  fi
-
-  ReportLog="${optMap[log]}"
-
-  do_test "${optMap[size]}" "${optMap[src-dir]}" "${optMap[dest-coll]}"
-}
-
-
-map_opts()
-{
-  local mapVar="$1"
-  shift
-
-  local opts
-  if ! opts=$(fmt_opts "$@")
-  then
-    return 1
-  fi
-
   eval set -- "$opts"
 
+  local testTime
+  testTime="$(date --utc --iso-8601=seconds)"
+
+  local size=1GiB
+  local destDir="${TMPDIR:-$HOME}/download-throughput-$testTime"
+  local srcColl=
+  local versionReq=
   while true
   do
     case "$1" in
       -h|--help)
-        eval $mapVar[help]=help
-        shift
+        show_help
+        return 0
         ;;
       -V|--version)
-        eval $mapVar[version]=version
+        versionReq=1
         shift
         ;;
       -v|--verbose)
-        eval $mapVar[verbose]=verbose
+        StatusLog=/dev/stderr
         shift
         ;;
-      -D|--dest-coll)
-        eval $mapVar[dest-coll]="$2"
+      -D|--dest-dir)
+        destDir="$2"
         shift 2
         ;;
       -L|--log)
-        eval $mapVar[log]="$2"
+        ReportLog="$2"
         shift 2
         ;;
-      -S|--src-dir)
-        eval $mapVar[src-dir]="$2"
+      -S|--src-coll)
+        srcColl="$2"
         shift 2
         ;;
       -s|--size)
-        eval $mapVar[size]="$2"
+        size="$2"
         shift 2
         ;;
       --)
@@ -165,10 +130,18 @@ map_opts()
         break
         ;;
       *)
+        show_help >&2
         return 1
         ;;
     esac
   done
+
+  if [[ -n "$versionReq" ]]
+  then
+    printf '%s\n' "$Version"
+  else
+    do_test "$size" "$testTime" "$srcColl" "$destDir"
+  fi
 }
 
 
@@ -176,7 +149,7 @@ fmt_opts()
 {
   getopt \
     --name "$ExecName" \
-    --longoptions help,verbose.version,dest-coll:,log:,size:,src-dir: \
+    --longoptions help,verbose.version,dest-dir:,log:,size:,src-coll: \
     --options hVvD:L:S:s: \
     -- \
     "$@"
@@ -186,8 +159,9 @@ fmt_opts()
 do_test()
 {
   local size="$1"
-  local srcDir="$2"
-  local destColl="$3"
+  local testTime="$2"
+  local srcColl="$3"
+  local destDir="$4"
 
   if ! ensure_irods_sess
   then
@@ -195,54 +169,70 @@ do_test()
     return 1
   fi
 
-  local testTime="$(date --utc --iso-8601=seconds)"
-
-  if [[ -z "$destColl" ]]
+  if [[ -z "$srcColl" ]]
   then
-    destColl="$(ipwd)/upload-throughput-$testTime"
+    srcColl="$(ipwd)/download-throughput-$testTime"
+  fi
+
+  # shellcheck disable=SC2064
+  trap "clean_up '$srcColl' '$destDir'" EXIT
+
+  printf 'Creating source collection %s\n' "$srcColl" >> "$StatusLog"
+  if ! imkdir "$srcColl"
+  then
+    printf 'Failed to create source collection\n' >&2
+    return 1
+  fi
+
+  printf 'Creating destination directory %s\n' "$destDir" >> "$StatusLog"
+  if ! mkdir "$destDir"
+  then
+    printf 'Cannot create destination directory\n' >&2
+    return 1
   fi
 
   local srcFile
-  if ! srcFile=$(TMPDIR="$srcDir" mktemp)
+  if ! srcFile=$(TMPDIR="$destDir" mktemp)
   then
     printf 'Cannot reserve temporary file\n' >&2
     return 1
   fi
 
-  # shellcheck disable=SC2064
-  trap "clean_up '$srcFile' '$destColl'" EXIT
-
-  printf 'Creating test file %s\n' "$srcFile" >> "$StatusLog"
+  printf 'Creating test file\n' >> "$StatusLog"
   if ! truncate --size "$size" "$srcFile"
   then
     printf 'Failed to create file\n' >&2
     return 1
   fi
 
-  printf 'Creating destination collection %s\n' "$destColl" >> "$StatusLog"
-  if ! imkdir "$destColl"
+  local srcObj="$srcColl"/test_file
+  printf 'Staging test file\n' >> "$StatusLog"
+  if ! iput "$srcFile" "$srcObj"
   then
-    printf 'Failed to create destination collection\n' >&2
+    printf 'Failed to stage test file\n' >&2
     return 1
   fi
+
+  rm --force "$srcFile"
 
   printf 'Beginning test\n' >> "$StatusLog"
 
   local attempt
   for attempt in $(seq "$NumRuns")
   do
-    printf 'Uploading %s\n' "$attempt" >> "$StatusLog"
+    printf 'Downloading %s\n' "$attempt" >> "$StatusLog"
 
-    local obj
-    printf -v obj '%s/upload-%02d' "$destColl" "$attempt"
-    perform_upload "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
+    local destFile
+    printf -v destFile '%s/download-%02d' "$destDir" "$attempt"
+    perform_download "$attempt" "$srcObj" "$destFile" | tee --append "$StatusLog"
+    rm --force "$destFile"
   done | gen_report "$testTime" "$size" > "$ReportLog"
 
   printf 'Finished test\n' >> "$StatusLog"
 }
 
 
-perform_upload()
+perform_download()
 {
   local run="$1"
   local src="$2"
@@ -250,24 +240,24 @@ perform_upload()
 
   local startTime duration rate
   startTime=$(date --utc --iso-8601=seconds)
-  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
+  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget -v "$src" "$dest")
   printf '%d %s %s %s\n' "$run" "$startTime" "$duration" "$rate"
 }
 
 
 clean_up()
 {
-  local testFile="$1"
-  local destColl="$2"
+  local srcColl="$1"
+  local destDir="$2"
 
-  if ils "$destColl" &> /dev/null
+  printf 'Deleting destination directory %s\n' "$destDir" >> "$StatusLog"
+  rm --force --recursive "$destDir"
+
+  if ils "$srcColl" &> /dev/null
   then
-    printf 'Deleting destination collection %s\n' "$destColl" >> "$StatusLog"
-    irm -f -r "$destColl"
+    printf 'Deleting source collection %s\n' "$srcColl" >> "$StatusLog"
+    irm -f -r "$srcColl"
   fi
-
-  printf 'Deleting test file %s\n' "$testFile" >> "$StatusLog"
-  rm --force "$testFile"
 
   printf 'Finished\n' >> "$StatusLog"
   return 0
@@ -326,14 +316,16 @@ gen_report()
   likelyLB=$(dc --expression "3 k $geoMeanRate $geoStd / p")
   likelyUB=$(dc --expression "3 k $geoMeanRate $geoStd * 1 / p")
 
+  local irodsVer numCores totMem
+  numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
+  totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
+  irodsVer=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
+
   local reportSize
   reportSize=$(sed 's/^\([0-9]*\)/\1 /' <<<"$size")
 
-  local clientReport
-  clientReport=$(gen_client_report)
-
   local report
-  printf -v report 'UPLOAD THROUGHPUT REPORT\n\n'
+  printf -v report 'DOWNLOAD THROUGHPUT REPORT\n\n'
 
   printf -v report '%sExecution Time:         %s\n' "$report" "$reportTime"
   printf -v report '%sFile Size:              %s\n\n' "$report" "$reportSize"
@@ -343,26 +335,12 @@ gen_report()
 
   printf -v report '%sBounds on Measurements: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
 
-  printf -v report '%s\n\n%s\n\n\n%s' "$report" "$clientReport" "$runsReport"
-
-  printf '%s' "$report"
-}
-
-
-gen_client_report()
-{
-  local irodsVer numCores totMem
-  numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
-  totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
-  irodsVer=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
-
-  local report
-  printf -v report 'Client Information\n\n'
+  printf -v report '%s\n\nClient Information\n\n' "$report"
   printf -v report '%siCommands:  %s\n' "$report" "$irodsVer"
   printf -v report '%sMemory:     %s\n' "$report" "$totMem"
   printf -v report '%sCores:      %d\n' "$report" "$numCores"
 
-  printf '%s' "$report"
+  printf '%s\n\n%s' "$report" "$runsReport"
 }
 
 
