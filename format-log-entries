@@ -19,6 +19,14 @@ main()
 {
   local year="$1"
 
+  iconv -c | format "$year"
+}
+
+
+format()
+{
+  local year="$1"
+
   awk --assign YEAR="$year" --file - <(cat) <<'EOF'
     function escape_ctrls(line) {
       patsplit(line, ctrlChars, /[\x01-\x1f]/, segs);
