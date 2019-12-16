@@ -78,10 +78,10 @@ declare StatusLog
 main()
 {
   declare -A optMap=(
-    [help]=
-    [version]=
-    [verbose]=
-    [dest-coll]=
+    [help]=''
+    [version]=''
+    [verbose]=''
+    [dest-coll]=''
     [src-dir]="${TMPDIR:-$PWD}"
     [size]=1GiB
     [log]=/dev/stdout )
@@ -134,31 +134,31 @@ map_opts()
   do
     case "$1" in
       -h|--help)
-        eval $mapVar[help]=help
+        eval "$mapVar[help]=help"
         shift
         ;;
       -V|--version)
-        eval $mapVar[version]=version
+        eval "$mapVar[version]=version"
         shift
         ;;
       -v|--verbose)
-        eval $mapVar[verbose]=verbose
+        eval "$mapVar[verbose]=verbose"
         shift
         ;;
       -D|--dest-coll)
-        eval $mapVar[dest-coll]="$2"
+        eval "$mapVar[dest-coll]='$2'"
         shift 2
         ;;
       -L|--log)
-        eval $mapVar[log]="$2"
+        eval "$mapVar[log]='$2'"
         shift 2
         ;;
       -S|--src-dir)
-        eval $mapVar[src-dir]="$2"
+        eval "$mapVar[src-dir]='$2'"
         shift 2
         ;;
       -s|--size)
-        eval $mapVar[size]="$2"
+        eval "$mapVar[size]='$2'"
         shift 2
         ;;
       --)
