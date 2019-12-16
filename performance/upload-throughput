@@ -68,6 +68,7 @@ set -o nounset -o pipefail
 readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
+readonly TestTime="$(date --utc --iso-8601=seconds)"
 readonly NumRuns=30
 
 declare ReportLog
@@ -195,11 +196,9 @@ do_test()
     return 1
   fi
 
-  local testTime="$(date --utc --iso-8601=seconds)"
-
   if [[ -z "$destColl" ]]
   then
-    destColl="$(ipwd)/upload-throughput-$testTime"
+    destColl="$(ipwd)/upload-throughput-$TestTime"
   fi
 
   local srcFile
@@ -236,7 +235,7 @@ do_test()
     local obj
     printf -v obj '%s/upload-%02d' "$destColl" "$attempt"
     perform_upload "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
-  done | gen_report "$testTime" "$size" > "$ReportLog"
+  done | gen_report "$size" > "$ReportLog"
 
   printf 'Finished test\n' >> "$StatusLog"
 }
@@ -292,8 +291,7 @@ ensure_irods_sess()
 
 gen_report()
 {
-  local reportTime="$1"
-  local size="$2"
+  local size="$1"
 
   local rates=()
 
@@ -335,7 +333,7 @@ gen_report()
   local report
   printf -v report 'UPLOAD THROUGHPUT REPORT\n\n'
 
-  printf -v report '%sExecution Time:         %s\n' "$report" "$reportTime"
+  printf -v report '%sExecution Time:         %s\n' "$report" "$TestTime"
   printf -v report '%sFile Size:              %s\n\n' "$report" "$reportSize"
   printf -v report '%sEstimated Throuphput:   %s MiB/s\n' "$report" "${expectedRate/#./0.}"
   printf -v report '%s67%% Confidence Bounds:  [%s, %s] MiB/s\n\n' \
