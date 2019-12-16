@@ -387,6 +387,7 @@ compute_geostd()
 EOF
 }
 
+
 compute_max()
 {
   awk --file - <(printf '%s\n' "$@") <<'EOF'
@@ -395,6 +396,7 @@ compute_max()
     END { print max; }
 EOF
 }
+
 
 compute_min()
 {
