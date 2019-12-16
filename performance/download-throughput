@@ -35,94 +35,131 @@ It generates a report similar to the following.
 $(tput bold)
 DOWNLOAD THROUGHPUT REPORT
 
-Execution Time:         2019-12-02T22:47:13+00:00
-File Size:              10GiB
+Execution Time:         2019-12-12T22:40:08+00:00
+File Size:              1 GiB
 
-Estimated Throuphput:   85.121 MiB/s
-67% Confidence Bounds:  [84.427, 85.819] MiB/s
+Estimated Throuphput:   85.207 MiB/s
+67% Confidence Bounds:  [77.066, 94.207] MiB/s
 
-Bounds on Measurements: [82.116, 85.775] MiB/s
+Bounds on Measurements: [64.456, 92.493] MiB/s
 
 
 Client Information
 
 iCommands:  rods4.1.10
-Memory:     16172752 kB
+Memory:     16172756 kB
 Cores:      8
 
 
 Runs
 
 Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
- 01   2019-12-02T22:47:14        120.022           85.316
- 02   2019-12-02T22:49:15        119.380           85.775
+ 01   2019-12-12T22:40:32         12.566           81.486
+ 02   2019-12-12T22:40:49         12.668           80.833
 .
 .
-.
- 30   2019-12-02T23:46:29        119.912           85.394  $(tput sgr0)
+.e
+ 30   2019-12-12T22:47:39         13.825           74.067  $(tput sgr0)
 EOF
 }
 
 
 set -o nounset -o pipefail
 
+readonly Version=1
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
-readonly Version=1
-
+readonly TestTime="$(date --utc --iso-8601=seconds)"
 readonly NumRuns=30
 
-StatusLog=/dev/null
-ReportLog=/dev/stdout
+declare ReportLog
+declare StatusLog
 
 
 main()
 {
-  local opts
-  if ! opts=$(fmt_opts "$@")
+  declare -A optMap=(
+    [help]=''
+    [version]=''
+    [verbose]=''
+    [dest-dir]="${TMPDIR:-$PWD}/download-throughput-$TestTime"
+    [src-coll]=''
+    [size]=1GiB
+    [log]=/dev/stdout )
+
+  if ! map_opts optMap "$@"
   then
     show_help >&2
     return 1
   fi
 
+  if [[ -n "${optMap[help]}" ]]
+  then
+    show_help
+    return 0
+  fi
+
+  if [[ -n "${optMap[version]}" ]]
+  then
+    printf '%s\n' "$Version"
+    return 0
+  fi
+
+  if [[ -z "${optMap[verbose]}" ]]
+  then
+    StatusLog=/dev/null
+  else
+    StatusLog=/dev/stderr
+  fi
+
+  ReportLog="${optMap[log]}"
+
+  do_test "${optMap[size]}" "${optMap[src-coll]}" "${optMap[dest-dir]}"
+}
+
+
+map_opts()
+{
+  local mapVar="$1"
+  shift
+
+  local opts
+  if ! opts=$(fmt_opts "$@")
+  then
+    return 1
+  fi
+
   eval set -- "$opts"
 
-  local testTime
-  testTime="$(date --utc --iso-8601=seconds)"
-
-  local size=1GiB
-  local destDir="${TMPDIR:-$HOME}/download-throughput-$testTime"
-  local srcColl=
-  local versionReq=
   while true
   do
     case "$1" in
       -h|--help)
-        show_help
-        return 0
+        eval "$mapVar[help]=help"
+        shift
         ;;
       -V|--version)
-        versionReq=1
+        eval "$mapVar[version]=version"
         shift
         ;;
       -v|--verbose)
-        StatusLog=/dev/stderr
+        eval "$mapVar[verbose]=verbose"
         shift
         ;;
       -D|--dest-dir)
-        destDir="$2"
+        eval "$mapVar[dest-dir]='$2'"
         shift 2
         ;;
       -L|--log)
-        ReportLog="$2"
+        eval "$mapVar[log]='$2'"
         shift 2
         ;;
       -S|--src-coll)
-        srcColl="$2"
+        eval "$mapVar[src-coll]='$2'"
         shift 2
         ;;
       -s|--size)
-        size="$2"
+        eval "$mapVar[size]='$2'"
         shift 2
         ;;
       --)
@@ -130,18 +167,10 @@ main()
         break
         ;;
       *)
-        show_help >&2
         return 1
         ;;
     esac
   done
-
-  if [[ -n "$versionReq" ]]
-  then
-    printf '%s\n' "$Version"
-  else
-    do_test "$size" "$testTime" "$srcColl" "$destDir"
-  fi
 }
 
 
@@ -159,9 +188,8 @@ fmt_opts()
 do_test()
 {
   local size="$1"
-  local testTime="$2"
-  local srcColl="$3"
-  local destDir="$4"
+  local srcColl="$2"
+  local destDir="$3"
 
   if ! ensure_irods_sess
   then
@@ -171,7 +199,7 @@ do_test()
 
   if [[ -z "$srcColl" ]]
   then
-    srcColl="$(ipwd)/download-throughput-$testTime"
+    srcColl="$(ipwd)/download-throughput-$TestTime"
   fi
 
   # shellcheck disable=SC2064
@@ -226,7 +254,7 @@ do_test()
     printf -v destFile '%s/download-%02d' "$destDir" "$attempt"
     perform_download "$attempt" "$srcObj" "$destFile" | tee --append "$StatusLog"
     rm --force "$destFile"
-  done | gen_report "$testTime" "$size" > "$ReportLog"
+  done | gen_report "$size" > "$ReportLog"
 
   printf 'Finished test\n' >> "$StatusLog"
 }
@@ -282,8 +310,7 @@ ensure_irods_sess()
 
 gen_report()
 {
-  local reportTime="$1"
-  local size="$2"
+  local size="$1"
 
   local rates=()
 
@@ -327,7 +354,7 @@ gen_report()
   local report
   printf -v report 'DOWNLOAD THROUGHPUT REPORT\n\n'
 
-  printf -v report '%sExecution Time:         %s\n' "$report" "$reportTime"
+  printf -v report '%sExecution Time:         %s\n' "$report" "$TestTime"
   printf -v report '%sFile Size:              %s\n\n' "$report" "$reportSize"
   printf -v report '%sEstimated Throuphput:   %s MiB/s\n' "$report" "${expectedRate/#./0.}"
   printf -v report '%s67%% Confidence Bounds:  [%s, %s] MiB/s\n\n' \
