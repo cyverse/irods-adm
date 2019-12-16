@@ -197,51 +197,9 @@ do_test()
     return 1
   fi
 
-  if [[ -z "$srcColl" ]]
-  then
-    srcColl="$(ipwd)/download-throughput-$TestTime"
-  fi
+  local srcObj=test_file
 
-  # shellcheck disable=SC2064
-  trap "clean_up '$srcColl' '$destDir'" EXIT
-
-  printf 'Creating source collection %s\n' "$srcColl" >> "$StatusLog"
-  if ! imkdir "$srcColl"
-  then
-    printf 'Failed to create source collection\n' >&2
-    return 1
-  fi
-
-  printf 'Creating destination directory %s\n' "$destDir" >> "$StatusLog"
-  if ! mkdir "$destDir"
-  then
-    printf 'Cannot create destination directory\n' >&2
-    return 1
-  fi
-
-  local srcFile
-  if ! srcFile=$(TMPDIR="$destDir" mktemp)
-  then
-    printf 'Cannot reserve temporary file\n' >&2
-    return 1
-  fi
-
-  printf 'Creating test file\n' >> "$StatusLog"
-  if ! truncate --size "$size" "$srcFile"
-  then
-    printf 'Failed to create file\n' >&2
-    return 1
-  fi
-
-  local srcObj="$srcColl"/test_file
-  printf 'Staging test file\n' >> "$StatusLog"
-  if ! iput "$srcFile" "$srcObj"
-  then
-    printf 'Failed to stage test file\n' >&2
-    return 1
-  fi
-
-  rm --force "$srcFile"
+  setup "$size" "$srcColl" "$srcObj" "$destDir"
 
   printf 'Beginning test\n' >> "$StatusLog"
 
@@ -252,11 +210,65 @@ do_test()
 
     local destFile
     printf -v destFile '%s/download-%02d' "$destDir" "$attempt"
-    perform_download "$attempt" "$srcObj" "$destFile" | tee --append "$StatusLog"
+    perform_download "$attempt" "$srcColl/$srcObj" "$destFile" | tee --append "$StatusLog"
     rm --force "$destFile"
   done | gen_report "$size" > "$ReportLog"
 
   printf 'Finished test\n' >> "$StatusLog"
+}
+
+
+setup()
+{
+   local size="$1"
+   local srcColl="$2"
+   local srcObj="$3"
+   local destDir="$4"
+
+    if [[ -z "$srcColl" ]]
+    then
+      srcColl="$(ipwd)/download-throughput-$TestTime"
+    fi
+
+    # shellcheck disable=SC2064
+    trap "clean_up '$srcColl' '$destDir'" EXIT
+
+    printf 'Creating source collection %s\n' "$srcColl" >> "$StatusLog"
+    if ! imkdir "$srcColl"
+    then
+      printf 'Failed to create source collection\n' >&2
+      return 1
+    fi
+
+    printf 'Creating destination directory %s\n' "$destDir" >> "$StatusLog"
+    if ! mkdir "$destDir"
+    then
+      printf 'Cannot create destination directory\n' >&2
+      return 1
+    fi
+
+    local srcFile
+    if ! srcFile=$(TMPDIR="$destDir" mktemp)
+    then
+      printf 'Cannot reserve temporary file\n' >&2
+      return 1
+    fi
+
+    printf 'Creating test file\n' >> "$StatusLog"
+    if ! truncate --size "$size" "$srcFile"
+    then
+      printf 'Failed to create file\n' >&2
+      return 1
+    fi
+
+    printf 'Staging test file\n' >> "$StatusLog"
+    if ! iput "$srcFile" "$srcColl/$srcObj"
+    then
+      printf 'Failed to stage test file\n' >&2
+      return 1
+    fi
+
+    rm --force "$srcFile"
 }
 
 
