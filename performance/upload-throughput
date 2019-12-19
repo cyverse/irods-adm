@@ -278,7 +278,12 @@ ensure_irods_sess()
   local authFile
   authFile="$(ienv | sed --quiet 's/.*irods_authentication_file - //p')"
 
-  if [[ -z "$authFile" ]] || [[ ! -e "$authFile" ]]
+  if [[ -z "$authFile" ]]
+  then
+    authFile="$HOME"/.irods/.irodsA
+  fi
+
+  if [[ ! -e "$authFile" ]]
   then
     if ! iinit
     then
