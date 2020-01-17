@@ -11,23 +11,25 @@ Usage:
 
 This script measures upload throughput from the client running this script to
 the CyVerse Data Store. It uploads a file thirty times in a row, with each
-upload being to a new data object. A report is written to stdout, while errors
-and status messages are written to stderr.
+upload being to a new data object. If multiple sizes are requested, a file of
+each size will be uploaded thirty times. A report is written to stdout, while
+errors and status messages are written to stderr.
 
 Options:
- -s, --size FILE-SIZE       the size of the file with units in a form accepted
-                            by \`truncate\`, e.g., 2MiB gives a 2 mebibyte file.
-                            The default is 1GiB.
- -D, --dest-coll DEST-COLL  the name of the temporary collection where the test
-                            file will be repeatedly uploaded. Defaults to
-                            \`ipwd\`/upload-throughput-\`date -u -Iseconds\`.
- -S, --src-dir SRC-DIR      the directory where the temporary test file will be
-                            generated. Defaults to the system default temporary
-                            directory.
- -L, --log REPORT-FILE      write report to REPORT-FILE instead of stdout.
- -h, --help                 show help and exit
- -V, --version              show version and exit
- -v, --verbose              output status messages
+ -D, --dest-coll DEST-COLL      the name of the temporary collection where the
+                                test file will be repeatedly uploaded. Defaults
+                                to
+                                \`ipwd\`/upload-throughput-\`date -u -Iseconds\`.
+ -h, --help                     show help and exit
+ -L, --log REPORT-FILE          write report to REPORT-FILE instead of stdout.
+ -S, --src-dir SRC-DIR          the directory where the temporary test file will
+                                be generated. Defaults to the system default
+                                temporary directory.
+ -s, --sizes SIZE_1,SIZE_2,...  the size of the file with units in a form
+                                accepted by \`truncate\`, e.g., 2MiB gives a 2
+                                mebibyte file. The default is 1GiB.
+ -V, --version                  show version and exit
+ -v, --verbose                  output status messages
 
 Output:
 It generates a report similar to the following.
@@ -35,12 +37,6 @@ $(tput bold)
 UPLOAD THROUGHPUT REPORT
 
 Execution Time:         2019-12-02T22:47:13+00:00
-File Size:              10GiB
-
-Estimated Throuphput:   85.121 MiB/s
-67% Confidence Bounds:  [84.427, 85.819] MiB/s
-
-Bounds on Measurements: [82.116, 85.775] MiB/s
 
 
 Client Information
@@ -50,22 +46,45 @@ Memory:     16172752 kB
 Cores:      8
 
 
-Runs
+Summary
+
+File Size:               10 GiB
+Estimated Throuphput:    85.121 MiB/s
+67% Confidence Bounds:   [84.427, 85.819] MiB/s
+Bounds on Measurements:  [82.116, 85.775] MiB/s
+.
+.
+.
+
+File Size:               10 MiB
+Estimated Throuphput:    3.577 MiB/s
+67% Confidence Bounds:   [3.426, 3.736] MiB/s
+Bounds on Measurements:  [3.290, 3.894] MiB/s
+
+
+10 GiB Runs
 
 Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
  01   2019-12-02T22:47:14        120.022           85.316
- 02   2019-12-02T22:49:15        119.380           85.775
 .
 .
 .
- 30   2019-12-02T23:46:29        119.912           85.394  $(tput sgr0)
+ 30   2019-12-02T23:46:29        119.912           85.394
+.
+.
+.
+
+10 MiB Runs
+.
+.
+.$(tput sgr0)
 EOF
 }
 
 
 set -o nounset -o pipefail
 
-readonly Version=2
+readonly Version=3
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 readonly TestTime="$(date --utc --iso-8601=seconds)"
@@ -83,7 +102,7 @@ main()
     [verbose]=''
     [dest-coll]=''
     [src-dir]="${TMPDIR:-$PWD}"
-    [size]=1GiB
+    [sizes]=1GiB
     [log]=/dev/stdout )
 
   if ! map_opts optMap "$@"
@@ -113,7 +132,7 @@ main()
 
   ReportLog="${optMap[log]}"
 
-  do_test "${optMap[size]}" "${optMap[src-dir]}" "${optMap[dest-coll]}"
+  do_test "${optMap[sizes]}" "${optMap[src-dir]}" "${optMap[dest-coll]}"
 }
 
 
@@ -157,8 +176,8 @@ map_opts()
         eval "$mapVar[src-dir]='$2'"
         shift 2
         ;;
-      -s|--size)
-        eval "$mapVar[size]='$2'"
+      -s|--sizes)
+        eval "$mapVar[sizes]='$2'"
         shift 2
         ;;
       --)
@@ -177,7 +196,7 @@ fmt_opts()
 {
   getopt \
     --name "$ExecName" \
-    --longoptions help,verbose.version,dest-coll:,log:,size:,src-dir: \
+    --longoptions help,verbose.version,dest-coll:,log:,sizes:,src-dir: \
     --options hVvD:L:S:s: \
     -- \
     "$@"
@@ -186,7 +205,7 @@ fmt_opts()
 
 do_test()
 {
-  local size="$1"
+  local sizes="$1"
   local srcDir="$2"
   local destColl="$3"
 
@@ -211,13 +230,6 @@ do_test()
   # shellcheck disable=SC2064
   trap "clean_up '$srcFile' '$destColl'" EXIT
 
-  printf 'Creating test file %s\n' "$srcFile" >> "$StatusLog"
-  if ! truncate --size "$size" "$srcFile"
-  then
-    printf 'Failed to create file\n' >&2
-    return 1
-  fi
-
   printf 'Creating destination collection %s\n' "$destColl" >> "$StatusLog"
   if ! imkdir "$destColl"
   then
@@ -227,30 +239,55 @@ do_test()
 
   printf 'Beginning test\n' >> "$StatusLog"
 
-  local attempt
-  for attempt in $(seq "$NumRuns")
+  local size
+  for size in ${sizes//,/ }
   do
-    printf 'Uploading %s\n' "$attempt" >> "$StatusLog"
+    setup "$srcFile" "$size"
 
-    local obj
-    printf -v obj '%s/upload-%02d' "$destColl" "$attempt"
-    perform_upload "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
-  done | gen_report "$size" > "$ReportLog"
+    printf 'Beginning %s measurements\n' "$size" >> "$StatusLog"
+
+    local attempt
+    for attempt in $(seq "$NumRuns")
+    do
+      printf 'Uploading %s\n' "$attempt" >> "$StatusLog"
+
+      local obj
+      printf -v obj '%s/%s-upload-%02d' "$destColl" "$size" "$attempt"
+      perform_upload "$size" "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
+    done
+
+    printf 'Finished %s measurements\n' "$size" >> "$StatusLog"
+  done | gen_report > "$ReportLog"
 
   printf 'Finished test\n' >> "$StatusLog"
 }
 
 
+setup()
+{
+  local srcFile="$1"
+  local size="$2"
+
+  printf 'Creating test file %s\n' "$srcFile" >> "$StatusLog"
+  if ! truncate --size "$size" "$srcFile"
+  then
+    printf 'Failed to create file\n' >&2
+    return 1
+  fi
+}
+
+
 perform_upload()
 {
-  local run="$1"
-  local src="$2"
-  local dest="$3"
+  local size="$1"
+  local run="$2"
+  local src="$3"
+  local dest="$4"
 
   local startTime duration rate
   startTime=$(date --utc --iso-8601=seconds)
   IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
-  printf '%d %s %s %s\n' "$run" "$startTime" "$duration" "$rate"
+  printf '%d %s %s %s %s\n' "$run" "$startTime" "$size" "$duration" "$rate"
 }
 
 
@@ -296,19 +333,39 @@ ensure_irods_sess()
 
 gen_report()
 {
-  local size="$1"
+  local clientReport
+  clientReport=$(gen_client_report)
+
+  local sumReport
+  printf -v sumReport 'Summary\n'
 
   local rates=()
-
-  local runsReport
-  printf -v runsReport 'Runs\n\n'
-
-  printf -v runsReport \
-    '%sRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$runsReport"
+  local sizeSumReport=
+  local runsReport=
+  local reportSize=
+  local curSize=
 
   local duration rate run startTime
-  while IFS=' ' read -r run startTime duration rate
+  while IFS=' ' read -r run startTime size duration rate
   do
+    if [[ "$size" != "$curSize" ]]
+    then
+      if [[ -n "${rates-}" ]]
+      then
+        sizeSumReport=$(gen_size_summary "$reportSize" "${rates[@]}")
+        printf -v sumReport '%s\n%s\n' "$sumReport" "$sizeSumReport"
+
+        rates=()
+      fi
+
+      curSize="$size"
+      reportSize=$(sed 's/^\([0-9]*\)/\1 /' <<<"$curSize")
+
+      printf -v runsReport '%s\n\n%s Runs\n' "$runsReport" "$reportSize"
+      printf -v runsReport \
+        '%s\nRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$runsReport"
+    fi
+
     rates=(${rates[*]} $rate)
     startTime="${startTime%+*}"
 
@@ -316,37 +373,13 @@ gen_report()
       '%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "$startTime" "$duration" "$rate"
   done
 
-  local maxRate minRate
-  maxRate=$(compute_max "${rates[@]}")
-  minRate=$(compute_min "${rates[@]}")
-
-  local geoMeanRate geoStd
-  geoMeanRate=$(compute_geomean "${rates[@]}")
-  geoStd=$(compute_geostd "$geoMeanRate" "${rates[@]}")
-
-  local expectedRate likelyLB likelyUB
-  expectedRate=$(dc --expression "3 k $geoMeanRate 1 / p")
-  likelyLB=$(dc --expression "3 k $geoMeanRate $geoStd / p")
-  likelyUB=$(dc --expression "3 k $geoMeanRate $geoStd * 1 / p")
-
-  local reportSize
-  reportSize=$(sed 's/^\([0-9]*\)/\1 /' <<<"$size")
-
-  local clientReport
-  clientReport=$(gen_client_report)
+  sizeSumReport=$(gen_size_summary "$reportSize" "${rates[@]}")
+  printf -v sumReport '%s\n%s\n' "$sumReport" "$sizeSumReport"
 
   local report
-  printf -v report 'UPLOAD THROUGHPUT REPORT\n\n'
-
-  printf -v report '%sExecution Time:         %s\n' "$report" "$TestTime"
-  printf -v report '%sFile Size:              %s\n\n' "$report" "$reportSize"
-  printf -v report '%sEstimated Throuphput:   %s MiB/s\n' "$report" "${expectedRate/#./0.}"
-  printf -v report '%s67%% Confidence Bounds:  [%s, %s] MiB/s\n\n' \
-    "$report" "${likelyLB/#./0.}" "${likelyUB/#./0.}"
-
-  printf -v report '%sBounds on Measurements: [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
-
-  printf -v report '%s\n\n%s\n\n\n%s' "$report" "$clientReport" "$runsReport"
+  printf -v report 'UPLOAD THROUGHPUT REPORT\n'
+  printf -v report '%s\nExecution Time:  %s\n' "$report" "$TestTime"
+  printf -v report '%s\n\n%s\n\n\n%s%s' "$report" "$clientReport" "$sumReport" "$runsReport"
 
   printf '%s' "$report"
 }
@@ -365,7 +398,37 @@ gen_client_report()
   printf -v report '%sMemory:     %s\n' "$report" "$totMem"
   printf -v report '%sCores:      %d\n' "$report" "$numCores"
 
-  printf '%s' "$report"
+  printf '%s\n' "$report"
+}
+
+
+gen_size_summary()
+{
+  local size="$1"
+  shift
+  local rates=("$@")
+
+  local maxRate minRate
+  maxRate=$(compute_max "${rates[@]}")
+  minRate=$(compute_min "${rates[@]}")
+
+  local geoMeanRate geoStd
+  geoMeanRate=$(compute_geomean "${rates[@]}")
+  geoStd=$(compute_geostd "$geoMeanRate" "${rates[@]}")
+
+  local expectedRate likelyLB likelyUB
+  expectedRate=$(dc --expression "3 k $geoMeanRate 1 / p")
+  likelyLB=$(dc --expression "3 k $geoMeanRate $geoStd / p")
+  likelyUB=$(dc --expression "3 k $geoMeanRate $geoStd * 1 / p")
+
+  local report
+  printf -v report 'File Size:               %s\n' "$size"
+  printf -v report '%sEstimated Throuphput:    %s MiB/s\n' "$report" "${expectedRate/#./0.}"
+  printf -v report '%s67%% Confidence Bounds:   [%s, %s] MiB/s\n' \
+    "$report" "${likelyLB/#./0.}" "${likelyUB/#./0.}"
+  printf -v report '%sBounds on Measurements:  [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
+
+  printf '%s\n' "$report"
 }
 
 
