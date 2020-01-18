@@ -412,18 +412,18 @@ gen_size_summary()
   maxRate=$(compute_max "${rates[@]}")
   minRate=$(compute_min "${rates[@]}")
 
-  local geoMeanRate geoStd
+  local geoMeanRate geoDev
   geoMeanRate=$(compute_geomean "${rates[@]}")
-  geoStd=$(compute_geostd "$geoMeanRate" "${rates[@]}")
+  geoDev=$(compute_geostd "$geoMeanRate" "${rates[@]}")
 
   local expectedRate likelyLB likelyUB
-  expectedRate=$(dc --expression "3 k $geoMeanRate 1 / p")
-  likelyLB=$(dc --expression "3 k $geoMeanRate $geoStd / p")
-  likelyUB=$(dc --expression "3 k $geoMeanRate $geoStd * 1 / p")
+  expectedRate=$(awk --assign RATE="$geoMeanRate" 'END { printf "%0.3f", RATE }' /dev/null)
+  likelyLB=$(compute_low_bound "$geoMeanRate" "$geoDev")
+  likelyUB=$(compute_high_bound "$geoMeanRate" "$geoDev")
 
   local report
   printf -v report 'File Size:               %s\n' "$size"
-  printf -v report '%sEstimated Throuphput:    %s MiB/s\n' "$report" "${expectedRate/#./0.}"
+  printf -v report '%sEstimated Throuphput:    %s MiB/s\n' "$report" "$expectedRate"
   printf -v report '%s67%% Confidence Bounds:   [%s, %s] MiB/s\n' \
     "$report" "${likelyLB/#./0.}" "${likelyUB/#./0.}"
   printf -v report '%sBounds on Measurements:  [%s, %s] MiB/s\n' "$report" "$minRate" "$maxRate"
@@ -452,6 +452,28 @@ compute_geostd()
     GEOMEAN == 0 { totSqrLnScaled = +inf }
     GEOMEAN != 0 { totSqrLnScaled += log($0 / GEOMEAN)^2 }
     END { print exp(sqrt(totSqrLnScaled / NR)); }
+EOF
+}
+
+
+compute_high_bound()
+{
+  local geoMean="$1"
+  local geoDev="$2"
+
+  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - /dev/null <<'EOF'
+    END { printf "%0.3f", GEOMEAN * GEODEV; }
+EOF
+}
+
+
+compute_low_bound()
+{
+  local geoMean="$1"
+  local geoDev="$2"
+
+  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - /dev/null <<'EOF'
+    END { printf "%0.3f", GEOMEAN / GEODEV; }
 EOF
 }
 
