@@ -1,0 +1,632 @@
+#!/bin/bash
+
+show_help()
+{
+  cat <<EOF
+
+$ExecName version $Version
+
+Usage:
+ $ExecName [options]
+
+This script measures transfer throughput of the client running this script to
+and from the CyVerse Data Store. It downloads a data object thirty times in a
+row, with each download being to a new file. Afterwards, it uploads a file
+thirty times, with each upload being to a new data object. If multiple
+sizes are requested, this process is repeated for each size. A report is written
+to stdout, while errors and status messages are written to stderr.
+
+For each set of downloads or uploads of a given size, the geometric mean is
+computed to estimate the throughput and the 67% geometric deviation is computed
+to estimate the variability.
+
+Options:
+ -C, --server-coll SERVER-COLL  the name of the iRODS collection where used
+                                during testing. Defaults to
+                                \`ipwd\`/throughput-\`date -u -Iseconds\`.
+ -D, --client-dir CLIENT-DIR    the name of the temporary directory used on the
+                                client. Defaults to
+                                \`\$TMPDIR\`/throughput-\`date -u -Iseconds\`.
+ -h, --help                     show help and exit
+ -L, --log REPORT-FILE          write report to REPORT-FILE instead of stdout.
+ -S, --sizes SIZE-1,SIZE-2,...  the sizes of the files with units in a form
+                                accepted by \`truncate\`, e.g., 2MiB gives a two
+                                mebibyte file. The default is 1GiB.
+ -V, --version                  show version and exit
+ -v, --verbose                  output status messages
+
+Output:
+It generates a report similar to the following.
+$(tput bold)
+CYVERSE THROUGHPUT REPORT
+
+Execution Time:  2019-12-12T22:40:08+00:00
+
+
+Client Information
+
+iCommands:  rods4.1.10
+Memory:     16172756 kB
+Cores:      8
+
+
+Summary
+
+File Size:                      1 GiB
+Estimated Download Throuphput:  85.207 [77.066, 94.207] MiB/s
+Estimated Upload Throuphput:    85.207 [77.066, 94.207] MiB/s
+.
+.
+.
+
+File Size:                      10 GiB
+Estimated Download Throuphput:  535.184 [442.045, 647.947] MiB/s
+Estimated Upload Throughput:    535.184 [442.045, 647.947] MiB/s
+
+
+1 GiB Downloads
+
+Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
+ 01   2019-12-12T22:40:32         12.566           81.486
+.
+.
+.
+ 30   2019-12-12T22:47:39         13.825           74.067
+
+
+1 GiB Uploads
+
+Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
+01   2019-12-12T22:40:32         12.566           81.486
+.
+.
+.
+30   2019-12-12T22:47:39         13.825           74.067
+.
+.
+.
+
+
+10 GiB Downloads
+.
+.
+.$(tput sgr0)
+EOF
+}
+
+
+set -o nounset -o pipefail
+
+readonly Version=1
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
+readonly TestTime="$(date --utc --iso-8601=seconds)"
+readonly NumRuns=30
+
+declare ReportLog
+declare StatusLog
+
+
+main()
+{
+  declare -A optMap=(
+    [help]=''
+    [version]=''
+    [verbose]=''
+    [client-dir]="${TMPDIR:-$PWD}/throughput-$TestTime"
+    [server-coll]=''
+    [sizes]=1GiB
+    [log]=/dev/stdout )
+
+  if ! map_opts optMap "$@"
+  then
+    show_help >&2
+    return 1
+  fi
+
+  if [[ -n "${optMap[help]}" ]]
+  then
+    show_help
+    return 0
+  fi
+
+  if [[ -n "${optMap[version]}" ]]
+  then
+    printf '%s\n' "$Version"
+    return 0
+  fi
+
+  if [[ -z "${optMap[verbose]}" ]]
+  then
+    StatusLog=/dev/null
+  else
+    StatusLog=/dev/stderr
+  fi
+
+  ReportLog="${optMap[log]}"
+
+  do_test "${optMap[sizes]}" "${optMap[client-dir]}" "${optMap[server-coll]}"
+}
+
+
+map_opts()
+{
+  local mapVar="$1"
+  shift
+
+  local opts
+  if ! opts=$(fmt_opts "$@")
+  then
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        eval "$mapVar[help]=help"
+        shift
+        ;;
+      -V|--version)
+        eval "$mapVar[version]=version"
+        shift
+        ;;
+      -v|--verbose)
+        eval "$mapVar[verbose]=verbose"
+        shift
+        ;;
+      -D|--client-dir)
+        eval "$mapVar[client-dir]='$2'"
+        shift 2
+        ;;
+      -L|--log)
+        eval "$mapVar[log]='$2'"
+        shift 2
+        ;;
+      -C|--server-coll)
+        eval "$mapVar[server-coll]='$2'"
+        shift 2
+        ;;
+      -S|--sizes)
+        eval "$mapVar[sizes]='$2'"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done
+}
+
+
+fmt_opts()
+{
+  getopt \
+    --name "$ExecName" \
+    --longoptions help,verbose,version,client-dir:,log:,server-coll:,sizes: \
+    --options hVvD:L:S:C: \
+    -- \
+    "$@"
+}
+
+
+do_test()
+{
+  local sizes="$1"
+  local clientDir="$2"
+  local svrColl="$3"
+
+  if ! ensure_irods_sess
+  then
+    printf 'iRODS session not initialized\n' >&2
+    return 1
+  fi
+
+  if [[ -z "$svrColl" ]]
+  then
+    svrColl="$(ipwd)/throughput-$TestTime"
+  fi
+
+  # shellcheck disable=SC2064
+  trap "clean_up '$clientDir' '$svrColl'" EXIT
+
+  printf 'Creating server collection %s\n' "$svrColl" >> "$StatusLog"
+  if ! imkdir "$svrColl"
+  then
+    printf 'Failed to create server collection\n' >&2
+    return 1
+  fi
+
+  printf 'Creating client directory %s\n' "$clientDir" >> "$StatusLog"
+  if ! mkdir "$clientDir"
+  then
+    printf 'Cannot create client directory\n' >&2
+    return 1
+  fi
+
+  printf 'Beginning test\n' >> "$StatusLog"
+
+  local size
+  for size in ${sizes//,/ }
+  do
+    measure_downloads "$size" "$svrColl" "$clientDir"
+    measure_uploads "$size" "$clientDir" "$svrColl"
+  done | gen_report > "$ReportLog"
+
+  printf 'Finished test\n' >> "$StatusLog"
+}
+
+
+clean_up()
+{
+  local clientDir="$1"
+  local svrColl="$2"
+
+  printf 'Deleting client directory %s\n' "$clientDir" >> "$StatusLog"
+  rm --force --recursive "$clientDir"
+
+  if ils "$svrColl" &> /dev/null
+  then
+    printf 'Deleting server collection %s\n' "$svrColl" >> "$StatusLog"
+    irm -f -r "$svrColl"
+  fi
+
+  printf 'Finished\n' >> "$StatusLog"
+  return 0
+}
+
+
+ensure_irods_sess()
+{
+  local authFile
+  authFile="$(ienv | sed --quiet 's/.*irods_authentication_file - //p')"
+
+  if [[ -z "$authFile" ]]
+  then
+    authFile="$HOME"/.irods/.irodsA
+  fi
+
+  if [[ ! -e "$authFile" ]]
+  then
+    if ! iinit
+    then
+      iexit full
+      return 1
+    fi
+  fi
+}
+
+
+measure_downloads()
+{
+  local size="$1"
+  local srcColl="$2"
+  local destDir="$3"
+
+  local srcObj
+  srcObj=$(setup_download "$size" "$srcColl" "$destDir")
+
+  printf 'Beginning %s download measurements\n' "$size" >> "$StatusLog"
+
+  local attempt
+  for attempt in $(seq "$NumRuns")
+  do
+    printf 'Downloading %s\n' "$attempt" >> "$StatusLog"
+
+    local destFile
+    printf -v destFile '%s/download-%02d' "$destDir" "$attempt"
+    perform_download "$size" "$attempt" "$srcObj" "$destFile" | tee --append "$StatusLog"
+    rm --force "$destFile"
+  done
+
+  printf 'Finished %s download measurements\n' "$size" >> "$StatusLog"
+}
+
+
+setup_download()
+{
+  local size="$1"
+  local srcColl="$2"
+  local destDir="$3"
+
+  local srcFile
+  if ! srcFile=$(TMPDIR="$destDir" mktemp)
+  then
+   printf 'Cannot reserve temporary file\n' >&2
+   return 1
+  fi
+
+  printf 'Creating %s test file\n' "$size" >> "$StatusLog"
+  if ! truncate --size "$size" "$srcFile"
+  then
+    printf 'Failed to create %s test file\n' "$size" >&2
+    return 1
+  fi
+
+  local srcObj="$srcColl/test_file.$size"
+
+  printf 'Staging %s test file\n' "$size" >> "$StatusLog"
+  if ! iput "$srcFile" "$srcObj"
+  then
+    printf 'Failed to stage %s test file\n' "$size" >&2
+    return 1
+  fi
+
+  rm --force "$srcFile"
+
+  echo "$srcObj"
+}
+
+
+perform_download()
+{
+  local size="$1"
+  local run="$2"
+  local src="$3"
+  local dest="$4"
+
+  local startTime duration rate
+  startTime=$(date --utc --iso-8601=seconds)
+  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget -v "$src" "$dest")
+  printf 'download %d %s %s %s %s\n' "$run" "$startTime" "$size" "$duration" "$rate"
+}
+
+
+measure_uploads()
+{
+  local size="$1"
+  local srcDir="$2"
+  local destColl="$3"
+
+  local srcFile
+  srcFile=$(setup_uploads "$size" "$srcDir")
+
+  printf 'Beginning %s upload measurements\n' "$size" >> "$StatusLog"
+
+  local attempt
+  for attempt in $(seq "$NumRuns")
+  do
+    printf 'Uploading %s\n' "$attempt" >> "$StatusLog"
+
+    local obj
+    printf -v obj '%s/%s-upload-%02d' "$destColl" "$size" "$attempt"
+    perform_upload "$size" "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
+  done
+
+  printf 'Finished %s upload measurements\n' "$size" >> "$StatusLog"
+
+  printf 'Deleting test file %s\n' "$srcFile" >> "$StatusLog"
+  rm --force "$srcFile"
+}
+
+
+setup_uploads()
+{
+  local size="$1"
+  local srcDir="$2"
+
+  local srcFile
+  if ! srcFile=$(TMPDIR="$srcDir" mktemp)
+  then
+    printf 'Cannot reserve temporary file\n' >&2
+    return 1
+  fi
+
+  printf 'Creating test file %s\n' "$srcFile" >> "$StatusLog"
+  if ! truncate --size "$size" "$srcFile"
+  then
+    printf 'Failed to create file\n' >&2
+    return 1
+  fi
+
+  echo "$srcFile"
+}
+
+
+perform_upload()
+{
+  local size="$1"
+  local run="$2"
+  local src="$3"
+  local dest="$4"
+
+  local startTime duration rate
+  startTime=$(date --utc --iso-8601=seconds)
+  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
+  printf 'upload %d %s %s %s %s\n' "$run" "$startTime" "$size" "$duration" "$rate"
+}
+
+
+gen_report()
+{
+  local clientReport
+  clientReport=$(gen_client_report)
+
+  local sumReport
+  printf -v sumReport 'Summary\n'
+
+  local downRates=()
+  local upRates=()
+  local sizeSumReport=
+  local runsReport=
+  local reportSize=
+  local curSize=
+  local curDir=
+
+  local direction duration rate run size startTime
+  while IFS=' ' read -r direction run startTime size duration rate
+  do
+    if [[ "$direction" != "$curDir" ]]
+    then
+      curDir="$direction"
+
+      if [[ "$size" != "$curSize" ]]
+      then
+        if [[ -n "${downRates-}" ]] || [[ -n "${upRates-}" ]]
+        then
+          sumReport=$(append_size_summary "$sumReport" "$reportSize" downRates upRates)
+          downRates=()
+          upRates=()
+        fi
+
+        curSize="$size"
+        reportSize=$(sed 's/^\([0-9]*\)/\1 /' <<<"$curSize")
+      fi
+
+      printf -v runsReport '%s\n\n%s %s\n' "$runsReport" "$reportSize" "${curDir^}s"
+      printf -v runsReport \
+        '%s\nRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$runsReport"
+    fi
+
+    if [[ "$curDir" = download ]]
+    then
+      downRates=(${downRates[@]-} $rate)
+    else
+      upRates=(${upRates[@]-} $rate)
+    fi
+
+    printf -v runsReport \
+      '%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "${startTime%+*}" "$duration" "$rate"
+  done
+
+  sumReport=$(append_size_summary "$sumReport" "$reportSize" downRates upRates)
+
+  local report
+  printf -v report 'CYVERSE THROUGHPUT REPORT\n'
+  printf -v report '%s\nExecution Time:  %s\n' "$report" "$TestTime"
+  printf -v report '%s\n\n%s\n\n\n%s\n%s' "$report" "$clientReport" "$sumReport" "$runsReport"
+
+  printf '%s' "$report"
+}
+
+
+gen_client_report()
+{
+  local irodsVer numCores totMem
+  numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
+  totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
+  irodsVer=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
+
+  local report
+  printf -v report 'Client Information\n\n'
+  printf -v report '%siCommands:  %s\n' "$report" "$irodsVer"
+  printf -v report '%sMemory:     %s\n' "$report" "$totMem"
+  printf -v report '%sCores:      %d\n' "$report" "$numCores"
+
+  printf '%s\n' "$report"
+}
+
+
+append_size_summary()
+{
+  local report="$1"
+  local size="$2"
+  local downRatesVar="$3"
+  local upRatesVar="$4"
+
+  local downloadSum uploadSum
+  downloadSum=$(gen_throughput_summary "$downRatesVar")
+  uploadSum=$(gen_throughput_summary "$upRatesVar")
+
+  local summary
+  printf -v summary 'File Size:                      %s\n' "$size"
+  printf -v summary '%sEstimated Download Throughput:  %s\n' "$summary" "$downloadSum"
+  printf -v summary '%sEstimated Upload Throughput:    %s\n' "$summary" "$uploadSum"
+
+  printf '%s\n\n%s\n' "$report" "$summary"
+}
+
+
+gen_throughput_summary()
+{
+  local ratesVar="$1"
+
+  local rates
+  eval 'rates=(${'"$ratesVar"'[@]})'
+
+  local geoMeanRate geoDev
+  geoMeanRate=$(compute_geomean "${rates[@]}")
+  geoDev=$(compute_geostd "$geoMeanRate" "${rates[@]}")
+
+  local expectedRate likelyLB likelyUB
+  expectedRate=$(awk --assign RATE="$geoMeanRate" 'END { printf "%0.3f", RATE }' /dev/null)
+  likelyLB=$(compute_low_bound "$geoMeanRate" "$geoDev")
+  likelyUB=$(compute_high_bound "$geoMeanRate" "$geoDev")
+
+  printf '%s [%s, %s] MiB/s' "$expectedRate" "$likelyLB" "$likelyUB"
+}
+
+
+compute_geomean()
+{
+  awk --file - <(printf '%s\n' "$@") <<'EOF'
+    BEGIN { totLn = 0.0; }
+    { totLn += log($0); }
+    END { print exp(totLn / NR); }
+EOF
+}
+
+
+compute_geostd()
+{
+  local geoMean="$1"
+  shift
+
+  awk --assign GEOMEAN="$geoMean" --file - <(printf '%s\n' "$@") <<'EOF'
+    BEGIN { totSqrLnScaled = 0.0; }
+    GEOMEAN == 0 { totSqrLnScaled = +inf; }
+    GEOMEAN != 0 { totSqrLnScaled += log($0 / GEOMEAN)^2; }
+    END { print exp(sqrt(totSqrLnScaled / NR)); }
+EOF
+}
+
+
+compute_high_bound()
+{
+  local geoMean="$1"
+  local geoDev="$2"
+
+  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - /dev/null <<'EOF'
+    END { printf "%0.3f", GEOMEAN * GEODEV; }
+EOF
+}
+
+
+compute_low_bound()
+{
+  local geoMean="$1"
+  local geoDev="$2"
+
+  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - /dev/null <<'EOF'
+    END { printf "%0.3f", GEOMEAN / GEODEV; }
+EOF
+}
+
+
+compute_max()
+{
+  awk --file - <(printf '%s\n' "$@") <<'EOF'
+    NR == 1 { max = $0; }
+    { if ($0 > max) { max = $0; } }
+    END { print max; }
+EOF
+}
+
+
+compute_min()
+{
+  awk --file - <(printf '%s\n' "$@") <<'EOF'
+    NR == 1 { min = $0; }
+    { if ($0 < min) { min = $0; } }
+    END { print min; }
+EOF
+}
+
+
+main "$@"
