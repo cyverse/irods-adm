@@ -259,9 +259,7 @@ main()
       # Large file transfers
       cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"   480  8192 < "$objList")  # [480, 8192) MiB transfers
       cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"  8192 16384 < "$objList")  # [8, 16) GiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" 16384 32768 < "$objList")  # [16, 32) GiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" 32768 65536 < "$objList")  # [32, 64) GiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" 65536       < "$objList")  # >= 64 GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" 16384       < "$objList")  # >= 16 GiB transfers
 
       # zero byte files
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512  0  0 < "$objList")  # 16 1-threaded transfers
