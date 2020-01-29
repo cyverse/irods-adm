@@ -87,7 +87,7 @@ rm_trash()
   delTot=$(wc --lines < "$trashList")
   printf '%d data objects to delete\n' "$delTot"
 
-  xargs --no-run-if-empty --delimiter '\n' irm -f -v < "$trashList"
+  xargs --no-run-if-empty --delimiter '\n' --max-procs 2 irm -f -v < "$trashList"
 
   # Remove the empty trash collections
   printf 'Retrieving home collections to prune...\n'
