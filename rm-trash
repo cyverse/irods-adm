@@ -55,11 +55,11 @@ main()
   # shellcheck disable=SC2064
   trap "rm_temps '$trashTempFiles'" EXIT
 
-  dump_logs "$trashTempFiles"
+  rm_trash "$trashTempFiles"
 }
 
 
-dump_logs()
+rm_trash()
 {
   local trashTempFiles="$1"
 
