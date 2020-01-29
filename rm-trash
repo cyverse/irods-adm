@@ -55,11 +55,11 @@ main()
   # shellcheck disable=SC2064
   trap "rm_temps '$trashTempFiles'" EXIT
 
-  dump_logs "$trashTempFiles"
+  rm_trash "$trashTempFiles"
 }
 
 
-dump_logs()
+rm_trash()
 {
   local trashTempFiles="$1"
 
@@ -87,7 +87,7 @@ dump_logs()
   delTot=$(wc --lines < "$trashList")
   printf '%d data objects to delete\n' "$delTot"
 
-  xargs --no-run-if-empty --delimiter '\n' irm -f -v < "$trashList"
+  xargs --no-run-if-empty --delimiter '\n' --max-procs 2 irm -f -v < "$trashList"
 
   # Remove the empty trash collections
   printf 'Retrieving home collections to prune...\n'
