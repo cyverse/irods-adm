@@ -52,7 +52,7 @@ Cores:      8
 
 Summary
 
-File Size:            1 GiB
+File Size:            1GiB
 Download Duration:    12.018 [10.870, 13.287] s
 Download Throughput:  85.207 [77.066, 94.207] MiB/s
 Upload Duration:      13.219 [10.871, 16.074] s
@@ -61,14 +61,14 @@ Upload Throughput:    77.464 [63.705, 94.196] MiB/s
 .
 .
 
-File Size:            10 GiB
+File Size:            10GiB
 Download Duration:    19.134 [15.804, 23.165] s
 Download Throuphput:  535.184 [442.045, 647.947] MiB/s
 Upload Duration:      64.773 [48.628, 86.277] s
 Upload Throughput:    158.091 [118.687, 210.578] MiB/s
 
 
-1 GiB Downloads
+Size 1GiB Downloads
 
 Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
  01   2019-12-12T22:40:32         12.566           81.486
@@ -78,20 +78,20 @@ Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
  30   2019-12-12T22:47:39         13.825           74.067
 
 
-1 GiB Uploads
+Size 1GiB Uploads
 
 Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
-01   2019-12-12T22:47:56         15.207           67.337
+ 01   2019-12-12T22:47:56         15.207           67.337
 .
 .
 .
-30   2019-12-12T22:55:46         13.822           74.085
+ 30   2019-12-12T22:55:46         13.822           74.085
 .
 .
 .
 
 
-10 GiB Downloads
+Size 10GiB Downloads
 .
 .
 .$(tput sgr0)
@@ -533,7 +533,7 @@ gen_client_report()
   local irodsVer numCores totMem
   numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
   totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
-  irodsVer=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
+  irodsVer=$(get_irods_version)
 
   local report
   printf -v report 'Client Information\n\n'
@@ -542,6 +542,19 @@ gen_client_report()
   printf -v report '%sCores:      %d\n' "$report" "$numCores"
 
   printf '%s\n' "$report"
+}
+
+get_irods_version()
+{
+  local version
+  version=$(ienv | sed --quiet 's/.*irods_version - \([0-9.]*\).*/\1/p')
+
+  if [[ -z "$version" ]]
+  then
+    version=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
+  fi
+
+  printf '%s' "$version"
 }
 
 
