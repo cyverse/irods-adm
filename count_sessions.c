@@ -1,3 +1,9 @@
+#!/usr/bin/tcc -run
+/* This is a conversion of `count-sessions` to C so that it runs in a reasonable
+ * amount of time. Once this program is feature complete, `count-sessions`
+ * should be removed
+ */
+
 #include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
