@@ -39,6 +39,12 @@ The program `session-intervals` can be used to extract session time intervals
 from a sequence of sessions.
 
 
+## Monitoring
+
+The program `check_irods` checks to see if an iRODS service is online. It is
+intended for use with Nagios.
+
+
 ## Moving files to another resource
 
 The program `phymv` can be used to move groups of files from one resource to
@@ -72,6 +78,9 @@ The program `count-sessions` can be combined with `sessions-intervals` to
 generate a report on the number of concurrent sessions during each second for
 the time period covered by a sequence of sessions.
 
+The program `cyverse-throughput` reports throughput between the client running
+the script and the CyVerse Data Store.
+
 The program `daily-transfer-report` generates a report summarizing the amount of
 data uploaded and downloaded each day.
 
@@ -81,7 +90,7 @@ Data Store.
 The program `histogram` can be used to generate a histogram of sizes from an
 arbitrary SQL query for byte-based sizes.
 
-The program `ips-proxy` can be used to generate a report similar to ips, but
+The program `ips-proxy` can be used to generate a report similar to `ips`, but
 when the IES behind a proxy.
 
 The program `list-rods-logs` can be used to list the iRODS log files on a given
