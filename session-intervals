@@ -1,12 +1,11 @@
 #!/usr/bin/awk -f
 #
-# This script extracts the begin and end times for each session from a stream of iRODS sessions.
-# It writes one interval per line with the follwoing format.
+# This script extracts the begin and end times for each session from a stream of
+# iRODS sessions. It writes one interval per line with the following format.
 #
 # <start time> <end time> <client user>
 #
 # The times are in seconds since the POSIX epoch.
-
 
 
 function read_time(entry) {
