@@ -657,26 +657,6 @@ EOF
 }
 
 
-compute_max()
-{
-  awk --file - <(printf '%s\n' "$@") <<'EOF'
-    NR == 1 { max = $0; }
-    { if ($0 > max) { max = $0; } }
-    END { print max; }
-EOF
-}
-
-
-compute_min()
-{
-  awk --file - <(printf '%s\n' "$@") <<'EOF'
-    NR == 1 { min = $0; }
-    { if ($0 < min) { min = $0; } }
-    END { print min; }
-EOF
-}
-
-
 compute_rate()
 {
   local sizeB="$1"
