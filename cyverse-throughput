@@ -52,19 +52,23 @@ Cores:      8
 
 Summary
 
-File Size:                      1 GiB
-Estimated Download Throuphput:  85.207 [77.066, 94.207] MiB/s
-Estimated Upload Throuphput:    85.207 [77.066, 94.207] MiB/s
+File Size:            1GiB
+Download Duration:    12.018 [10.870, 13.287] s
+Download Throughput:  85.207 [77.066, 94.207] MiB/s
+Upload Duration:      13.219 [10.871, 16.074] s
+Upload Throughput:    77.464 [63.705, 94.196] MiB/s
 .
 .
 .
 
-File Size:                      10 GiB
-Estimated Download Throuphput:  535.184 [442.045, 647.947] MiB/s
-Estimated Upload Throughput:    535.184 [442.045, 647.947] MiB/s
+File Size:            10GiB
+Download Duration:    19.134 [15.804, 23.165] s
+Download Throuphput:  535.184 [442.045, 647.947] MiB/s
+Upload Duration:      64.773 [48.628, 86.277] s
+Upload Throughput:    158.091 [118.687, 210.578] MiB/s
 
 
-1 GiB Downloads
+Size 1GiB Downloads
 
 Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
  01   2019-12-12T22:40:32         12.566           81.486
@@ -74,20 +78,20 @@ Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
  30   2019-12-12T22:47:39         13.825           74.067
 
 
-1 GiB Uploads
+Size 1GiB Uploads
 
 Run   Start Time (UTC)      Duration (s)   Throughput (MiB/s)
-01   2019-12-12T22:40:32         12.566           81.486
+ 01   2019-12-12T22:47:56         15.207           67.337
 .
 .
 .
-30   2019-12-12T22:47:39         13.825           74.067
+ 30   2019-12-12T22:55:46         13.822           74.085
 .
 .
 .
 
 
-10 GiB Downloads
+Size 10GiB Downloads
 .
 .
 .$(tput sgr0)
@@ -305,27 +309,34 @@ ensure_irods_sess()
 
 measure_downloads()
 {
-  local size="$1"
+  local reqSize="$1"
   local srcColl="$2"
   local destDir="$3"
 
-  local srcObj
-  srcObj=$(setup_download "$size" "$srcColl" "$destDir")
 
-  printf 'Beginning %s download measurements\n' "$size" >> "$StatusLog"
+  local srcObj
+  srcObj=$(setup_download "$reqSize" "$srcColl" "$destDir")
+
+  local srcName
+  srcName=$(basename "$srcObj")
+
+  local actSize
+  actSize=$(iquest '%s' "select DATA_SIZE where COLL_NAME = '$srcColl' and DATA_NAME = '$srcName'")
+
+  printf 'Beginning %s download measurements\n' "$reqSize" >> "$StatusLog"
 
   local attempt
   for attempt in $(seq "$NumRuns")
   do
     printf 'Downloading %s\n' "$attempt" >> "$StatusLog"
 
-    local destFile
-    printf -v destFile '%s/download-%02d' "$destDir" "$attempt"
-    perform_download "$size" "$attempt" "$srcObj" "$destFile" | tee --append "$StatusLog"
-    rm --force "$destFile"
+    local file
+    printf -v file '%s/%s-download-%02d' "$destDir" "$reqSize" "$attempt"
+    perform_download "$reqSize" "$actSize" "$attempt" "$srcObj" "$file" | tee --append "$StatusLog"
+    rm --force "$file"
   done
 
-  printf 'Finished %s download measurements\n' "$size" >> "$StatusLog"
+  printf 'Finished %s download measurements\n' "$reqSize" >> "$StatusLog"
 }
 
 
@@ -364,30 +375,19 @@ setup_download()
 }
 
 
-perform_download()
-{
-  local size="$1"
-  local run="$2"
-  local src="$3"
-  local dest="$4"
-
-  local startTime duration rate
-  startTime=$(date --utc --iso-8601=seconds)
-  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget -v "$src" "$dest")
-  printf 'download %d %s %s %s %s\n' "$run" "$startTime" "$size" "$duration" "$rate"
-}
-
-
 measure_uploads()
 {
-  local size="$1"
+  local reqSize="$1"
   local srcDir="$2"
   local destColl="$3"
 
   local srcFile
-  srcFile=$(setup_uploads "$size" "$srcDir")
+  srcFile=$(setup_uploads "$reqSize" "$srcDir")
 
-  printf 'Beginning %s upload measurements\n' "$size" >> "$StatusLog"
+  local actSize
+  actSize=$(stat --format '%s' "$srcFile")
+
+  printf 'Beginning %s upload measurements\n' "$reqSize" >> "$StatusLog"
 
   local attempt
   for attempt in $(seq "$NumRuns")
@@ -395,11 +395,11 @@ measure_uploads()
     printf 'Uploading %s\n' "$attempt" >> "$StatusLog"
 
     local obj
-    printf -v obj '%s/%s-upload-%02d' "$destColl" "$size" "$attempt"
-    perform_upload "$size" "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
+    printf -v obj '%s/%s-upload-%02d' "$destColl" "$reqSize" "$attempt"
+    perform_upload "$reqSize" "$actSize" "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
   done
 
-  printf 'Finished %s upload measurements\n' "$size" >> "$StatusLog"
+  printf 'Finished %s upload measurements\n' "$reqSize" >> "$StatusLog"
 
   printf 'Deleting test file %s\n' "$srcFile" >> "$StatusLog"
   rm --force "$srcFile"
@@ -429,17 +429,40 @@ setup_uploads()
 }
 
 
+perform_download()
+{
+  local reqSize="$1"
+  local actSize="$2"
+  local run="$3"
+  local src="$4"
+  local dest="$5"
+
+  local startTime
+  startTime=$(date --utc --iso-8601=seconds)
+
+  local duration rate
+  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget -v "$src" "$dest")
+
+  printf 'download %d %s %s %s %s %s\n' \
+    "$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
+}
+
+
 perform_upload()
 {
-  local size="$1"
-  local run="$2"
-  local src="$3"
-  local dest="$4"
+  local reqSize="$1"
+  local actSize="$2"
+  local run="$3"
+  local src="$4"
+  local dest="$5"
 
-  local startTime duration rate
+  local startTime
   startTime=$(date --utc --iso-8601=seconds)
+
+  local duration rate
   IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
-  printf 'upload %d %s %s %s %s\n' "$run" "$startTime" "$size" "$duration" "$rate"
+
+  printf 'upload %d %s %s %s %s %s\n' "$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
 }
 
 
@@ -449,53 +472,52 @@ gen_report()
   clientReport=$(gen_client_report)
 
   local sumReport
-  printf -v sumReport 'Summary\n'
+  printf -v sumReport 'Summary'
 
-  local downRates=()
-  local upRates=()
-  local sizeSumReport=
+  local downDurs=()
+  local upDurs=()
   local runsReport=
   local reportSize=
   local curSize=
   local curDir=
 
-  local direction duration rate run size startTime
-  while IFS=' ' read -r direction run startTime size duration rate
+  local direction duration rate reqSize run actSize startTime
+  while IFS=' ' read -r direction run startTime reqSize actSize duration rate
   do
     if [[ "$direction" != "$curDir" ]]
     then
       curDir="$direction"
 
-      if [[ "$size" != "$curSize" ]]
+      if [[ "$actSize" != "$curSize" ]]
       then
-        if [[ -n "${downRates-}" ]] || [[ -n "${upRates-}" ]]
+        if [[ -n "${downDurs-}" ]] || [[ -n "${upDurs-}" ]]
         then
-          sumReport=$(append_size_summary "$sumReport" "$reportSize" downRates upRates)
-          downRates=()
-          upRates=()
+          sumReport=$(append_size_summary "$sumReport" "$reportSize" "$curSize" downDurs upDurs)
+          downDurs=()
+          upDurs=()
         fi
 
-        curSize="$size"
-        reportSize=$(sed 's/^\([0-9]*\)/\1 /' <<<"$curSize")
+        curSize="$actSize"
+        reportSize="$reqSize"
       fi
 
-      printf -v runsReport '%s\n\n%s %s\n' "$runsReport" "$reportSize" "${curDir^}s"
+      printf -v runsReport '%s\n\nSize %s %s\n' "$runsReport" "$reportSize" "${curDir^}s"
       printf -v runsReport \
         '%s\nRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$runsReport"
     fi
 
     if [[ "$curDir" = download ]]
     then
-      downRates=(${downRates[@]-} $rate)
+      downDurs=(${downDurs[@]-} $duration)
     else
-      upRates=(${upRates[@]-} $rate)
+      upDurs=(${upDurs[@]-} $duration)
     fi
 
     printf -v runsReport \
       '%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "${startTime%+*}" "$duration" "$rate"
   done
 
-  sumReport=$(append_size_summary "$sumReport" "$reportSize" downRates upRates)
+  sumReport=$(append_size_summary "$sumReport" "$reportSize" "$curSize" downDurs upDurs)
 
   local report
   printf -v report 'CYVERSE THROUGHPUT REPORT\n'
@@ -511,7 +533,7 @@ gen_client_report()
   local irodsVer numCores totMem
   numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
   totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
-  irodsVer=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
+  irodsVer=$(get_irods_version)
 
   local report
   printf -v report 'Client Information\n\n'
@@ -522,44 +544,70 @@ gen_client_report()
   printf '%s\n' "$report"
 }
 
+get_irods_version()
+{
+  local version
+  version=$(ienv | sed --quiet 's/.*irods_version - \([0-9.]*\).*/\1/p')
+
+  if [[ -z "$version" ]]
+  then
+    version=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
+  fi
+
+  printf '%s' "$version"
+}
+
 
 append_size_summary()
 {
   local report="$1"
-  local size="$2"
-  local downRatesVar="$3"
-  local upRatesVar="$4"
+  local repSize="$2"
+  local size="$3"
+  local downDurationsVar="$4"
+  local upDurationsVar="$5"
 
-  local downloadSum uploadSum
-  downloadSum=$(gen_throughput_summary "$downRatesVar")
-  uploadSum=$(gen_throughput_summary "$upRatesVar")
+  local downDurations upDurations
+  eval 'downDurations=(${'"$downDurationsVar"'[@]})'
+  eval 'upDurations=(${'"$upDurationsVar"'[@]})'
 
-  local summary
-  printf -v summary 'File Size:                      %s\n' "$size"
-  printf -v summary '%sEstimated Download Throughput:  %s\n' "$summary" "$downloadSum"
-  printf -v summary '%sEstimated Upload Throughput:    %s\n' "$summary" "$uploadSum"
+  local geoMeanDownDur geoMeanDownRate geoDevDown
+  geoMeanDownDur=$(compute_geomean "${downDurations[@]}")
+  geoMeanDownRate=$(compute_rate "$size" "$geoMeanDownDur")
+  geoDevDown=$(compute_geodev "$geoMeanDownDur" "${downDurations[@]}")
+
+  local geoMeanUpDur geoMeanUpRate geoDevUp
+  geoMeanUpDur=$(compute_geomean "${upDurations[@]}")
+  geoMeanUpRate=$(compute_rate "$size" "$geoMeanUpDur")
+  geoDevUp=$(compute_geodev "$geoMeanUpDur" "${upDurations[@]}")
+
+  local downDurSum downRateSum upDurSum upRateSum
+  downDurSum=$(gen_stat "$geoMeanDownDur" "$geoDevDown")
+  downRateSum=$(gen_stat "$geoMeanDownRate" "$geoDevDown")
+  upDurSum=$(gen_stat "$geoMeanUpDur" "$geoDevUp")
+  upRateSum=$(gen_stat "$geoMeanUpRate" "$geoDevUp")
+
+  local summary=
+  printf -v summary '%sFile Size:            %s\n' "$summary" "$repSize"
+  printf -v summary '%sDownload Duration:    %s s\n' "$summary" "$downDurSum"
+  printf -v summary '%sDownload Throughput:  %s MiB/s\n' "$summary" "$downRateSum"
+  printf -v summary '%sUpload Duration:      %s s\n' "$summary" "$upDurSum"
+  printf -v summary '%sUpload Throughput:    %s MiB/s\n' "$summary" "$upRateSum"
 
   printf '%s\n\n%s\n' "$report" "$summary"
 }
 
 
-gen_throughput_summary()
+gen_stat()
 {
-  local ratesVar="$1"
+  local geoMean="$1"
+  local geoDev="$2"
 
-  local rates
-  eval 'rates=(${'"$ratesVar"'[@]})'
+  local expectedVal likelyLB likelyUB
+  expectedVal=$(awk --assign VAL="$geoMean" 'END { printf "%0.3f", VAL; }' /dev/null)
+  likelyLB=$(compute_low_bound "$geoMean" "$geoDev")
+  likelyUB=$(compute_high_bound "$geoMean" "$geoDev")
 
-  local geoMeanRate geoDev
-  geoMeanRate=$(compute_geomean "${rates[@]}")
-  geoDev=$(compute_geostd "$geoMeanRate" "${rates[@]}")
-
-  local expectedRate likelyLB likelyUB
-  expectedRate=$(awk --assign RATE="$geoMeanRate" 'END { printf "%0.3f", RATE }' /dev/null)
-  likelyLB=$(compute_low_bound "$geoMeanRate" "$geoDev")
-  likelyUB=$(compute_high_bound "$geoMeanRate" "$geoDev")
-
-  printf '%s [%s, %s] MiB/s' "$expectedRate" "$likelyLB" "$likelyUB"
+  printf '%s [%s, %s]' "$expectedVal" "$likelyLB" "$likelyUB"
 }
 
 
@@ -573,7 +621,7 @@ EOF
 }
 
 
-compute_geostd()
+compute_geodev()
 {
   local geoMean="$1"
   shift
@@ -592,8 +640,8 @@ compute_high_bound()
   local geoMean="$1"
   local geoDev="$2"
 
-  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - /dev/null <<'EOF'
-    END { printf "%0.3f", GEOMEAN * GEODEV; }
+  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - <<'EOF'
+    BEGIN { printf "%0.3f", GEOMEAN * GEODEV; }
 EOF
 }
 
@@ -603,28 +651,19 @@ compute_low_bound()
   local geoMean="$1"
   local geoDev="$2"
 
-  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - /dev/null <<'EOF'
-    END { printf "%0.3f", GEOMEAN / GEODEV; }
+  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - <<'EOF'
+    BEGIN { printf "%0.3f", GEOMEAN / GEODEV; }
 EOF
 }
 
 
-compute_max()
+compute_rate()
 {
-  awk --file - <(printf '%s\n' "$@") <<'EOF'
-    NR == 1 { max = $0; }
-    { if ($0 > max) { max = $0; } }
-    END { print max; }
-EOF
-}
+  local sizeB="$1"
+  local durationS="$2"
 
-
-compute_min()
-{
-  awk --file - <(printf '%s\n' "$@") <<'EOF'
-    NR == 1 { min = $0; }
-    { if ($0 < min) { min = $0; } }
-    END { print min; }
+  awk --assign DURATION_S="$durationS" --assign SIZE_B="$sizeB" --file - <<'EOF'
+    BEGIN { print (SIZE_B / (1024^2 * DURATION_S)); }
 EOF
 }
 

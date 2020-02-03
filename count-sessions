@@ -1,140 +1,280 @@
-#!/bin/bash
+#!/usr/bin/tcc -run
 
-readonly ExecName=$(basename "$0")
-readonly Version=1
+#include <stdio.h>
 
+static void
+show_help( FILE * const stream, char const * const execName, int const version ) {
+  char const * const help =
+"\n"
+"%s version %d\n"
+"\n"
+"Usage:\n"
+" %s [OPTIONS] INTERVALS_FILE\n"
+" \n"
+" Generates a report on the number of concurrent sessions during each second.\n"
+" \n"
+"Parameters:\n"
+" INTERVALS_FILE  the file containing session intervals\n"
+" \n"
+"Options:\n"
+" -h, --help     show help and exit\n"
+" -v, --version  show version and exit\n"
+" \n"
+"Summary:\n"
+" Generates a report on the number of concurrent sessions during each second. It\n"
+" reads an interval report with the following format.\n"
+" \n"
+" START_TIME STOP_TIME ...\n"
+" \n"
+" START_TIME is the time when a session started in seconds since the POSIX epoch.\n"
+" STOP_TIME is the time when the same session ended in seconds since the POSIX\n"
+" epoch. The rest of the line is ignored.\n"
+" \n"
+" The generate report is written to standard output where each line has the\n"
+" following format.\n"
+" \n"
+" TIME OPEN_SESSION_COUNT\n"
+" \n"
+" TIME is in seconds since the POSIX epoch. OPEN_SESSION_COUNT is the number of\n"
+" open sessions at TIME.\n"
+" \n"
+" The report is sorted by time with the first time being the earliest start time\n"
+" and the last time being the latest stop time.\n";
 
-show_help()
-{
-  cat <<EOF
-
-$ExecName version $Version
-
-Usage:
-  $ExecName [options] <intervals_file>
-
-Generates a report on the number of concurrent sessions during each second.
-
-Parameters:
-  <intervals_file>  the file containing session intervals
-
-Options:
- -h, --help     show help and exit
- -v, --version  show version and exit
-
-Summary:
-
-Generates a report on the number of concurrent sessions during each second. It
-reads an interval report with the following format.
-
-START_TIME STOP_TIME ...
-
-START_TIME is the time when a session started in seconds since the POSIX epoch.
-STOP_TIME is the time when the same session ended in seconds since the POSIX
-epoch. The rest of the line is ignored.
-
-The generate report is written to standard output where each line has the
-following format.
-
-TIME OPEN_SESSION_COUNT
-
-TIME is in seconds since the POSIX epoch. OPEN_SESSION_COUNT is the number of
-open sessions at TIME.
-
-The report is sorted by time with the first time being the earliest start time
-and the last time being the latest stop time.
-EOF
+  fprintf( stream, help, execName, version, execName );
 }
 
 
-main()
-{
-  local opts
-  if ! opts=$(getopt --name "$ExecName" --options hv --longoptions help,version -- "$@")
-  then
-    exit_with_help
-  fi
+#include <limits.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
-  eval set -- "$opts"
+#include <getopt.h>
+#include <libgen.h>
+#include <unistd.h>
 
-  while true
-  do
-    case "$1" in
-      -h|--help)
-        show_help
-        return 0
-        ;;
-      -v|--version)
-        show_version
-        return 0
-        ;;
-      --)
-        shift
-        break
-        ;;
-      *)
-        exit_with_help
-        ;;
-    esac
-  done
+// If PATH_MAX isn't defined in limits.h, give it a default value
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
-  if [ "$#" -lt 1 ]
-  then
-    exit_with_help
-  fi
 
-  local intervalsFile="$1"
-  count "$intervalsFile"
+typedef struct {
+  unsigned int begin;
+  unsigned int end;
+} Interval;
+
+typedef struct {
+  Interval span;
+  size_t numBins;
+  size_t * bin;
+} Bins;
+
+typedef bool (* ConsumeFunction)( void *, Interval const * );
+
+
+static bool bin_sessions( Bins *, Interval const * );
+static bool count_sessions( char const * const );
+static bool parse_intervals( FILE *, ConsumeFunction, void * );
+static bool update_time_bounds( Interval *, Interval const * );
+static void write_counts( Bins const * );
+
+static int const Version = 1;
+
+
+int
+main( int const argc, char * const argv [] ) {
+  char execPath [ PATH_MAX + 1 ] = "\0";
+
+  ssize_t len = 0;
+  if( (len = readlink( argv[ 0 ], execPath, sizeof( execPath ) - 1 )) != -1 ) {
+    execPath[ len ] = '\0';
+  } else {
+    strncpy( execPath, argv[ 0 ], sizeof( execPath ) );
+  }
+
+  char const * const execName = basename( execPath );
+
+  bool showVersion = false;
+
+  while( true ) {
+    struct option const longOpts [] = {
+      { "help", no_argument, NULL, 'h' },
+      { "verbose", no_argument, NULL, 'v' }
+    };
+
+    int const shortOpt = getopt_long( argc, argv, "hv", longOpts, NULL );
+
+    if( shortOpt == -1 ) {
+      break;
+    }
+
+    switch( shortOpt ) {
+      case 'h':
+        show_help( stdout, execName, Version );
+        return EXIT_SUCCESS;
+
+      case 'v':
+        showVersion = true;
+        break;
+
+      case '?':
+      default:
+        show_help( stderr, execName, Version );
+        return EXIT_FAILURE;
+    }
+  }
+
+  if( showVersion ) {
+    printf( "%d\n", Version );
+    return EXIT_SUCCESS;
+  }
+
+  if( argc - optind < 1 ) {
+    show_help( stderr, execName, Version );
+    return EXIT_FAILURE;
+  }
+
+  char const * const intervalsFile = argv[ optind ];
+
+  return count_sessions( intervalsFile ) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 
-count()
-{
-  local intervalsFile="$1"
+static bool
+count_sessions( char const * const intervalsFile ) {
+  FILE * const stream = fopen( intervalsFile, "r" );
 
-  local lb
-  lb=$(cut --delimiter ' ' --fields 1 "$intervalsFile" | sort --numeric-sort | head --lines 1)
+  if( stream == NULL ) {
+    fprintf( stderr, "Fatal: cannot open %s\n", intervalsFile );
+    return false;
+  }
 
-  local max=0
+  Interval timeSpan = { UINT_MAX, 0 };
 
-  local counts
+  if( !parse_intervals( stream, ( ConsumeFunction )&update_time_bounds, &timeSpan ) ) {
+    fclose( stream );
+    return false;
+  }
 
-  local words
-  while read -r -a words
-  do
-    local start=$((words[0] - lb))
-    local stop=$((words[1] - lb))
+  fprintf( stderr, "Info: lb = %u, ub = %u\n", timeSpan.begin, timeSpan.end );
 
-    for t in $(seq "$start" "$stop")
-    do
-      counts["$t"]=$((counts[t] + 1))
-    done
+  size_t const numBins = ( size_t )(timeSpan.end - timeSpan.begin + 1);
+  fprintf( stderr, "Info: numBins = %lu\n", numBins );
 
-    if [ "$stop" -gt "$max" ]
-    then
-      max="$stop"
-    fi
-  done < "$intervalsFile"
+  Bins counts = {
+    timeSpan,
+    numBins,
+    ( size_t * )calloc( numBins, sizeof( size_t ) )
+  };
 
-  for t in $(seq 0 "$max")
-  do
-    printf '%d %d\n' $((lb + t)) $((counts[t] + 0))
-  done
+  if( counts.bin == NULL ) {
+    fprintf( stderr, "Fatal: couldn't allocate binning array\n" );
+    fclose( stream );
+    return false;
+  }
+
+  rewind( stream );
+
+  if( !parse_intervals( stream, ( ConsumeFunction )&bin_sessions, &counts ) ) {
+    free( counts.bin );
+    fclose( stream );
+    return false;
+  }
+
+  fclose( stream );
+  write_counts( &counts );
+  free( counts.bin );
+  return true;
 }
 
 
-exit_with_help()
-{
-  show_help >&2
-  return 1
+static bool
+bin_sessions( Bins * const counts, Interval const * const interval ) {
+  for( size_t binIdx = ( size_t )(interval->begin - counts->span.begin);
+       binIdx <= ( size_t )(interval->end - counts->span.begin);
+       ++binIdx ) {
+    if( binIdx >= counts->numBins ) {
+      fprintf( stderr, "Warning: not enough bins\n" );
+      break;
+    }
+
+    ++counts->bin[ binIdx ];
+  }
+
+  return true;
 }
 
 
-show_version()
-{
-   printf '%s\n' "$Version"
+static bool
+parse_intervals(
+    FILE * const stream,
+    ConsumeFunction const consume_interval,
+    void * const consumerState ) {
+  size_t lineLen = 22;
+  char * line = (char *)calloc( lineLen, 1 );
+
+  if( line == NULL ) {
+    fprintf( stderr, "Fatal: out of memory\n" );
+    return false;
+  }
+
+  size_t intervalNum = 0;
+  ssize_t nread = 0;
+
+  while( (nread = getline( &line, &lineLen, stream )) >= 0 ) {
+    if( line[ 0 ] == '\n' ) {
+      continue;
+    }
+
+    ++intervalNum;
+
+    if( nread < 21 ) {
+      fprintf( stderr, "Error: interval %lu is too short, skipping\n", intervalNum );
+      continue;
+    }
+
+    Interval interval = { UINT_MAX, 0 };
+
+    if( sscanf( line, "%u %u", &interval.begin, &interval.end ) < 2 ) {
+      fprintf( stderr, "Error: interval %lu can't be parsed, skipping\n", intervalNum );
+      continue;
+    }
+
+    if( !(*consume_interval)( consumerState, &interval ) ) {
+      break;
+    }
+  }
+
+  free( line );
+
+  if( ferror( stream ) != 0 ) {
+    fprintf( stderr, "FATAL: Failed to fully read intervals file\n" );
+    return false;
+  }
+
+  return true;
 }
 
 
-set -eu
-main "$@"
+static bool
+update_time_bounds( Interval * const bounds, Interval const * const interval ) {
+   if( bounds->begin > interval->begin ) {
+     bounds->begin = interval->begin;
+   }
+
+   if( bounds->end < interval->end ) {
+     bounds->end = interval->end;
+   }
+
+   return true;
+}
+
+
+static void
+write_counts( Bins const * const counts ) {
+  for( size_t binIdx = 0; binIdx < counts->numBins; ++binIdx ) {
+    printf( "%u %lu\n", counts->span.begin + ( unsigned int )binIdx, counts->bin[ binIdx ] );
+  }
+}

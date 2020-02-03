@@ -1,11 +1,12 @@
 #!/bin/bash
 #
-# Usage: dump-logs [YEAR [MONTH [DAY]]]
+# Usage: dump-logs [YEAR [MONTH [DAY[,DAY]]]]
 #
 # YEAR is a the four digit year to restrict the dump to. MONTH is the number of
 # the month to restrict the dump to. January is 1, February is 2, etc. DAY is
 # the number of the day of the month to restrict the dump to. 1 is the first of
-# the month, 2 is the second, etc.
+# the month, 2 is the second, etc. DAY1,DAY2 is an inclusive range of days from
+# DAY1 through DAY2. They both must be in the same month.
 #
 # This script dumps all of the logs from the rodsLog files on the IES and all of
 # the resource servers. It groups the log by session, and it dumps each session
@@ -29,39 +30,41 @@
 #       dumping /var/log/irods/iRODS/server/log/rodsLog.<year>.<month>.<start_day>
 #         <total session count>
 
+set -o nounset -o pipefail
 
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecDir=$(dirname "$ExecPath")
 readonly LogDir=/var/lib/irods/iRODS/server/log
 readonly LogBase=rodsLog
 
-declare year=\*
-declare month=\*
-declare startDay=\*
 
-if [ $# -ge 1 ]; then printf -v year '%04d' $((10#$1)); fi
-if [ $# -ge 2 ]; then printf -v month '%02d' $((10#$2)); fi
+fmt_number()
+{
+  local len="$1"
+  local number="$2"
 
-if [ $# -ge 3 ]
-then
-  printf -v day '%02d' $((10#$3))
-  startDay=$(( 1 + (5 * ((10#$day - 1) / 5)) ))
-  printf -v startDay '%02d' "$startDay"
-fi
+  printf '%0*d' "$len" $((10#$number))
+}
 
-readonly LogExt="$year"."$month"."$startDay"
+
+log_day()
+{
+  local day="$1"
+
+  fmt_number 2 $(( 1 + (5 * ((10#$day - 1) / 5)) ))
+}
 
 
 filter_day()
 {
-  if [ -z "$day" ]
+  if [ -z "$dayRangeBegin" ]
   then
     cat
   else
-    local date="$year"-"$month"-"$day"
+    local startTime="$year-$month-$dayRangeBegin 00:00:00"
+    local endTime="$year-$month-$dayRangeEnd 23:59:59"
 
-    "$ExecDir"/filter-sessions-by-time \
-      --assign ERA_BEGIN="$date 00:00:00" --assign ERA_END="$date 23:59:59"
+    "$ExecDir"/filter-sessions-by-time "$startTime" "$endTime"
   fi
 }
 
@@ -108,6 +111,40 @@ dump_log()
 }
 
 
+if [ $# -ge 1 ]
+then
+  yearInput="$1"
+  year=$(fmt_number 4 "$yearInput")
+else
+  year=\*
+fi
+
+if [ $# -ge 2 ]
+then
+  monthInput="$2"
+  month=$(fmt_number 2 "$monthInput")
+else
+  month=\*
+fi
+
+if [ $# -ge 3 ]
+then
+  dayInput="$3"
+
+  dayRangeBegin=$(fmt_number 2 "${dayInput%,*}")
+  dayRangeEnd=$(fmt_number 2 "${dayInput#*,}")
+
+  logStartDay=$(log_day "$dayRangeBegin")
+  logEndDay=$(log_day "$dayRangeEnd")
+else
+  dayRangeBegin=
+  dayRangeEnd=
+  logStartDay=
+  logEndDay=
+fi
+
+readonly LogExt="$year"."$month"
+
 declare -i cnt
 
 mkdir --parents logs
@@ -120,9 +157,19 @@ do
   printf '\rdumping logs from %s\n' "$svr" >&2
   out=logs/"$svr".sessions
 
-  for log in $("$ExecDir"/list-rods-logs --name-pattern "$LogBase"."$LogExt" "$svr")
+  for log in $("$ExecDir"/list-rods-logs --name-pattern "$LogBase.$LogExt.*" "$svr")
   do
     logName=$(basename "$log")
+
+    if [[ -n "$logStartDay" ]]
+    then
+      logDay="${logName##*.}"
+
+      if [[ "$logDay" -lt "$logStartDay" ]] || [[ "$logDay" -gt "$logEndDay" ]]
+      then
+        continue
+      fi
+    fi
 
     dump_log "$svr" "${logName#*.}" >> "$out"
   done

@@ -1,27 +1,36 @@
 #!/bin/bash
-#
-# Usage: data-store-check [HOST [PORT [USER [CUTOFF_TIME [DEBUG]]]]]
-#
-# This script generates two reports, one for collections and one for data
-# objects. Each report lists all collections or data objects, respectively, that
-# where created before the cutoff data and are missing the own permission for
-# the rodsadmin group or don't have one and only one UUID assigned to it. The
-# data object report includes information on missing checksums.
-#
-# HOST is the domain name or IP address of the server where the PostgreSQL DBMS
-# containing the ICAT DB runs. The default value is 'localhost'.
-#
-# PORT is the TCP port the DBMS listens on. The default value is '5432'.
-#
-# USER is the user used to authenticate the connection to the DB. The default
-# value is 'irods'.
-#
-# CUTOFF_TIME is the upper bound of the creation time for the collections and
-# data objects contained in the reports. The format should be the default format
-# used by `date`. The default value is today '00:00:00' in the local time zone.
-#
-# DEBUG is any value that, if present, will cause the script to generate
-# describing what it is doing. It is not present by default.
+
+show_help()
+{
+  cat <<'EOF'
+
+Usage: data-store-fix [options] [HOST [PORT [USER [CUTOFF_TIME [DEBUG]]]]]
+
+This script generates two reports, one for collections and one for data
+objects. Each report lists all collections or data objects, respectively, that
+where created before the cutoff data and are missing the own permission for
+the rodsadmin group or don't have one and only one UUID assigned to it. The
+data object report includes information on missing checksums.
+
+HOST is the domain name or IP address of the server where the PostgreSQL DBMS
+containing the ICAT DB runs. The default value is 'localhost'.
+
+PORT is the TCP port the DBMS listens on. The default value is '5432'.
+
+USER is the user used to authenticate the connection to the DB. The default
+value is 'irods'.
+
+CUTOFF_TIME is the upper bound of the creation time for the collections and
+data objects contained in the reports. The format should be the default format
+used by `date`. The default value is today '00:00:00' in the local time zone.
+
+DEBUG is any value that, if present, will cause the script to generate
+describing what it is doing. It is not present by default.
+
+Options:
+ -h, --help  show help and exit
+EOF
+}
 
 
 set -o nounset -o pipefail
@@ -29,6 +38,33 @@ set -o nounset -o pipefail
 
 main()
 {
+  local opts
+  if ! opts=$(getopt --name data-store-fix --options h --longoptions help -- "$@")
+  then
+    show_help >&2
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        return 1
+        ;;
+    esac
+  done
+
   if [ "$#" -ge 1 ]
   then
     readonly HOST="$1"
@@ -410,10 +446,19 @@ process_chksum_issue()
 
   if [ "${issue// /}" = t ]
   then
-    if ichksum --silent -R "$resc" "$obj" > /dev/null
+    local err retCode
+    err=$(ichksum --silent -R "$resc" "$obj" 2>&1 > /dev/null)
+    retCode="$?"
+
+    if [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]
     then
       printf '%s' "${issue/%  /✓ }"
     else
+      if [[ -n "$err" ]]
+      then
+        echo "$err" >&2
+      fi
+
       printf '%s' "${issue/%  /✗ }"
       printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
     fi

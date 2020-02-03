@@ -9,11 +9,13 @@ EOF
 }
 
 
-set -o nounset
+set -o nounset -o pipefail
 
 readonly Version=1
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
+
+readonly Concurrency=4
 
 
 main()
@@ -87,7 +89,7 @@ rm_trash()
   delTot=$(wc --lines < "$trashList")
   printf '%d data objects to delete\n' "$delTot"
 
-  xargs --no-run-if-empty --delimiter '\n' --max-procs 2 irm -f -v < "$trashList"
+  xargs --no-run-if-empty --delimiter '\n' --max-procs "$Concurrency" irm -f -v < "$trashList"
 
   # Remove the empty trash collections
   printf 'Retrieving home collections to prune...\n'
