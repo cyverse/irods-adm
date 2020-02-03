@@ -55,41 +55,6 @@ log_day()
 }
 
 
-if [ $# -ge 1 ]
-then
-  yearInput="$1"
-  year=$(fmt_number 4 "$yearInput")
-else
-  year=\*
-fi
-
-if [ $# -ge 2 ]
-then
-  monthInput="$2"
-  month=$(fmt_number 2 "$monthInput")
-else
-  month=\*
-fi
-
-if [ $# -ge 3 ]
-then
-  dayInput="$3"
-
-  dayRangeBegin=$(fmt_number 2 "${dayInput%,*}")
-  dayRangeEnd=$(fmt_number 2 "${dayInput#*,}")
-
-  logStartDay=$(log_day "$dayRangeBegin")
-  logEndDay=$(log_day "$dayRangeEnd")
-else
-  dayRangeBegin=
-  dayRangeEnd=
-  logStartDay=
-  logEndDay=
-fi
-
-readonly LogExt="$year"."$month"
-
-
 filter_day()
 {
   if [ -z "$dayRangeBegin" ]
@@ -146,6 +111,40 @@ dump_log()
 }
 
 
+if [ $# -ge 1 ]
+then
+  yearInput="$1"
+  year=$(fmt_number 4 "$yearInput")
+else
+  year=\*
+fi
+
+if [ $# -ge 2 ]
+then
+  monthInput="$2"
+  month=$(fmt_number 2 "$monthInput")
+else
+  month=\*
+fi
+
+if [ $# -ge 3 ]
+then
+  dayInput="$3"
+
+  dayRangeBegin=$(fmt_number 2 "${dayInput%,*}")
+  dayRangeEnd=$(fmt_number 2 "${dayInput#*,}")
+
+  logStartDay=$(log_day "$dayRangeBegin")
+  logEndDay=$(log_day "$dayRangeEnd")
+else
+  dayRangeBegin=
+  dayRangeEnd=
+  logStartDay=
+  logEndDay=
+fi
+
+readonly LogExt="$year"."$month"
+
 declare -i cnt
 
 mkdir --parents logs
@@ -158,7 +157,7 @@ do
   printf '\rdumping logs from %s\n' "$svr" >&2
   out=logs/"$svr".sessions
 
-  for log in $("$ExecDir"/list-rods-logs --name-pattern "$LogBase"."$LogExt"."*" "$svr")
+  for log in $("$ExecDir"/list-rods-logs --name-pattern "$LogBase.$LogExt.*" "$svr")
   do
     logName=$(basename "$log")
 
