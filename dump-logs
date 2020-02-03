@@ -29,6 +29,7 @@
 #       dumping /var/log/irods/iRODS/server/log/rodsLog.<year>.<month>.<start_day>
 #         <total session count>
 
+set -o nounset -o pipefail
 
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecDir=$(dirname "$ExecPath")
