@@ -446,10 +446,19 @@ process_chksum_issue()
 
   if [ "${issue// /}" = t ]
   then
-    if ichksum --silent -R "$resc" "$obj" > /dev/null
+    local err retCode
+    err=$(ichksum --silent -R "$resc" "$obj" 2>&1 > /dev/null)
+    retCode="$?"
+
+    if [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]
     then
       printf '%s' "${issue/%  /✓ }"
     else
+      if [[ -n "$err" ]]
+      then
+        echo "$err" >&2
+      fi
+
       printf '%s' "${issue/%  /✗ }"
       printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
     fi
