@@ -42,7 +42,7 @@ EOF
 
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
-readonly Version=1
+readonly Version=2
 
 readonly ReqStore=$(mktemp)
 trap 'rm -rf "$ReqStore"' EXIT
@@ -290,6 +290,7 @@ ping()
   printf 'not iRODS\n'
   return 2
 }
+
 
 show_version()
 {
