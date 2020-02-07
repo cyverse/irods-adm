@@ -10,7 +10,8 @@ Usage:
  $ExecName [options] HOST
 
 Checks to see is if an iRODS service is online. If connects to iRODS is it
-prints 'up' to standard output and exits with status code 0. If it doesn't
+prints 'up|time=<resp-time>s' to standard output where '<resp-time>' is the time
+it took for iRODS to respond, and it exits with status code 0. If it doesn't
 connect to anything, it prints 'down' to standard output and exits with status
 code 1. If it connects to something that isn't iRODS, it prints 'not iRODS' and
 exits with status code 2.
@@ -248,6 +249,9 @@ ping()
   local service="$4"
   local zone="$5"
 
+  local startTime
+  startTime=$(date +'%s.%N')
+
   if ! exec 3<>/dev/tcp/"$ies"/"$port"
   then
     printf 'down\n'
@@ -262,12 +266,18 @@ ping()
     local respMsg
     if respMsg=$(parse_resp <&3)
     then
+      local stopTime
+      stopTime=$(date +'%s.%N')
+
       mk_req RODS_DISCONNECT >&3
       close_conn
 
       if [ "$verbose" -eq 0 ]
       then
-        printf 'up\n'
+        local dt
+        dt=$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN{print (STOP-START)}')
+
+        printf 'up|time=%ss\n' "$dt"
       else
         printf '%s\n' "$respMsg"
       fi
@@ -280,7 +290,6 @@ ping()
   printf 'not iRODS\n'
   return 2
 }
-
 
 show_version()
 {
