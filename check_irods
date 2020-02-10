@@ -10,14 +10,16 @@ Usage:
  $ExecName [options] HOST
 
 Checks to see is if an iRODS service is online. If connects to iRODS is it
-prints 'up' to standard output and exits with status code 0. If it doesn't
+prints 'up|time=<resp-time>s' to standard output where '<resp-time>' is the time
+it took for iRODS to respond, and it exits with status code 0. If it doesn't
 connect to anything, it prints 'down' to standard output and exits with status
 code 1. If it connects to something that isn't iRODS, it prints 'not iRODS' and
 exits with status code 2.
 
 The rodsLog will show a connection from the host where this is run with the proxy
-user set to $ExecName. If SERVICE is specified, the client user will be se to
-SERVICE. If ZONE is specificed, the zone for both users will be ZONE.
+user set to $ExecName. If SERVICE is specified, the client user will be set to
+SERVICE instead of $ExecName. If ZONE is specificed, the zone for both users 
+will be ZONE.
 
 If ips happens to be called while this is program is connected to iRODS, ips
 will show this program's connection as comming from $ExecName.
@@ -33,15 +35,18 @@ Options:
                         SERVICE belong to.
 
  -h, --help     show help and exit
- -V, --verbose  show the XML message returned from HOST
+ -V, --verbose  show the XML message returned from HOST instead of default
+                response
  -v, --version  show version and exit
 EOF
 }
 
 
+set -o nounset -o pipefail
+
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
-readonly Version=1
+readonly Version=2
 
 readonly ReqStore=$(mktemp)
 trap 'rm -rf "$ReqStore"' EXIT
@@ -58,9 +63,9 @@ main()
   eval set -- "$opts"
 
   local port=1247
-  local service
+  local service="$ExecName"
   local verbose=0
-  local zone
+  local zone=
 
   while true
   do
@@ -183,7 +188,7 @@ mk_req()
 {
   local msgType="$1"
 
-  local msg
+  local msg=
   if [ $# -ge 2 ]
   then
     msg="$2"
@@ -248,6 +253,9 @@ ping()
   local service="$4"
   local zone="$5"
 
+  local startTime
+  startTime=$(date +'%s.%N')
+
   if ! exec 3<>/dev/tcp/"$ies"/"$port"
   then
     printf 'down\n'
@@ -262,12 +270,18 @@ ping()
     local respMsg
     if respMsg=$(parse_resp <&3)
     then
+      local stopTime
+      stopTime=$(date +'%s.%N')
+
       mk_req RODS_DISCONNECT >&3
       close_conn
 
       if [ "$verbose" -eq 0 ]
       then
-        printf 'up\n'
+        local dt
+        dt=$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN{print (STOP-START)}')
+
+        printf 'up|time=%ss\n' "$dt"
       else
         printf '%s\n' "$respMsg"
       fi
