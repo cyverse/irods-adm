@@ -2,6 +2,8 @@
 #
 # This script extracts the begin and end times for each session from a stream of
 # iRODS sessions. It writes one interval per line with the following format.
+# This program ignores any session that does not both begin and end with "Agent
+# process" messages from the rodsServer process.
 #
 # <start time> <end time> <client user>
 #
@@ -32,6 +34,6 @@ BEGIN {
 }
 
 
-$2 ~ /cuser=/ {
+$2 ~ /cuser=/ && $NF ~ /Agent process/ {
   print_interval(read_time($2), read_time($NF), read_user($2));
 }

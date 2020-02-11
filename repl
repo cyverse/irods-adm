@@ -60,7 +60,6 @@ export PGHOST
 export PGPORT
 export PGUSER
 
-
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
