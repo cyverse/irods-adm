@@ -10,7 +10,8 @@ Usage:
  $ExecName [options]
 
 This script deletes the trash older than one month. It deletes the oldest trash
-first.
+first. It writes a complete report of everything deleted to standard output by
+default with all error messages be written to both standard error.
 
 Options:
  -h, --help     show help and exit
@@ -21,7 +22,7 @@ EOF
 
 set -o nounset -o pipefail
 
-readonly Version=1
+readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 
@@ -39,6 +40,7 @@ main()
 
   eval set -- "$opts"
 
+  local showVersion
   while true
   do
     case "$1" in
@@ -47,8 +49,8 @@ main()
         return 0
         ;;
       -v|--version)
-        printf '%s' "$Version"
-        return 0
+        showVersion=1
+        shift
         ;;
       --)
         shift
@@ -60,6 +62,12 @@ main()
         ;;
     esac
   done
+
+  if [[ -n "${showVersion-}" ]]
+  then
+    printf '%s' "$Version"
+    return 0
+  fi
 
   local trashTempFiles
   trashTempFiles=$(mktemp)
