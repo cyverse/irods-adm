@@ -2,9 +2,19 @@
 
 show_help()
 {
-  cat <<'EOF'
+  cat <<EOF
 
-This script deletes the trash older than one month. It deletes the oldest trash first.
+$ExecName version $Version
+
+Usage:
+ $ExecName [options]
+
+This script deletes the trash older than one month. It deletes the oldest trash
+first.
+
+Options:
+ -h, --help     show help and exit
+ -v, --version  show version and exit
 EOF
 }
 
@@ -187,8 +197,7 @@ truncate_by_time()
 {
   local upperBound="$1"
 
-  local dataObj
-  local modifyTs
+  local dataObj modifyTs
   while read -r modifyTs dataObj
   do
     if [ "$modifyTs" -ge "$upperBound" ]
