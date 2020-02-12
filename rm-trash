@@ -11,11 +11,14 @@ Usage:
 
 This script deletes the trash older than one month. It deletes the oldest trash
 first. It writes a complete report of everything deleted to standard output by
-default with all error messages be written to both standard error.
+default with all error messages be written to both standard error. If the output
+is directed to FILE, error messages will still be written to standard error in
+addition to FILE.
 
 Options:
- -h, --help     show help and exit
- -v, --version  show version and exit
+ -L, --log FILE  write all output to FILE
+ -h, --help      show help and exit
+ -v, --version   show version and exit
 EOF
 }
 
@@ -32,7 +35,7 @@ readonly Concurrency=4
 main()
 {
   local opts
-  if ! opts=$(getopt --longoptions help,version --options hv --name "$ExecName" -- "$@")
+  if ! opts=$(getopt --longoptions help,log:,version --options hL:v --name "$ExecName" -- "$@")
   then
     show_help >&2
     return 1
@@ -40,13 +43,17 @@ main()
 
   eval set -- "$opts"
 
-  local showVersion
+  local logFile showVersion
   while true
   do
     case "$1" in
       -h|--help)
         show_help
         return 0
+        ;;
+      -L|--log)
+        logFile="$2"
+        shift 2
         ;;
       -v|--version)
         showVersion=1
@@ -69,13 +76,63 @@ main()
     return 0
   fi
 
-  local trashTempFiles
-  trashTempFiles=$(mktemp)
+  if [[ -n "${logFile-}" ]]
+  then
+    if ! redirect_stdout "$logFile"
+    then
+      return 1
+    fi
+  fi
+
+  local trashTmpFiles
+  if ! trashTmpFiles=$(prep_tmp_files_db)
+  then
+    return 1
+  fi
+
+  rm_trash "$trashTmpFiles" 2> >(disp_err)
+}
+
+
+prep_tmp_files_db()
+{
+  local tmpFilesDB
+  if ! tmpFilesDB=$(mktemp)
+  then
+    # shellcheck disable=SC2182
+    printf 'Failed to create database for temporary files\n' >(disp_err)
+    return 1
+  fi
 
   # shellcheck disable=SC2064
-  trap "rm_temps '$trashTempFiles'" EXIT
+  trap "rm_temps '$tmpFilesDB' 2> >(disp_err)" EXIT
+  echo "$tmpFilesDB"
+}
 
-  rm_trash "$trashTempFiles"
+
+redirect_stdout()
+{
+  local logFile="$1"
+
+  exec 1>&-
+
+  if ! exec 1>"$logFile"
+  then
+    exec 1>/dev/stdout
+    printf 'Failed to open %s for writing\n' "$logFile" >&2
+    return 1
+  fi
+}
+
+
+disp_err()
+{
+  if [[ -t 1 ]]
+  then
+    cat >&2
+  else
+    tee /dev/stderr
+  fi
 }
 
 
