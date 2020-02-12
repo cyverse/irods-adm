@@ -24,7 +24,6 @@ EOF
 
 
 set -o nounset -o pipefail
-trap exit INT
 
 readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
@@ -106,7 +105,7 @@ prep_tmp_files_db()
   fi
 
   # shellcheck disable=SC2064
-  trap "rm_temps '$tmpFilesDB' 2> >(disp_err)" EXIT
+  trap "rm_temps '$tmpFilesDB' 2> >(disp_err)" EXIT INT
   echo "$tmpFilesDB"
 }
 
@@ -256,6 +255,7 @@ rm_temps()
 
   xargs --no-run-if-empty rm --force < "$trashTempFiles"
   rm --force "$trashTempFiles"
+  exit 0
 }
 
 
