@@ -24,6 +24,7 @@ EOF
 
 
 set -o nounset -o pipefail
+trap exit INT
 
 readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
@@ -85,10 +86,15 @@ main()
   fi
 
   local trashTmpFiles
-  if ! trashTmpFiles=$(prep_tmp_files_db)
+  if ! trashTmpFiles=$(mktemp)
   then
+    # shellcheck disable=SC2182
+    printf 'Failed to create database for temporary files\n' >(disp_err)
     return 1
   fi
+
+  # shellcheck disable=SC2064
+  trap "rm_temps '$trashTmpFiles' 2> >(disp_err)" EXIT
 
   rm_trash "$trashTmpFiles" 2> >(disp_err)
 }
@@ -97,16 +103,6 @@ main()
 prep_tmp_files_db()
 {
   local tmpFilesDB
-  if ! tmpFilesDB=$(mktemp)
-  then
-    # shellcheck disable=SC2182
-    printf 'Failed to create database for temporary files\n' >(disp_err)
-    return 1
-  fi
-
-  # shellcheck disable=SC2064
-  trap "rm_temps '$tmpFilesDB' 2> >(disp_err)" EXIT INT
-  echo "$tmpFilesDB"
 }
 
 
@@ -151,8 +147,8 @@ rm_trash()
 
   # Build the list of data objects to delete, sorted by age
   quest '%s %s/%s' \
-        "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
-         where COLL_NAME like '/$zone/trash/%'" \
+      "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
+       where COLL_NAME like '/$zone/trash/%'" \
     | sort --numeric --key 1,1 \
     | truncate_by_time "$upperBound" \
     | cut --delimiter ' ' --fields 2- \
@@ -168,8 +164,11 @@ rm_trash()
     < "$trashList"
 
   # Remove the empty trash collections
-  quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/$zone/trash/home'" > "$trashList"
-  quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/$zone/trash/orphan'" >> "$trashList"
+  quest '%s' \
+      "select order(COLL_NAME)
+       where COLL_PARENT_NAME = '/$zone/trash' || = '/$zone/trash/home'
+         and COLL_NAME != '/$zone/trash/home'" \
+    > "$trashList"
 
   delTot=$(wc --lines < "$trashList")
   printf '%d base collections will be pruned\n' "$delTot"
