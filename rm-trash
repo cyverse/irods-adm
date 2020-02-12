@@ -162,7 +162,9 @@ rm_trash()
   delTot=$(wc --lines < "$trashList")
   printf '%d data objects will be deleted\n' "$delTot"
 
-  parallel --no-notice --no-run-if-empty --delimiter '\n' --max-procs "$Concurrency" irm -f -v \
+  parallel --no-notice --no-run-if-empty \
+      --delimiter '\n' --max-args 1000 --max-procs "$Concurrency" \
+      RM_DATA_BATCH \
     < "$trashList"
 
   # Remove the empty trash collections
@@ -271,6 +273,13 @@ truncate_by_time()
     printf '%s %s\n' "$modifyTs" "$dataObj"
   done
 }
+
+
+RM_DATA_BATCH()
+{
+  irm -f -v "$@"
+}
+export -f RM_DATA_BATCH
 
 
 main "$@"
