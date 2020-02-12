@@ -162,7 +162,8 @@ rm_trash()
   delTot=$(wc --lines < "$trashList")
   printf '%d data objects will be deleted\n' "$delTot"
 
-  xargs --no-run-if-empty --delimiter '\n' --max-procs "$Concurrency" irm -f -v < "$trashList"
+  parallel --no-notice --no-run-if-empty --delimiter '\n' --max-procs "$Concurrency" irm -f -v \
+    < "$trashList"
 
   # Remove the empty trash collections
   quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/$zone/trash/home'" > "$trashList"
@@ -262,7 +263,7 @@ truncate_by_time()
   local dataObj modifyTs
   while read -r modifyTs dataObj
   do
-    if [[ "$modifyTs" -ge "$upperBound" ]]
+    if [[ "${modifyTs#0}" -ge "$upperBound" ]]
     then
       break
     fi
