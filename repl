@@ -64,8 +64,8 @@ readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
 
-Serial=
-UntilTS=
+declare Serial=
+declare UntilTS=
 
 
 main()
@@ -510,10 +510,6 @@ select_cohort_by_size()
   fi
 
   local maxThreads=16
-  if [[ "$Serial" ]]
-  then
-    maxThreads=0
-  fi
 
   if ! CHECK_TIME "$UntilTS"
   then
