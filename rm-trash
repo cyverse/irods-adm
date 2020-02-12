@@ -78,22 +78,50 @@ main()
 
   if [[ -n "${logFile-}" ]]
   then
-    exec 1>&-
-
-    if ! exec 1>"$logFile"
+    if ! redirect_stdout "$logFile"
     then
-      printf 'Failed to open %s for writing\n' "$logFile" >&2
       return 1
     fi
   fi
 
-  local trashTempFiles
-  trashTempFiles=$(mktemp)
+  local trashTmpFiles
+  if ! trashTmpFiles=$(prep_tmp_files_db)
+  then
+    return 1
+  fi
+
+  rm_trash "$trashTmpFiles" 2> >(disp_err)
+}
+
+
+prep_tmp_files_db()
+{
+  local tmpFilesDB
+  if ! tmpFilesDB=$(mktemp)
+  then
+    # shellcheck disable=SC2182
+    printf 'Failed to create database for temporary files\n' >(disp_err)
+    return 1
+  fi
 
   # shellcheck disable=SC2064
-  trap "rm_temps '$trashTempFiles' 2> >(disp_err)" EXIT
+  trap "rm_temps '$tmpFilesDB' 2> >(disp_err)" EXIT
+  echo "$tmpFilesDB"
+}
 
-  rm_trash "$trashTempFiles" 2> >(disp_err)
+
+redirect_stdout()
+{
+  local logFile="$1"
+
+  exec 1>&-
+
+  if ! exec 1>"$logFile"
+  then
+    exec 1>/dev/stdout
+    printf 'Failed to open %s for writing\n' "$logFile" >&2
+    return 1
+  fi
 }
 
 
