@@ -24,6 +24,7 @@ EOF
 
 
 set -o nounset -o pipefail
+trap exit INT
 
 readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
