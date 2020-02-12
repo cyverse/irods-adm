@@ -150,8 +150,6 @@ rm_trash()
   trashList=$(mk_temp "$trashTempFiles")
 
   # Build the list of data objects to delete, sorted by age
-  printf 'Retrieving data objects to delete...\n'
-
   quest '%s %s/%s' \
         "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
          where COLL_NAME like '/$zone/trash/%'" \
@@ -162,24 +160,22 @@ rm_trash()
 
   local delTot
   delTot=$(wc --lines < "$trashList")
-  printf '%d data objects to delete\n' "$delTot"
+  printf '%d data objects will be deleted\n' "$delTot"
 
   xargs --no-run-if-empty --delimiter '\n' --max-procs "$Concurrency" irm -f -v < "$trashList"
 
   # Remove the empty trash collections
-  printf 'Retrieving home collections to prune...\n'
-
   quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/$zone/trash/home'" > "$trashList"
   quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '/$zone/trash/orphan'" >> "$trashList"
 
   delTot=$(wc --lines < "$trashList")
-  printf '%d home collections to prune\n' "$delTot"
+  printf '%d base collections will be pruned\n' "$delTot"
 
   local parent
   while read -r parent
   do
-    printf 'Pruning %s...\n' "$parent"
     prune_children "$trashTempFiles" "$parent"
+    printf 'Pruned base collection %s\n' "$parent"
   done < "$trashList"
 
   rm --force "$trashList"
@@ -235,6 +231,7 @@ prune_collection()
     fi
   else
     prune_children "$trashTempFiles" "$collection"
+    printf 'Pruned collection %s\n' "$collection"
   fi
 }
 
