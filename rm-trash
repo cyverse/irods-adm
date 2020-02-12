@@ -163,8 +163,8 @@ rm_trash()
   delTot=$(wc --lines < "$trashList")
   printf '%d data objects will be deleted\n' "$delTot"
 
-  parallel --no-notice --no-run-if-empty \
-      --delimiter '\n' --max-args 1000 --max-procs "$Concurrency" \
+  parallel --line-buffer --no-notice --no-run-if-empty \
+      --delimiter '\n' --max-args 100 --max-procs "$Concurrency" \
       RM_DATA_BATCH \
     < "$trashList"
 
@@ -278,9 +278,40 @@ truncate_by_time()
 
 RM_DATA_BATCH()
 {
-  irm -f -v "$@"
+  stdbuf --error L --output L irm -f -v "$@" | MK_RM_MSGS "$@"
 }
 export -f RM_DATA_BATCH
+
+
+MK_RM_MSGS()
+{
+  local paths=("$@")
+  local idx=0
+
+  local line
+  while IFS= read -r line
+  do
+    local nameBeg
+    nameBeg=$(expr "$line" : '^   \(.*[^ ]\)  *[0-9][0-9]*\.[0-9][0-9][0-9] sec$')
+
+    local dur
+    dur=$(expr "$line" : '.*\([0-9][0-9]*\.[0-9][0-9][0-9]\) sec$')
+    while [[ "$idx" -lt "${#paths[@]}" ]]
+    do
+      local path="${paths[$((idx++))]}"
+
+      local name
+      name=$(basename "$path")
+
+      if [[ "$name" =~ "$nameBeg" ]]
+      then
+        printf 'took %s to delete data object %s\n' "$dur" "$path"
+        break
+      fi
+    done
+  done
+}
+export -f MK_RM_MSGS
 
 
 main "$@"
