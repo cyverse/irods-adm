@@ -218,12 +218,12 @@ prune_collection()
   local collDoTot
   collDoTot=$(quest '%s' "select count(DATA_ID) where COLL_NAME = '$collection'")
 
-  if [ "$collDoTot" -eq 0 ]
+  if [[ "$collDoTot" -eq 0 ]]
   then
     collDoTot=$(quest '%s' "select count(DATA_ID) where COLL_NAME like '$collection/%'")
   fi
 
-  if [ "$collDoTot" -eq 0 ]
+  if [[ "$collDoTot" -eq 0 ]]
   then
     if irm -f -r -v "$collection"
     then
@@ -262,7 +262,7 @@ truncate_by_time()
   local dataObj modifyTs
   while read -r modifyTs dataObj
   do
-    if [ "$modifyTs" -ge "$upperBound" ]
+    if [[ "$modifyTs" -ge "$upperBound" ]]
     then
       break
     fi
