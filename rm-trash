@@ -347,7 +347,7 @@ MK_RM_MSGS()
 
       if [[ "$name" =~ $nameBeg ]]
       then
-        printf 'took %s to delete data object %s\n' "$dur" "$path"
+        printf 'took %s s to delete data object %s\n' "$dur" "$path"
         break
       fi
     done
