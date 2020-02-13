@@ -13,7 +13,8 @@ This script deletes the trash older than one month. It deletes the oldest trash
 first. It writes a complete report of everything deleted to standard output by
 default with all error messages be written to both standard error. If the output
 is directed to FILE, error messages will still be written to standard error in
-addition to FILE.
+addition to FILE. In any case, each message written is formatted in syslog
+style.
 
 Options:
  -h, --help      show help and exit
@@ -76,9 +77,9 @@ main()
   fi
 
   # shellcheck disable=SC2064
-  trap "rm_temps '$trashTmpFiles' 2> >(disp_err)" EXIT
+  trap "rm_temps '$trashTmpFiles' 2> >(disp_err) > >(disp_out)" EXIT
 
-  rm_trash "$trashTmpFiles" 2> >(disp_err)
+  rm_trash "$trashTmpFiles" 2> >(disp_err) > >(disp_out)
 }
 
 
@@ -137,7 +138,43 @@ redirect_stdout()
 }
 
 
+rm_temps()
+{
+  local trashTempFiles="$1"
+
+  xargs --no-run-if-empty rm --force < "$trashTempFiles"
+  rm --force "$trashTempFiles"
+}
+
+
 disp_err()
+{
+  while IFS= read -r err
+  do
+    fmt_msg ERROR "$err"
+  done | route_err
+}
+
+
+disp_out()
+{
+  while IFS= read -r msg
+  do
+    fmt_msg INFO "$msg"
+  done
+}
+
+
+fmt_msg()
+{
+  local type="$1"
+  local body="$2"
+
+  printf '%s %s: %s\n' "$(date --iso-8601=seconds)" "$type" "$body"
+}
+
+
+route_err()
 {
   if [[ -t 1 ]]
   then
@@ -261,15 +298,6 @@ quest()
 
   iquest --no-page "$fmt" "$query" \
     | sed '/^CAT_NO_ROWS_FOUND: Nothing was found matching your query$/d'
-}
-
-
-rm_temps()
-{
-  local trashTempFiles="$1"
-
-  xargs --no-run-if-empty rm --force < "$trashTempFiles"
-  rm --force "$trashTempFiles"
 }
 
 
