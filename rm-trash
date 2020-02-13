@@ -27,7 +27,7 @@ EOF
 set -o nounset -o pipefail
 trap 'exit 130' INT
 
-readonly Version=2
+readonly Version=3
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 
