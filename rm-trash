@@ -24,7 +24,7 @@ EOF
 
 
 set -o nounset -o pipefail
-trap exit INT
+trap 'exit 130' INT
 
 readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
@@ -270,7 +270,6 @@ rm_temps()
 
   xargs --no-run-if-empty rm --force < "$trashTempFiles"
   rm --force "$trashTempFiles"
-  exit 0
 }
 
 
