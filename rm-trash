@@ -16,8 +16,8 @@ is directed to FILE, error messages will still be written to standard error in
 addition to FILE.
 
 Options:
- -L, --log FILE  write all output to FILE
  -h, --help      show help and exit
+ -L, --log FILE  write all output to FILE
  -v, --version   show version and exit
 EOF
 }
@@ -35,51 +35,33 @@ readonly Concurrency=4
 
 main()
 {
-  local opts
-  if ! opts=$(getopt --longoptions help,log:,version --options hL:v --name "$ExecName" -- "$@")
+  declare -A optMap=(
+    [help]=''
+    [version]=''
+    [log]=''
+  )
+
+  if ! map_opts optMap "$@"
   then
     show_help >&2
     return 1
   fi
 
-  eval set -- "$opts"
-
-  local logFile showVersion
-  while true
-  do
-    case "$1" in
-      -h|--help)
-        show_help
-        return 0
-        ;;
-      -L|--log)
-        logFile="$2"
-        shift 2
-        ;;
-      -v|--version)
-        showVersion=1
-        shift
-        ;;
-      --)
-        shift
-        break
-        ;;
-      *)
-        show_help >&2
-        return 1
-        ;;
-    esac
-  done
-
-  if [[ -n "${showVersion-}" ]]
+  if [[ -n "${optMap[help]}" ]]
   then
-    printf '%s' "$Version"
+    show_help
     return 0
   fi
 
-  if [[ -n "${logFile-}" ]]
+  if [[ -n "${optMap[version]}" ]]
   then
-    if ! redirect_stdout "$logFile"
+    printf '%s\n' "$Version"
+    return 0
+  fi
+
+  if [[ -n "${optMap[log]}" ]]
+  then
+    if ! redirect_stdout "${optMap[log]}"
     then
       return 1
     fi
@@ -100,9 +82,43 @@ main()
 }
 
 
-prep_tmp_files_db()
+map_opts()
 {
-  local tmpFilesDB
+  local mapVar="$1"
+  shift
+
+  local opts
+  if ! opts=$(getopt --longoptions help,log:,version --options hL:v --name "$ExecName" -- "$@")
+  then
+    return 1
+  fi
+
+  eval set -- "$opts"
+
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        eval "$mapVar[help]=help"
+        shift
+        ;;
+      -L|--log)
+        eval "$mapVar[log]='$2'"
+        shift 2
+        ;;
+      -v|--version)
+        eval "$mapVar[version]=version"
+        shift
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done
 }
 
 
@@ -302,7 +318,7 @@ MK_RM_MSGS()
       local name
       name=$(basename "$path")
 
-      if [[ "$name" =~ "$nameBeg" ]]
+      if [[ "$name" =~ $nameBeg ]]
       then
         printf 'took %s to delete data object %s\n' "$dur" "$path"
         break
