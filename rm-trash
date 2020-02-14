@@ -198,7 +198,7 @@ rm_trash()
   local trashList
   trashList=$(mk_temp "$trashTempFiles")
 
-  # Build the list of data objects to delete, sorted by age
+  Build the list of data objects to delete, sorted by age
   quest '%s %s/%s' \
       "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
        where COLL_NAME like '/$zone/trash/%'" \
@@ -206,6 +206,7 @@ rm_trash()
     | truncate_by_time "$upperBound" \
     | cut --delimiter ' ' --fields 2- \
     > "$trashList"
+  cp "$trashList" sample-trash-list
 
   local delTot
   delTot=$(wc --lines < "$trashList")
@@ -338,6 +339,8 @@ MK_RM_MSGS()
 
     local dur
     dur=$(expr "$line" : '.*\([0-9][0-9]*\.[0-9][0-9][0-9]\) sec$')
+
+    local resolved=
     while [[ "$idx" -lt "${#paths[@]}" ]]
     do
       local path="${paths[$((idx++))]}"
@@ -345,12 +348,20 @@ MK_RM_MSGS()
       local name
       name=$(basename "$path")
 
-      if [[ "$name" =~ $nameBeg ]]
+      if [[ "$name" =~ ^"$nameBeg" ]]
       then
-        printf 'took %s s to delete data object %s\n' "$dur" "$path"
+        resolved="$path"
         break
       fi
     done
+
+    if [[ -z "$resolved" ]]
+    then
+      printf 'Could not resolve path of %s\n' "$nameBeg" >&2
+      resolved="$nameBeg"
+    fi
+
+    printf 'took %s s to delete data object %s\n' "$dur" "$resolved"
   done
 }
 export -f MK_RM_MSGS
