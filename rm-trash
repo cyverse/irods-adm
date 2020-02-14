@@ -151,7 +151,7 @@ disp_err()
 {
   while IFS= read -r err
   do
-    fmt_msg ERROR "$err"
+    fmt_msg ERROR "${err#ERROR: }"
   done | route_err
 }
 
