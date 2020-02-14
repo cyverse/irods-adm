@@ -198,7 +198,7 @@ rm_trash()
   local trashList
   trashList=$(mk_temp "$trashTempFiles")
 
-  Build the list of data objects to delete, sorted by age
+  # Build the list of data objects to delete, sorted by age
   quest '%s %s/%s' \
       "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
        where COLL_NAME like '/$zone/trash/%'" \
