@@ -64,7 +64,6 @@ readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
 
-declare Serial=
 declare UntilTS=
 
 
@@ -90,6 +89,7 @@ main()
   local age=1
   local baseColl=
   local procMult=1
+  local serial=
   local srcRes=
   local stopTime=
 
@@ -125,7 +125,7 @@ main()
         shift 2
         ;;
       -s|--serial)
-        Serial=true
+        serial=true
         shift
         ;;
       -u|--until)
@@ -244,7 +244,7 @@ main()
 
   if [[ "$tot" -gt 0 ]]
   then
-    if [[ -z "$Serial" ]]
+    if [[ -z "$serial" ]]
     then
       local cnt=0
 
@@ -257,14 +257,15 @@ main()
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  2   8  7 15 < "$objList")  # 2 8--15-threaded
 
       # Large file transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"   480  8192 < "$objList")  # [480, 8192) MiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"  8192 65536 < "$objList")  # [8, 64) GiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" 65536       < "$objList")  # >= 64 GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"    480   8192 < "$objList")  # [480, 8192) MiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"   8192  65536 < "$objList")  # [8, 64) GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"  65536 524288 < "$objList")  # [64, 512) GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" 524288        < "$objList")  # >= 512 GiB transfers
 
       # zero byte files
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512  0  0 < "$objList")  # 16 1-threaded transfers
     else
-      select_cohort 0 "$tot" "$destResc" "$procMult" 16 2 0 0 < "$objList" > /dev/null
+      select_cohort 0 "$tot" "$destResc" "$procMult" 16 2 -1 -1 < "$objList" > /dev/null
     fi
   fi
 }
@@ -425,7 +426,7 @@ select_cohort()
   fi
 
   local maxSizeB maxSizeMiB minSizeB minSizeMiB
-  if [[ "$Serial" ]]
+  if [[ "$maxThreads" -eq -1 ]]
   then
     maxThreads=0
     minSizeMiB=0
