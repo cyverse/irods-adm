@@ -283,7 +283,6 @@ prune_collection()
     fi
   else
     prune_children "$trashTempFiles" "$collection"
-    printf 'Pruned collection %s\n' "$collection"
   fi
 }
 
