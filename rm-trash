@@ -23,9 +23,13 @@ Options:
 EOF
 }
 
-
 set -o nounset -o pipefail
 trap 'exit 130' INT
+
+if [[ -z "${STDBUF-}" ]]
+then
+  STDBUF=yes /usr/bin/stdbuf --error L --output L "$0"
+fi
 
 readonly Version=3
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
@@ -238,14 +242,6 @@ rm_trash()
 }
 
 
-mk_temp()
-{
-  local trashTempFiles="$1"
-
-  mktemp | tee --append "$trashTempFiles"
-}
-
-
 prune_children()
 {
   local trashTempFiles="$1"
@@ -287,8 +283,15 @@ prune_collection()
     fi
   else
     prune_children "$trashTempFiles" "$collection"
-    printf 'Pruned collection %s\n' "$collection"
   fi
+}
+
+
+mk_temp()
+{
+  local trashTempFiles="$1"
+
+  mktemp | tee --append "$trashTempFiles"
 }
 
 
