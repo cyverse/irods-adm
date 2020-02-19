@@ -23,12 +23,14 @@ Options:
 EOF
 }
 
+
 set -o nounset -o pipefail
 trap 'exit 130' INT
 
 if [[ -z "${STDBUF-}" ]]
 then
-  STDBUF=yes /usr/bin/stdbuf --error L --output L "$0"
+  STDBUF=yes /usr/bin/stdbuf --error L --output L "$0" "$@"
+  exit $?
 fi
 
 readonly Version=3
