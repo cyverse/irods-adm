@@ -144,7 +144,10 @@ rcat_log()
   #shellcheck disable=SC2087
   ssh -q -t "$host" 2> /dev/null \
 <<EOF
-  printf '%s\n' "$password" | sudo -S cat "$log"
+  if ! cat "$log" 2> /dev/null
+  then
+    printf '%s\n' "$password" | sudo -S cat "$log"
+  fi
 EOF
 }
 
