@@ -256,10 +256,9 @@ main()
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  2   8  7 15 "$untilTS" < "$objList")  # 2 8--15-threaded
 
       # Large file transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS"    480   8192 < "$objList")  # [480, 8192) MiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS"   8192  65536 < "$objList")  # [8, 64) GiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS"  65536 524288 < "$objList")  # [64, 512) GiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS" 524288        < "$objList")  # >= 512 GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS"   480  8192 < "$objList")  # [480, 8192) MiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS"  8192 65536 < "$objList")  # [8, 64) GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS" 65536       < "$objList")  # >= 64 GiB transfers
 
       # zero byte files
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512  0  0 < "$objList")  # 16 1-threaded transfers
