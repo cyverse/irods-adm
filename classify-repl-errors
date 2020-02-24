@@ -53,7 +53,7 @@ EOF
 }
 
 
-set -o nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
