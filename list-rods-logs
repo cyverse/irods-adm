@@ -84,7 +84,7 @@ main()
 
   local host="$1"
 
-  list_logs "$host" "$password" "$namePattern"
+  list_logs "$host" "$password" "$namePattern" | sort
 }
 
 
@@ -113,7 +113,7 @@ list_logs()
   #shellcheck disable=SC2087
   ssh -q -t "$host" 2> /dev/null \
 <<EOF
-  printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name "$namePattern" -type f | sort
+  printf '%s\n' "$password" | sudo -S find "$LogDir" -maxdepth 1 -name "$namePattern" -type f
 EOF
 }
 
