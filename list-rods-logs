@@ -44,7 +44,7 @@ main()
   eval set -- "$opts"
 
   local password=
-  local namePattern=*
+  local namePattern='*'
 
   while true
   do
