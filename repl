@@ -511,7 +511,7 @@ select_cohort_by_size()
     maxSizeMiB="$7"
   fi
 
-  local maxThreads=16
+  local maxThreads=3
 
   if ! CHECK_TIME "$untilTS"
   then
