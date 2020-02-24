@@ -64,8 +64,6 @@ readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
 
-declare UntilTS=
-
 
 main()
 {
@@ -169,9 +167,10 @@ main()
     fi
   fi
 
+  local untilTS=
   if [[ -n "$stopTime" ]]
   then
-    if ! UntilTS=$(date --date="$stopTime" '+%s')
+    if ! untilTS=$(date --date="$stopTime" '+%s')
     then
       printf '%s is not a valid date format\n' "$stopTime"
       exit 1
@@ -185,7 +184,7 @@ main()
   objList=$(mktemp)
 
   #shellcheck disable=SC2064
-  trap "finish '$objList'" EXIT
+  trap "finish '$objList' '$untilTS'" EXIT
 
   if ! iadmin lz &> /dev/null
   then
@@ -199,7 +198,7 @@ main()
     exit 1
   fi
 
-  if ! CHECK_TIME "$UntilTS"
+  if ! CHECK_TIME "$untilTS"
   then
    printf 'Stop time is in the past\n' >&2
    exit 1
@@ -249,18 +248,18 @@ main()
       local cnt=0
 
       # Small non-zero byte files
-      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512  0  1 < "$objList")  # 16 1-threaded transfers
-      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  8 128  1  2 < "$objList")  # 8 2-threaded
-      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  6  72  2  3 < "$objList")  # 6 3-threaded
-      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  4  32  3  5 < "$objList")  # 4 4--5-threaded
-      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  3  18  5  7 < "$objList")  # 3 6--7-threaded
-      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  2   8  7 15 < "$objList")  # 2 8--15-threaded
+      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512  0  1 "$untilTS" < "$objList")  # 16 1-threaded transfers
+      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  8 128  1  2 "$untilTS" < "$objList")  # 8 2-threaded
+      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  6  72  2  3 "$untilTS" < "$objList")  # 6 3-threaded
+      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  4  32  3  5 "$untilTS" < "$objList")  # 4 4--5-threaded
+      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  3  18  5  7 "$untilTS" < "$objList")  # 3 6--7-threaded
+      cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  2   8  7 15 "$untilTS" < "$objList")  # 2 8--15-threaded
 
       # Large file transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"    480   8192 < "$objList")  # [480, 8192) MiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"   8192  65536 < "$objList")  # [8, 64) GiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult"  65536 524288 < "$objList")  # [64, 512) GiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" 524288        < "$objList")  # >= 512 GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS"    480   8192 < "$objList")  # [480, 8192) MiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS"   8192  65536 < "$objList")  # [8, 64) GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS"  65536 524288 < "$objList")  # [64, 512) GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS" 524288        < "$objList")  # >= 512 GiB transfers
 
       # zero byte files
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512  0  0 < "$objList")  # 16 1-threaded transfers
@@ -287,8 +286,9 @@ exit_with_help()
 finish()
 {
   local objList="$1"
+  local untilTS="$2"
 
-  if ! CHECK_TIME "$UntilTS"
+  if ! CHECK_TIME "$untilTS"
   then
     printf 'out of time\n' >&2
   fi
@@ -419,8 +419,9 @@ select_cohort()
   local maxArgs="$6"
   local minThreads="$7"
   local maxThreads="$8"
+  local untilTS="$9"
 
-  if ! CHECK_TIME "$UntilTS"
+  if ! CHECK_TIME "$untilTS"
   then
     exit 0
   fi
@@ -481,7 +482,7 @@ select_cohort()
     maxProcs=$((maxProcs * procMult))
 
     parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
-          REPL_BATCH "'$destResc'" "'$maxThreads'" "'$UntilTS'" \
+          REPL_BATCH "'$destResc'" "'$maxThreads'" "'$untilTS'" \
         < "$cohortList" \
         2>&"$Log" \
       | tee >(cat >&"$Log") \
@@ -502,17 +503,18 @@ select_cohort_by_size()
   local tot="$2"
   local destResc="$3"
   local procMult="$4"
-  local minSizeMiB="$5"
+  local untilTS="$5"
+  local minSizeMiB="$6"
 
   local maxSizeMiB=
-  if [[ "$#" -ge 6 ]]
+  if [[ "$#" -ge 7 ]]
   then
-    maxSizeMiB="$6"
+    maxSizeMiB="$7"
   fi
 
   local maxThreads=16
 
-  if ! CHECK_TIME "$UntilTS"
+  if ! CHECK_TIME "$untilTS"
   then
     exit 0
   fi
@@ -548,7 +550,7 @@ select_cohort_by_size()
     local maxProcs=$((1 * procMult))
 
     parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
-          REPL_BATCH "'$destResc'" "'$maxThreads'" "'$UntilTS'" \
+          REPL_BATCH "'$destResc'" "'$maxThreads'" "'$untilTS'" \
         < "$cohortList" \
         2>&"$Log" \
       | tee >(cat >&"$Log") \
