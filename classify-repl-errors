@@ -26,23 +26,26 @@ The program reads the output of the \`repl\` command from standard in. It groups
 the data objects that failed to replicate into different files based on the
 error that occurred. Here's a breakdown of what each output file holds.
 
- <class_base>.src_path_errors holds the paths to data objects that have paths
- that cause \`irepl\` problems.
+<class_base>.src_path_errors holds the paths to data objects that have paths
+that cause \`irepl\` problems.
 
 <class_base>.broken_conn holds the paths to data object where the connection to
 the IES was broken.
 
- <class_base>.short_file holds the paths to data objects having sizes larger
- than their respective physical files' sizes.
+<class_base>.short_file holds the paths to data objects having sizes larger than
+their respective physical files' sizes.
 
- <class_base>.connection_reset holds the paths to data objects where the
- connections were reset during the replication.
+<class_base>.connection_reset holds the paths to data objects where the
+connections were reset during the replication.
 
- <class_base>.chksum_mismatches holds the paths to data objects with checksums
- that differ from the checksums of their respective physical files.
+<class_base>.chksum_mismatches holds the paths to data objects with checksums
+that differ from the checksums of their respective physical files.
 
- <class_base>.missing_file holds the paths to data objects that are missing
- their physical files.
+<class_base>.missing_file holds the paths to data objects that are missing
+their physical files.
+
+<class_base>.timeout holds the paths to data objects that failed replication due
+to a connection timeout.
 
 <class_base>.unclassified_repl_errors holds the log messages for replication
 related errors that couldn't be classified.
@@ -53,7 +56,7 @@ EOF
 }
 
 
-set -o nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 readonly Version=2
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
@@ -201,6 +204,14 @@ classify_repl_errors()
                                  "$logBase".connection_reset)
 
   display_error_count 'connections reset' "$cRBPCnt" "$totErrCnt"
+
+  local sSRTCnt
+  sSRTCnt=$(split_out_repl_class "$replErrorsFile" \
+                                 -115000 \
+                                 SYS_SOCK_READ_TIMEDOUT \
+                                 "$logBase".timeout)
+
+  display_error_count timeouts "$sSRTCnt" "$totErrCnt"
 
   local uCMCnt
   uCMCnt=$(split_out_repl_class "$replErrorsFile" \
