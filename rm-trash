@@ -135,7 +135,7 @@ redirect_stdout()
 
   exec 1>&-
 
-  if ! exec 1>"$logFile"
+  if ! exec 1>>"$logFile"
   then
     exec 1>/dev/stdout
     printf 'Failed to open %s for writing\n' "$logFile" >&2
