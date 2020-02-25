@@ -53,7 +53,7 @@ EOF
 
 readonly Version=2
 
-set -o nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 # Ensure these are declared for PostgreSQL
 export PGHOST
