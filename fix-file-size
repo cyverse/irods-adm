@@ -1,9 +1,5 @@
 #!/bin/bash
 
-readonly ExecName=$(basename "$0")
-readonly Version=1
-
-
 show_help()
 {
   cat <<EOF
@@ -30,6 +26,10 @@ user must have passwordless access to the root account on the relevant storage
 resources.
 EOF
 }
+
+
+readonly ExecName=$(basename "$0")
+readonly Version=1
 
 
 show_version()
