@@ -121,17 +121,29 @@ FIX()
 {
   local objPath="$1"
 
+  local fixed
+
   printf '%s\n' "$objPath"
 
   while read -r rescHier storeHost filePath
   do
+    fixed=
+    
     local coordResc="${rescHier%%;*}"
 
     local fixCmd
     fixCmd=$(FIX_CMD "$objPath" "$coordResc" "$filePath")
 
-    EXEC_ON_RS "$storeHost" "$fixCmd"
+    if EXEC_ON_RS "$storeHost" "$fixCmd"
+    then
+      fixed="$objPath"
+    fi
   done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
+
+  if [[ -z "${fixed-}" ]]
+  then
+    printf 'ERROR: failed to fix %s\n' "$objPath" >&2
+  fi
 }
 export -f FIX
 
