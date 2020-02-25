@@ -53,7 +53,7 @@ EOF
 
 readonly Version=2
 
-set -o nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 # Ensure these are declared for PostgreSQL
 export PGHOST
@@ -512,6 +512,7 @@ select_cohort_by_size()
   fi
 
   local maxThreads=3
+  local maxProcs=6
 
   if ! CHECK_TIME "$untilTS"
   then
@@ -546,7 +547,7 @@ select_cohort_by_size()
 
   if [[ "$subTotal" -gt 0 ]]
   then
-    local maxProcs=$((1 * procMult))
+    maxProcs=$((maxProcs * procMult))
 
     parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
           REPL_BATCH "'$destResc'" "'$maxThreads'" "'$untilTS'" \
