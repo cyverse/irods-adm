@@ -59,6 +59,8 @@ export PGHOST
 export PGPORT
 export PGUSER
 
+export TIMEDOUT=3
+
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
@@ -183,7 +185,7 @@ main()
   objList=$(mktemp)
 
   #shellcheck disable=SC2064
-  trap "finish '$objList' '$untilTS'" EXIT
+  trap 'finish "$?" '"'$objList'" EXIT
 
   if ! iadmin lz &> /dev/null
   then
@@ -282,16 +284,19 @@ exit_with_help()
 
 finish()
 {
-  local objList="$1"
-  local untilTS="$2"
-
-  if ! CHECK_TIME "$untilTS"
-  then
-    printf 'out of time\n' >&2
-  fi
+  local exitCode="$1"
+  local objList="$2"
 
   rm --force "$objList"
   eval "exec 1>&$Log $Log>&-"
+
+  if [[ "$exitCode" -eq "$TIMEDOUT" ]]
+  then
+    printf 'out of time\n' >&2
+    exit 0
+  fi
+
+  exit "$exitCode"
 }
 
 
@@ -420,7 +425,7 @@ select_cohort()
 
   if ! CHECK_TIME "$untilTS"
   then
-    exit 0
+    exit "$TIMEDOUT"
   fi
 
   local maxSizeB maxSizeMiB minSizeB minSizeMiB
@@ -509,12 +514,12 @@ select_cohort_by_size()
     maxSizeMiB="$7"
   fi
 
-  local maxThreads=3
-  local maxProcs=6
+  local maxThreads=8
+  local maxProcs=1
 
   if ! CHECK_TIME "$untilTS"
   then
-    exit 0
+    exit "$TIMEDOUT"
   fi
 
   local minSizeB=$((minSizeMiB * 1024 ** 2))
@@ -582,7 +587,7 @@ REPL_BATCH()
 
   if ! CHECK_TIME "$untilTS"
   then
-    exit 1
+    exit "$TIMEDOUT"
   fi
 
   irepl -B -M -T -v -N "$maxThreads" -R "$destResc" "$@"
