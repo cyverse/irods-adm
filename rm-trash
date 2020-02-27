@@ -35,9 +35,10 @@ then
   exit $?
 fi
 
+export UNKNOWN_ERROR=3
+
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
-
 readonly Concurrency=4
 
 
@@ -156,9 +157,17 @@ rm_temps()
 
 disp_err()
 {
+  local parallelPat='(parallel:| Hangup  *parallel) '
+
+  local err
   while IFS= read -r err
   do
-    fmt_msg ERROR "${err#ERROR: }"
+    err="${err#ERROR: }"
+    
+    if ! [[ "$err" =~ $parallelPat ]]
+    then
+      fmt_msg ERROR "$err"
+    fi
   done | route_err
 }
 
@@ -199,37 +208,32 @@ rm_trash()
   local zone
   zone=$(ienv | sed --quiet 's/NOTICE: irods_zone_name - //p')
 
-  local upperBound
-  upperBound=$(date --date "$(date --iso-8601 --date '1 month ago')" '+%s')
-
   local trashList
   trashList=$(mk_temp "$trashTempFiles")
 
-  # Build the list of data objects to delete, sorted by age
-  quest '%s %s/%s' \
-      "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME
-       where COLL_NAME like '/$zone/trash/%'" \
-    | sort --numeric --key 1,1 \
-    | truncate_by_time "$upperBound" \
-    | cut --delimiter ' ' --fields 2- \
-    > "$trashList"
-  cp "$trashList" sample-trash-list
+  if ! trashed_data "$zone" > "$trashList"
+  then
+    printf 'failed to determine data objects to delete\n' >&2
+    return 1
+  fi
 
   local delTot
   delTot=$(wc --lines < "$trashList")
   printf '%d data objects will be deleted\n' "$delTot"
 
-  parallel --line-buffer --no-notice --no-run-if-empty \
-      --delimiter '\n' --max-args 100 --max-procs "$Concurrency" \
-      RM_DATA_BATCH \
-    < "$trashList"
+  parallel --line-buffer --no-notice --no-run-if-empty --delimiter '\n' --max-args 100 --max-procs "$Concurrency" RM_DATA_BATCH < "$trashList"
+  local rc="$?"
+  if [[ "$rc" -eq 129 ]]
+  then
+    printf 'EXITING\n' >&2
+    return 1
+  fi
 
-  # Remove the empty trash collections
-  quest '%s' \
-      "select order(COLL_NAME)
-       where COLL_PARENT_NAME = '/$zone/trash' || = '/$zone/trash/home'
-         and COLL_NAME != '/$zone/trash/home'" \
-    > "$trashList"
+  if ! base_collections "$zone" > "$trashList"
+  then
+    printf 'failed to determine base trash collecitons\n' >&2
+    return 0
+  fi
 
   delTot=$(wc --lines < "$trashList")
   printf '%d base collections will be pruned\n' "$delTot"
@@ -237,11 +241,43 @@ rm_trash()
   local parent
   while read -r parent
   do
-    prune_children "$trashTempFiles" "$parent"
-    printf 'Pruned base collection %s\n' "$parent"
+    if ! prune_children "$trashTempFiles" "$parent"
+    then
+      printf 'Failed to prune base collection %s\n' "$parent" >&2
+    else
+      printf 'Pruned base collection %s\n' "$parent"
+    fi
   done < "$trashList"
 
   rm --force "$trashList"
+}
+
+
+base_collections()
+{
+  local zone="$1"
+
+  quest \
+      '%s' \
+      "select order(COLL_NAME)
+       where COLL_PARENT_NAME = '/$zone/trash' || = '/$zone/trash/home'
+         and COLL_NAME != '/$zone/trash/home'"
+}
+
+
+trashed_data()
+{
+  local zone="$1"
+
+  local upperBound
+  upperBound=$(date --date "$(date --iso-8601 --date '1 month ago')" '+%s')
+
+  quest \
+      '%s %s/%s' \
+      "select max(DATA_MODIFY_TIME), COLL_NAME, DATA_NAME where COLL_NAME like '/$zone/trash/%'" \
+    | sort --numeric --key 1,1 \
+    | truncate_by_time "$upperBound" \
+    | cut --delimiter ' ' --fields 2-
 }
 
 
@@ -250,18 +286,27 @@ prune_children()
   local trashTempFiles="$1"
   local parent="$2"
 
+  local rc=0
+
   local childList
   childList=$(mk_temp "$trashTempFiles")
 
-  quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '$parent'" > "$childList"
-
-  local collection
-  while read -r collection
-  do
-    prune_collection "$trashTempFiles" "$collection"
-  done < "$childList"
+  if quest '%s' "select COLL_NAME where COLL_PARENT_NAME = '$parent'" > "$childList"
+  then
+    local collection
+    while read -r collection
+    do
+      if ! prune_collection "$trashTempFiles" "$collection"
+      then
+        rc=1
+      fi
+    done < "$childList"
+  else
+    rc=1
+  fi
 
   rm --force "$childList"
+  return "$rc"
 }
 
 
@@ -270,23 +315,41 @@ prune_collection()
   local trashTempFiles="$1"
   local collection="$2"
 
+  local rc=0
+
   local collDoTot
-  collDoTot=$(quest '%s' "select count(DATA_ID) where COLL_NAME = '$collection'")
-
-  if [[ "$collDoTot" -eq 0 ]]
+  if ! collDoTot=$(count_data "$collection")
   then
-    collDoTot=$(quest '%s' "select count(DATA_ID) where COLL_NAME like '$collection/%'")
-  fi
-
-  if [[ "$collDoTot" -eq 0 ]]
+    rc=1
+  elif [[ "$collDoTot" -eq 0 ]]
   then
     if irm -f -r -v "$collection"
     then
       printf 'Deleted collection %s\n' "$collection"
+    else
+      rc=1
     fi
   else
-    prune_children "$trashTempFiles" "$collection"
+    if ! prune_children "$trashTempFiles" "$collection"
+    then
+      rc=1
+    fi
   fi
+
+  if [[ "$rc" -ne 0 ]]
+  then
+    printf 'Failed to prune %s\n' "$collection" >&2
+  fi
+
+  return "$rc"
+}
+
+
+count_data()
+{
+  local collection="$1"
+
+  quest '%s' "select count(DATA_ID) where COLL_NAME = '$collection' || like '$collection/%'"
 }
 
 
@@ -327,9 +390,28 @@ truncate_by_time()
 
 RM_DATA_BATCH()
 {
-  stdbuf --error L --output L irm -f -v "$@" | MK_RM_MSGS "$@"
+  trap 'kill -TERM "$PARALLEL_PID"; sleep 1; kill -HUP "$PARALLEL_PID"' TERM
+
+  if ! stdbuf --error L --output L irm -f -v "$@" 2> >(MK_RM_ERRS) | MK_RM_MSGS "$@"
+  then
+    exit 1
+  fi
+
+  exit 0
 }
 export -f RM_DATA_BATCH
+
+
+MK_RM_ERRS()
+{
+  local line
+  while IFS= read -r line
+  do
+    printf 'UNKNOWN ERROR: %s\n' "$line" >&2
+    kill -TERM "$$"
+  done
+}
+export -f MK_RM_ERRS
 
 
 MK_RM_MSGS()
