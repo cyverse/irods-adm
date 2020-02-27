@@ -64,6 +64,7 @@ export TIMEDOUT=3
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
+readonly MaxThreads=12
 
 
 main()
@@ -514,7 +515,6 @@ select_cohort_by_size()
     maxSizeMiB="$7"
   fi
 
-  local maxThreads=8
   local maxProcs=1
 
   if ! CHECK_TIME "$untilTS"
@@ -553,7 +553,7 @@ select_cohort_by_size()
     maxProcs=$((maxProcs * procMult))
 
     parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
-          REPL_BATCH "'$destResc'" "'$maxThreads'" "'$untilTS'" \
+          REPL_BATCH "'$destResc'" "'$MaxThreads'" "'$untilTS'" \
         < "$cohortList" \
         2>&"$Log" \
       | tee >(cat >&"$Log") \
@@ -572,7 +572,7 @@ CHECK_TIME()
 
   if [[ -n "$untilTS" ]] && [[ "$(date '+%s')" -ge "$untilTS" ]]
   then
-    return 1
+    return "$TIMEDOUT"
   fi
 }
 export -f CHECK_TIME

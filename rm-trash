@@ -24,6 +24,8 @@ EOF
 }
 
 
+readonly Version=3
+
 set -o nounset -o pipefail
 trap 'exit 130' INT
 
@@ -33,7 +35,6 @@ then
   exit $?
 fi
 
-readonly Version=3
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 
