@@ -572,7 +572,7 @@ CHECK_TIME()
 
   if [[ -n "$untilTS" ]] && [[ "$(date '+%s')" -ge "$untilTS" ]]
   then
-    return 1
+    return "$TIMEDOUT"
   fi
 }
 export -f CHECK_TIME
