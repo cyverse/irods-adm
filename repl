@@ -64,7 +64,7 @@ export TIMEDOUT=3
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
-readonly MaxThreads=12
+readonly MaxThreads=14
 
 
 main()
