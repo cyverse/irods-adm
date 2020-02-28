@@ -378,12 +378,10 @@ truncate_by_time()
   local dataObj modifyTs
   while read -r modifyTs dataObj
   do
-    if [[ "${modifyTs#0}" -ge "$upperBound" ]]
+    if [[ "${modifyTs#0}" -lt "$upperBound" ]]
     then
-      break
+      printf '%s %s\n' "$modifyTs" "$dataObj"
     fi
-
-    printf '%s %s\n' "$modifyTs" "$dataObj"
   done
 }
 
