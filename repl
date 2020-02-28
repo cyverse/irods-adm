@@ -566,18 +566,6 @@ select_cohort_by_size()
 }
 
 
-CHECK_TIME()
-{
-  local untilTS="$1"
-
-  if [[ -n "$untilTS" ]] && [[ "$(date '+%s')" -ge "$untilTS" ]]
-  then
-    return "$TIMEDOUT"
-  fi
-}
-export -f CHECK_TIME
-
-
 REPL_BATCH()
 {
   local destResc="$1"
@@ -607,6 +595,18 @@ REPL_BATCH()
   exit 0
 }
 export -f REPL_BATCH
+
+
+CHECK_TIME()
+{
+  local untilTS="$1"
+
+  if [[ -n "$untilTS" ]] && [[ "$(date '+%s')" -ge "$untilTS" ]]
+  then
+    return "$TIMEDOUT"
+  fi
+}
+export -f CHECK_TIME
 
 
 main "$@"
