@@ -64,7 +64,7 @@ export TIMEDOUT=3
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
-readonly MaxThreads=14
+readonly MaxThreads=16
 
 
 main()
@@ -258,8 +258,7 @@ main()
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  2   8  7 15 "$untilTS" < "$objList")  # 2 8--15-threaded
 
       # Large file transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS"  480 8192 < "$objList")  # [480, 8192) MiB transfers
-      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS" 8192      < "$objList")  # >= 8 GiB transfers
+      cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS" 480 < "$objList")  # >= 480 MiB transfers
 
       # zero byte files
       cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512  0  0 "$untilTS" < "$objList")  # 16 1-threaded transfers
@@ -568,6 +567,8 @@ select_cohort_by_size()
 
 REPL_BATCH()
 {
+  set -o errexit -o nounset -o pipefail
+
   local destResc="$1"
   local maxThreads="$2"
   local untilTS="$3"
