@@ -574,10 +574,7 @@ REPL_BATCH()
   local untilTS="$3"
   shift 3
 
-  if ! CHECK_TIME "$untilTS"
-  then
-    exit "$TIMEDOUT"
-  fi
+  CHECK_TIME "$untilTS"
 
   irepl -B -M -T -v -N "$maxThreads" -R "$destResc" "$@"
 
