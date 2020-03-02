@@ -568,6 +568,8 @@ select_cohort_by_size()
 
 REPL_BATCH()
 {
+  set -o errexit -o nounset -o pipefail
+
   local destResc="$1"
   local maxThreads="$2"
   local untilTS="$3"
