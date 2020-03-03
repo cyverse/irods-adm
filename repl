@@ -468,10 +468,13 @@ select_cohort()
   local subTotal
   subTotal=$(count <"$cohortList")
 
-  if [[ -n "$maxSizeMiB" ]] && [[ "$maxSizeMiB" -eq 0 ]]
+  if [[ "$minSizeMiB" -le 0 ]] && [[ -z "$maxSizeMiB" ]]
+  then
+    printf 'Replicating %s files\n' "$subTotal"
+  elif [[ "$minSizeMiB" -le 0 ]] && [[ "$maxSizeMiB" -le 0 ]]
   then
     printf 'Replicating %s files with size 0 MiB\n' "$subTotal"
-  elif [[ "$minSizeMiB" -eq 0 ]]
+  elif [[ "$minSizeMiB" -le 0 ]]
   then
     printf 'Replicating %s files with size in (0, %s) MiB\n' "$subTotal" "$maxSizeMiB"
   else
