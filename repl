@@ -576,15 +576,15 @@ REPL_BATCH()
 
   CHECK_TIME "$untilTS"
 
-  irepl -B -M -T -v -N "$maxThreads" -R "$destResc" "$@"
+  local replStatus=0
+  irepl -B -M -T -v -N "$maxThreads" -R "$destResc" "$@" || replStatus="$?"
 
-# XXX: Trying to figure out the irepl error code for when irepl logs a
-# '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is probably
-# down status = -305113 USER_SOCK_CONNECT_ERR, No route to host' error message.
-# It is probably at 113, but we should confirm.
-# TODO: Once this is confirmed, if this status is returned, this function should
-# wait for a bit and try again.
-  local replStatus="$?"
+  # TODO: Trying to figure out the irepl error code for when irepl logs a
+  # '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is
+  # probably down status = -305113 USER_SOCK_CONNECT_ERR, No route to host'
+  # error message. It is probably at 113, but we should confirm. Once this is
+  # confirmed, if this status is returned, this function  should wait for a bit
+  # and try again.
   if [[ "$replStatus" -ne 0 ]]
   then
     printf 'repl: irepl exited with status %d\n' "$replStatus" >&2
