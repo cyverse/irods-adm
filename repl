@@ -25,6 +25,9 @@ Options:
  -h, --help                     show help and exit
  -m, --multiplier <multiplier>  a multiplier on the number of processes to run
                                 at once, default: 1
+ -N, --max-threads <max>        sets the maximum number of threds to use in
+                                parallel replication to <max>; if <max> is 0,
+																replication is streaming.
  -P, --port <port>              connect to the ICAT's DBMS listening on TCP port
                                 <port> instead of the PostgreSQL default
  -r, --resource <resource>      only replicate the data objects with a file on
@@ -64,7 +67,6 @@ export TIMEDOUT=3
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
-readonly MaxThreads=16
 
 
 main()
@@ -74,8 +76,8 @@ main()
 		getopt \
 			--name "$ExecName" \
 			--longoptions \
-				age:,collection:,help,host:,multiplier:,port:,resource:,serial,until:,user:,version \
-			--options A:c:hH:m:P:r:su:U:v \
+				age:,collection:,help,host:,max-threads:,multiplier:,port:,resource:,serial,until:,user:,version \
+			--options A:c:hH:m:N:P:r:su:U:v \
 			-- \
 			"$@")
 	local ret="$?"
@@ -88,7 +90,9 @@ main()
 
 	local age=1
 	local baseColl=
+	local maxThreads=16
 	local procMult=1
+	# TODO get rid of serial
 	local serial=
 	local srcRes=
 	local stopTime=
@@ -114,6 +118,10 @@ main()
 				;;
 			-m|--multiplier)
 				procMult="$2"
+				shift 2
+				;;
+			-N|--max-threads)
+			  maxThreads="$2"
 				shift 2
 				;;
 			-P|--port)
@@ -249,6 +257,7 @@ main()
 		then
 			local cnt=0
 
+      # TODO prevent select_cohort's maxThreads from being larger than --max-threads
 			# Small non-zero byte files
 			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512 0  1 "$untilTS" < "$objList")  # 16 1-threaded transfers
 			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  8 128 1  2 "$untilTS" < "$objList")  # 8 2-threaded
@@ -258,7 +267,7 @@ main()
 			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  2   8 7 15 "$untilTS" < "$objList")  # 2 8--15-threaded
 
 			# Large file transfers
-			cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$untilTS" 480 < "$objList")  # >= 480 MiB transfers
+			cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$maxThreads" "$untilTS" 480 < "$objList")  # >= 480 MiB transfers
 
 			# zero byte files
 			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512 0 0 "$untilTS" < "$objList")  # 16 1-threaded transfers
@@ -502,13 +511,14 @@ select_cohort_by_size()
 	local tot="$2"
 	local destResc="$3"
 	local procMult="$4"
-	local untilTS="$5"
-	local minSizeMiB="$6"
+	local maxThreads="$5"
+	local untilTS="$6"
+	local minSizeMiB="$7"
 
 	local maxSizeMiB=
-	if [[ "$#" -ge 7 ]]
+	if [[ "$#" -ge 8 ]]
 	then
-		maxSizeMiB="$7"
+		maxSizeMiB="$8"
 	fi
 
 	local maxProcs=1
@@ -549,7 +559,7 @@ select_cohort_by_size()
 		maxProcs=$((maxProcs * procMult))
 
 		parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
-					REPL_BATCH "'$destResc'" "'$MaxThreads'" "'$untilTS'" \
+					REPL_BATCH "'$destResc'" "'$maxThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$Log" \
 			| tee >(cat >&"$Log") \
