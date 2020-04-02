@@ -137,7 +137,7 @@ main()
 				shift 2
 				;;
 			-v|--version)
-				show_version
+  			printf '%s\n' "$Version"
 				exit 0
 				;;
 			--)
@@ -266,12 +266,6 @@ main()
 			select_cohort 0 "$tot" "$destResc" "$procMult" 16 2 -1 -1 "$untilTS" < "$objList" > /dev/null
 		fi
 	fi
-}
-
-
-show_version()
-{
-	printf '%s\n' "$Version"
 }
 
 
