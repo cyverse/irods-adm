@@ -25,9 +25,9 @@ Options:
  -h, --help                     show help and exit
  -m, --multiplier <multiplier>  a multiplier on the number of processes to run
                                 at once, default: 1
- -N, --max-threads <max>        sets the maximum number of threds to use in
-                                parallel replication to <max>; if <max> is 0,
-																replication is streaming.
+ -N, --max-threads <max>        sets the maximum number of threads for parallel
+                                replication to <max>; if <max> is 0 replication
+                                will be streaming.
  -P, --port <port>              connect to the ICAT's DBMS listening on TCP port
                                 <port> instead of the PostgreSQL default
  -r, --resource <resource>      only replicate the data objects with a file on
@@ -253,20 +253,47 @@ main()
 
 	if [[ "$tot" -gt 0 ]]
 	then
-		if [[ -z "$serial" ]]
+		if [[ -z "$serial" ]] || [[ "$maxThreads" -le 0 ]]
 		then
 			local cnt=0
 
-      # TODO prevent select_cohort's maxThreads from being larger than --max-threads
 			# Small non-zero byte files
-			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512 0  1 "$untilTS" < "$objList")  # 16 1-threaded transfers
-			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  8 128 1  2 "$untilTS" < "$objList")  # 8 2-threaded
-			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  6  72 2  3 "$untilTS" < "$objList")  # 6 3-threaded
-			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  4  32 3  5 "$untilTS" < "$objList")  # 4 4--5-threaded
-			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  3  18 5  7 "$untilTS" < "$objList")  # 3 6--7-threaded
-			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  2   8 7 15 "$untilTS" < "$objList")  # 2 8--15-threaded
+			cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult" 16 512 0 1 "$untilTS" < "$objList")  # 16 1-threaded transfers
+
+      if [[ "$maxThreads" -ge 2 ]]
+			then
+				cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  8 128 1 2 "$untilTS" < "$objList")  # 8 2-threaded
+      fi
+
+			if [[ "$maxThreads" -ge 3 ]]
+      then
+				cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  6  72 2 3 "$untilTS" < "$objList")  # 6 3-threaded
+			fi
+
+			if [[ "$maxThreads" -ge 5 ]]
+      then
+				cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  4  32 3 5 "$untilTS" < "$objList")  # 4 4--5-threaded
+			fi
+
+			if [[ "$maxThreads" -ge 7 ]]
+			then
+				cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  3  18 5 7 "$untilTS" < "$objList")  # 3 6--7-threaded
+			fi
+
+			if [[ "$maxThreads" -ge 15 ]]
+			then
+				cnt=$(select_cohort "$cnt" "$tot" "$destResc" "$procMult"  2   8 7 15 "$untilTS" < "$objList")  # 2 8--15-threaded
+			fi
 
 			# Large file transfers
+			local minSize
+			minSize=$(threads_to_MB "$maxThreads")
+
+			if [[ "$minSize" -lt 480 ]]
+			then
+				cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$maxThreads" "$untilTS" "$minSize" 480 < "$objList")  # < 480 MiB transfers
+			fi
+
 			cnt=$(select_cohort_by_size "$cnt" "$tot" "$destResc" "$procMult" "$maxThreads" "$untilTS" 480 < "$objList")  # >= 480 MiB transfers
 
 			# zero byte files
@@ -328,7 +355,7 @@ partition()
 
 	if [[ -n "$maxSizeB" ]]
 	then
-		awk --assign min="$minSizeB" --assign max="$maxSizeB" \
+		awk -v min="$minSizeB" -v max="$maxSizeB" \
 				'BEGIN {
 					 RS = "\0"
 					 FS = " "
@@ -339,7 +366,7 @@ partition()
 					 if ($1 >= min && $1 < max) { print substr($0, length($1) + 2) }
 				 }'
 	else
-		awk --assign min="$minSizeB" \
+		awk -v min="$minSizeB" \
 				'BEGIN {
 					 RS = "\0"
 					 FS = " "
@@ -449,12 +476,12 @@ select_cohort()
 	then
 		minSizeMiB=0
 		minSizeB=1
-		maxSizeMiB=$((maxThreads * 32))
+		maxSizeMiB=$(threads_to_MB "$maxThreads")
 		maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
 	else
-		minSizeMiB=$((minThreads * 32))
+		minSizeMiB=$(threads_to_MB "$minThreads")
 		minSizeB=$((minSizeMiB * ((1024 ** 2))))
-		maxSizeMiB=$((maxThreads * 32))
+		maxSizeMiB=$(threads_to_MB "$maxThreads")
 		maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
 	fi
 
@@ -569,6 +596,14 @@ select_cohort_by_size()
 	fi
 
 	rm --force "$cohortList"
+}
+
+
+threads_to_MB()
+{
+  local threads="$1"
+
+	echo $(( threads * 32 ))
 }
 
 
