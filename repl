@@ -234,19 +234,20 @@ main()
 	local replQuery
 	replQuery=$(mk_repl_query "$maxCreateTime" "$baseCond" "$resCond")
 
-	psql \
-			--no-align --tuples-only --record-separator-zero \
-			--command "$replQuery" --field-separator ' ' \
-			ICAT \
-		> "$objList"
+#	psql \
+#			--no-align --tuples-only --record-separator-zero \
+#			--command "$replQuery" --field-separator ' ' \
+#			ICAT \
+#		> "$objList"
 
 	local tot
-	tot=$(count < "$objList")
+  tot=1
+#	tot=$(count < "$objList")
 	printf '%d data objects to replicate\n' "$tot" >&2
 
 	if [[ "$tot" -gt 0 ]]
 	then
-		if [[ "$maxThreads" -le 0 ]]
+		if [[ "$maxThreads" -gt 0 ]]
 		then
 			local cnt=0
 
