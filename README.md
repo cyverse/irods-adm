@@ -125,8 +125,3 @@ with their files.
 
 The program `fix-file-size` can be used to set the sizes of a group of data
 objects with the sizes of their respective files.
-
-
-## Trash
-
-The program `rm-trash` can be used to empty trash older than one month.
