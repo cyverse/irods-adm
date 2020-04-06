@@ -32,7 +32,6 @@ Options:
                                 <port> instead of the PostgreSQL default
  -r, --resource <resource>      only replicate the data objects with a file on
                                 this resource
- -s, --serial                   disable parallel transport
  -u, --until <stop_time>        the time to stop replication in a format
                                 understandable by `date`
  -U, --user <user>              authorize the DBMS connection as user <user>
@@ -53,7 +52,7 @@ EOF
 }
 
 
-readonly Version=2
+readonly Version=3
 
 set -o errexit -o nounset -o pipefail
 
@@ -76,8 +75,8 @@ main()
 		getopt \
 			--name "$ExecName" \
 			--longoptions \
-				age:,collection:,help,host:,max-threads:,multiplier:,port:,resource:,serial,until:,user:,version \
-			--options A:c:hH:m:N:P:r:su:U:v \
+				age:,collection:,help,host:,max-threads:,multiplier:,port:,resource:,until:,user:,version \
+			--options A:c:hH:m:N:P:r:u:U:v \
 			-- \
 			"$@")
 	local ret="$?"
@@ -92,8 +91,6 @@ main()
 	local baseColl=
 	local maxThreads=16
 	local procMult=1
-	# TODO get rid of serial
-	local serial=
 	local srcRes=
 	local stopTime=
 
@@ -131,10 +128,6 @@ main()
 			-r|--resource)
 				srcRes="$2"
 				shift 2
-				;;
-			-s|--serial)
-				serial=true
-				shift
 				;;
 			-u|--until)
 				stopTime="$2"
@@ -253,7 +246,7 @@ main()
 
 	if [[ "$tot" -gt 0 ]]
 	then
-		if [[ -z "$serial" ]] || [[ "$maxThreads" -le 0 ]]
+		if [[ "$maxThreads" -le 0 ]]
 		then
 			local cnt=0
 
