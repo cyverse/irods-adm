@@ -98,7 +98,7 @@ main()
     esac
   done
 
-  if [ "$#" -lt 1 ]
+  if [[ "$#" -lt 1 ]]
   then
     show_help >&2
     return 1
@@ -131,7 +131,7 @@ process_input()
 
 remove_temp_files()
 {
-  if [ "${#TempFiles[@]}" -gt 0 ]
+  if [[ "${#TempFiles[@]}" -gt 0 ]]
   then
     rm --force "${TempFiles[@]}"
   fi
@@ -168,7 +168,7 @@ classify_errors()
 
   display_error_count 'unclassified errors' "$unclassifiedErrCnt" "$errCnt"
 
-  if [ "$unclassifiedErrCnt" -gt 0 ]
+  if [[ "$unclassifiedErrCnt" -gt 0 ]]
   then
     mv "$errorsFile" "$logBase".unclassified_errors
   fi
@@ -234,7 +234,7 @@ classify_repl_errors()
 
   display_error_count 'unclassified replication errors' "$unclassifiedReplErrCnt" "$totErrCnt"
 
-  if [ "$unclassifiedReplErrCnt" -gt 0 ]
+  if [[ "$unclassifiedReplErrCnt" -gt 0 ]]
   then
     mv "$replErrorsFile" "$logBase".unclassified_repl_errors
   fi
@@ -254,7 +254,7 @@ split_out_class()
   local classifiedErrors
   classifiedErrors=$(sed --quiet "/$classifier/p" <<< "$errors")
 
-  if [ -n "$classifiedErrors" ]
+  if [[ -n "$classifiedErrors" ]]
   then
     comm -2 -3 <(echo "$errors") <(echo "$classifiedErrors") > "$errorsFile"
     sed "s/$classifier/$substitution/" <<< "$classifiedErrors" > "$classFile"
