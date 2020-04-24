@@ -39,7 +39,7 @@ readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 readonly DefaultAge=1
 
-Debug=false
+declare Debug
 
 
 main()
@@ -63,7 +63,7 @@ main()
         shift 2
         ;;
       -d|--debug)
-        Debug=true
+        Debug=debug
         shift
         ;;
       -h|--help)
@@ -197,7 +197,7 @@ inject_debug_stmt()
 {
   local stmt="$*"
 
-  if [[ "$Debug" == true ]]
+  if [[ -n "${Debug-}" ]]
   then
     printf '%s\n' "$stmt"
   fi
