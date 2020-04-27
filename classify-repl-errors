@@ -84,7 +84,7 @@ main()
         return 0
         ;;
       -v|--version)
-        show_version
+        printf '%s\n' "$Version"
         return 0
         ;;
       --)
@@ -292,12 +292,6 @@ filter_errors ()
     | sed '/connectToRhost: readVersion to .* failed, msg=/d' \
     | sed '/^cliReconnManager: .*, status = -305111/d' \
     | sort
-}
-
-
-show_version()
-{
-  printf '%s\n' "$Version"
 }
 
 
