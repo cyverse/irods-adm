@@ -102,8 +102,8 @@ ask_irods()
   local resp
   resp=$(iquest --no-page \
                 '%s %s %s' \
-                "SELECT DATA_ID, DATA_RESC_HIER, DATA_PATH
-                 WHERE COLL_NAME = '$collPath' AND DATA_NAME = '$objName'")
+                "select DATA_ID, DATA_RESC_HIER, DATA_PATH
+                 where COLL_NAME = '$collPath' and DATA_NAME = '$objName'")
   local ec="$?"
   if [ "$ec" -ne 0 ] || [ "$resp" = 'CAT_NO_ROWS_FOUND: Nothing was found matching your query' ]
   then
