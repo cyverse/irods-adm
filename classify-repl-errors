@@ -111,6 +111,15 @@ main()
 }
 
 
+remove_temp_files()
+{
+  if [[ "${#TempFiles[@]}" -gt 0 ]]
+  then
+    rm --force "${TempFiles[@]}"
+  fi
+}
+
+
 process_input()
 {
   local logBase="$1"
@@ -129,12 +138,12 @@ process_input()
 }
 
 
-remove_temp_files()
+filter_errors ()
 {
-  if [[ "${#TempFiles[@]}" -gt 0 ]]
-  then
-    rm --force "${TempFiles[@]}"
-  fi
+  sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
+    | sed '/connectToRhost: readVersion to .* failed, msg=/d' \
+    | sed '/^cliReconnManager: .*, status = -305111/d' \
+    | sort
 }
 
 
@@ -241,6 +250,27 @@ classify_repl_errors()
 }
 
 
+display_error_count()
+{
+  local label="$1"
+  local count="$2"
+  local total="$3"
+
+  printf '%*d %s\n' "${#total}" "$count" "$label"
+}
+
+
+split_out_repl_class()
+{
+  local errorsFile="$1"
+  local status="$2"
+  local error="$3"
+  local classFile="$4"
+
+  split_out_class "$errorsFile" ", status = $status status = $status $error\$" '' "$classFile"
+}
+
+
 split_out_class()
 {
   local errorsFile="$1"
@@ -262,36 +292,6 @@ split_out_class()
   else
     printf '0'
   fi
-}
-
-
-split_out_repl_class()
-{
-  local errorsFile="$1"
-  local status="$2"
-  local error="$3"
-  local classFile="$4"
-
-  split_out_class "$errorsFile" ", status = $status status = $status $error\$" '' "$classFile"
-}
-
-
-display_error_count()
-{
-  local label="$1"
-  local count="$2"
-  local total="$3"
-
-  printf '%*d %s\n' "${#total}" "$count" "$label"
-}
-
-
-filter_errors ()
-{
-  sed --quiet 's/.*ERROR: \([^\[].*$\)/\1/p' \
-    | sed '/connectToRhost: readVersion to .* failed, msg=/d' \
-    | sed '/^cliReconnManager: .*, status = -305111/d' \
-    | sort
 }
 
 
