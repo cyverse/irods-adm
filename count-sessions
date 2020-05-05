@@ -66,7 +66,7 @@ typedef struct {
 } Interval;
 
 typedef struct {
-  Interval span;
+  Interval * span;
   size_t numBins;
   size_t * bin;
 } Bins;
@@ -164,7 +164,7 @@ count_sessions( char const * const intervalsFile ) {
   fprintf( stderr, "Info: numBins = %lu\n", numBins );
 
   Bins counts = {
-    timeSpan,
+    &timeSpan,
     numBins,
     ( size_t * )calloc( numBins, sizeof( size_t ) )
   };
@@ -192,8 +192,8 @@ count_sessions( char const * const intervalsFile ) {
 
 static bool
 bin_sessions( Bins * const counts, Interval const * const interval ) {
-  for( size_t binIdx = ( size_t )(interval->begin - counts->span.begin);
-       binIdx <= ( size_t )(interval->end - counts->span.begin);
+  for( size_t binIdx = ( size_t )(interval->begin - counts->span->begin);
+       binIdx <= ( size_t )(interval->end - counts->span->begin);
        ++binIdx ) {
     if( binIdx >= counts->numBins ) {
       fprintf( stderr, "Warning: not enough bins\n" );
@@ -275,6 +275,6 @@ update_time_bounds( Interval * const bounds, Interval const * const interval ) {
 static void
 write_counts( Bins const * const counts ) {
   for( size_t binIdx = 0; binIdx < counts->numBins; ++binIdx ) {
-    printf( "%u %lu\n", counts->span.begin + ( unsigned int )binIdx, counts->bin[ binIdx ] );
+    printf( "%u %lu\n", counts->span->begin + ( unsigned int )binIdx, counts->bin[ binIdx ] );
   }
 }
