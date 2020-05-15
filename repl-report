@@ -34,6 +34,8 @@ EOF
 
 set -o errexit -o nounset -o pipefail
 
+export PGHOST PGPORT PGUSER
+
 readonly Version=6
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
@@ -71,15 +73,15 @@ main()
         return 0
         ;;
       -H|--host)
-        export PGHOST="$2"
+        PGHOST="$2"
         shift 2
         ;;
       -P|--port)
-        export PGPORT="$2"
+        PGPORT="$2"
         shift 2
         ;;
       -U|--user)
-        export PGUSER="$2"
+        PGUSER="$2"
         shift 2
         ;;
       -v|--version)
