@@ -234,13 +234,13 @@ classify_repl_errors()
     mv "$replErrorsFile" "$logBase".unclassified_repl_errors
   fi
 
-    display_error_count 'broken connections' "$sHRLCnt" "$totErrCnt"
-    display_error_count 'short files' "$sCLECnt" "$totErrCnt"
-    display_error_count 'connections reset' "$cRBPCnt" "$totErrCnt"
-    display_error_count timeouts "$sSRTCnt" "$totErrCnt"
-    display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
-    display_error_count 'file open errors' "$uFOECnt" "$totErrCnt"
-    display_error_count 'unclassified replication errors' "$unclassifiedReplErrCnt" "$totErrCnt"
+  display_error_count 'broken connections' "$sHRLCnt" "$totErrCnt"
+  display_error_count 'short files' "$sCLECnt" "$totErrCnt"
+  display_error_count 'connections reset' "$cRBPCnt" "$totErrCnt"
+  display_error_count timeouts "$sSRTCnt" "$totErrCnt"
+  display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
+  display_error_count 'file open errors' "$uFOECnt" "$totErrCnt"
+  display_error_count 'unclassified replication errors' "$unclassifiedReplErrCnt" "$totErrCnt"
 }
 
 
