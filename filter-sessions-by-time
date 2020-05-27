@@ -17,6 +17,8 @@
 #  filter-sessions-by-time '2018-01-24 14:08:56' '2018-01-24 14:09:34' \
 #    < irods.sessions
 
+set -o errexit -o nounset -o pipefail
+
 if [[ "$#" -lt 2 ]]
 then
   exit 1
