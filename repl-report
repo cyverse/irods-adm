@@ -9,11 +9,14 @@ $ExecName version $Version
 Usage:
  $ExecName [options]
 
-This program generates a report on the data objects in /iplant/home that need to
-be replicated. An object needs to be replicated if it was created before a given
-day at midnight and has no replica yet. The report lists the number of
-unreplicated data objects and their volume broken down by the storage resource
-holding the corresponding files.
+This program generates a report on the data objects in the home collections of
+the local zone that need to be replicated. An object needs to be replicated if
+it was created before a given day at midnight and has no replica yet. The report
+lists the number of unreplicated data objects and their volume broken down by
+the storage resource holding the corresponding files.
+
+The caller must have an initialized iRODS session, i.e., called \`iinit\` to open
+an iRODS session with a cached authentication credentials.
 
 Options:
  -A, --age <age>    how many days old a data object must be to be replicated.
@@ -32,7 +35,7 @@ EOF
 }
 
 
-readonly Version=6
+readonly Version=7
 
 set -o errexit -o nounset -o pipefail
 
@@ -100,7 +103,10 @@ main()
     esac
   done
 
-  mk_report "$age"
+  local zone
+  zone=$(iquest '%s' "select ZONE_NAME where ZONE_TYPE = 'local'")
+
+  mk_report "$zone" "$age"
 }
 
 
@@ -117,7 +123,8 @@ prep_opts()
 
 mk_report()
 {
-  local age="$1"
+  local zone="$1"
+  local age="$2"
 
   psql --quiet ICAT \
 <<EOSQL
@@ -132,7 +139,7 @@ mk_report()
     SELECT resc_name, resc_hier, data_size
     FROM r_data_main
     WHERE data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
-      AND coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/iplant/home/%')
+      AND coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/$zone/home/%')
       AND $(inject_time_restriction "$age");
 
   CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
