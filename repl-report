@@ -103,10 +103,7 @@ main()
     esac
   done
 
-  local zone
-  zone=$(iquest '%s' "select ZONE_NAME where ZONE_TYPE = 'local'")
-
-  mk_report "$zone" "$age"
+  mk_report "$age"
 }
 
 
@@ -123,8 +120,7 @@ prep_opts()
 
 mk_report()
 {
-  local zone="$1"
-  local age="$2"
+  local age="$1"
 
   psql --quiet ICAT \
 <<EOSQL
@@ -136,10 +132,11 @@ mk_report()
 
   $(inject_debug_msg Gathering unreplicated data)
   CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) AS
-    SELECT resc_name, resc_hier, data_size
-    FROM r_data_main
-    WHERE data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
-      AND coll_id IN (SELECT coll_id FROM r_coll_main WHERE coll_name LIKE '/$zone/home/%')
+    SELECT d.resc_name, d.resc_hier, d.data_size
+    FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+    WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
+      AND c.coll_name
+        LIKE '/' || (SELECT zone_name FROM r_zone_main WHERE zone_type_name = 'local') || '/home/%'
       AND $(inject_time_restriction "$age");
 
   CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
@@ -235,7 +232,7 @@ inject_time_restriction()
 
     local supCreateTs
     supCreateTs=$(date --date "$supCreateDate" '+%s')
-    printf 'create_ts < '\''0%s'\' "$supCreateTs"
+    printf 'd.create_ts < '\''0%s'\' "$supCreateTs"
   fi
 }
 
