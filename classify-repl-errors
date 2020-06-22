@@ -146,6 +146,7 @@ filter_errors ()
   s/.*ERROR: \([^\[].*$\)/\1/
   /connectToRhost: readVersion to .* failed, msg=/d
   /^cliReconnManager: .*, status = -305111/d
+  /^replUtil: invalid repl objType 0 for /d
   p
 }
 EOF
@@ -157,9 +158,6 @@ classify_errors()
   local errorsFile="$1"
   local errCnt="$2"
   local logBase="$3"
-
-  # These are redundant
-  split_out_class "$errorsFile" '^replUtil: invalid repl objType 0 for ' '' /dev/null > /dev/null
 
   local sPECnt
   sPECnt=$(split_out_class "$errorsFile" \
