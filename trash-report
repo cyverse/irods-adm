@@ -28,8 +28,8 @@ EOF
 }
 
 
-readonly ExecName=$(basename "$0")
 readonly Version=1
+readonly ExecName=$(basename "$0")
 
 Debug=false
 
