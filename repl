@@ -57,9 +57,7 @@ readonly Version=3
 set -o errexit -o nounset -o pipefail
 
 # Ensure these are declared for PostgreSQL
-export PGHOST
-export PGPORT
-export PGUSER
+export PGHOST PGPORT PGUSER
 
 export TIMEDOUT=3
 
