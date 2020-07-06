@@ -2,7 +2,6 @@
 
 show_help()
 {
-# shellcheck disable=SC2006
 	cat <<EOF
 
 $ExecName version $Version
@@ -33,7 +32,7 @@ Options:
  -r, --resource <resource>      only replicate the data objects with a file on
                                 this resource
  -u, --until <stop_time>        the time to stop replication in a format
-                                understandable by `date`
+                                understandable by \`date\`
  -U, --user <user>              authorize the DBMS connection as user <user>
                                 instead of the default
  -v, --verison                  show version and exit
