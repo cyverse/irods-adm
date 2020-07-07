@@ -7,14 +7,14 @@ show_help()
 $ExecName version $Version
 
 Usage:
- $ExecName [options] <class_base>
+ $ExecName [options] CLASS-BASE
 
 Reads the output of the \`repl\` command and groups the data objects that failed
 to replicate into different files based on the error that occurred.
 
 Parameters:
- <class_base>  the common basename of the files that hold the groups of data
-               objects
+ CLASS-BASE  the common basename of the files that hold the groups of data
+             objects
 
 Options:
  -h, --help     show help and exit
@@ -26,31 +26,31 @@ The program reads the output of the \`repl\` command from standard in. It groups
 the data objects that failed to replicate into different files based on the
 error that occurred. Here's a breakdown of what each output file holds.
 
-<class_base>.src_path_errors holds the paths to data objects that have paths
-that cause \`irepl\` problems.
+CLASS-BASE.src_path_errors holds the paths to data objects that have paths that
+cause \`irepl\` problems.
 
-<class_base>.broken_conn holds the paths to data object where the connection to
+CLASS-BASE.broken_conn holds the paths to data object where the connection to
 the IES was broken.
 
-<class_base>.short_file holds the paths to data objects having sizes larger than
-their respective physical files' sizes.
+CLASS-BASE.chksum_mismatches holds the paths to data objects with checksums that
+differ from the checksums of their respective physical files.
 
-<class_base>.connection_reset holds the paths to data objects where the
+CLASS-BASE.connection_reset holds the paths to data objects where the
 connections were reset during the replication.
 
-<class_base>.chksum_mismatches holds the paths to data objects with checksums
-that differ from the checksums of their respective physical files.
+CLASS-BASE.missing_file holds the paths to data objects that are missing their
+physical files.
 
-<class_base>.missing_file holds the paths to data objects that are missing
-their physical files.
+CLASS-BASE.short_file holds the paths to data objects having sizes larger than
+their respective physical files' sizes.
 
-<class_base>.timeout holds the paths to data objects that failed replication due
+CLASS-BASE.timeout holds the paths to data objects that failed replication due
 to a connection timeout.
 
-<class_base>.unclassified_repl_errors holds the log messages for replication
+CLASS-BASE.unclassified_repl_errors holds the log messages for replication
 related errors that couldn't be classified.
 
-<class_base>.unclassified_errors holds the full log messages for errors that
+CLASS-BASE.unclassified_errors holds the full log messages for errors that
 couldn't be classified at all.
 EOF
 }
