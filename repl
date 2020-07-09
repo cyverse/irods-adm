@@ -17,25 +17,25 @@ Parameters:
 Options:
  -A, --age <age>                how many days old a data object must be to be
                                 replicated, default: 1
- -c, --collection <collection>  only replicate the data objects in this
+ -C, --collection <collection>  only replicate the data objects in this
                                 collection
  -H, --host <host>              connect to the ICAT's DBMS on the host <host>
                                 instead of the PostgreSQL default
  -h, --help                     show help and exit
- -m, --multiplier <multiplier>  a multiplier on the number of processes to run
+ -M, --multiplier <multiplier>  a multiplier on the number of processes to run
                                 at once, default: 1
  -N, --max-threads <max>        sets the maximum number of threads for parallel
                                 replication to <max>; if <max> is 0 replication
                                 will be streaming.
  -P, --port <port>              connect to the ICAT's DBMS listening on TCP port
                                 <port> instead of the PostgreSQL default
- -r, --resource <resource>      only replicate the data objects with a file on
+ -R, --resource <resource>      only replicate the data objects with a file on
                                 this resource
  -u, --until <stop_time>        the time to stop replication in a format
                                 understandable by \`date\`
  -U, --user <user>              authorize the DBMS connection as user <user>
-                                instead of the default
  -v, --verison                  show version and exit
+                                instead of the default
 
 Summary:
 This program replicates data objects that were created before yesterday. It only
@@ -51,7 +51,7 @@ EOF
 }
 
 
-readonly Version=3
+readonly Version=4
 
 set -o errexit -o nounset -o pipefail
 
@@ -73,7 +73,7 @@ main()
 			--name "$ExecName" \
 			--longoptions \
 				age:,collection:,help,host:,max-threads:,multiplier:,port:,resource:,until:,user:,version \
-			--options A:c:hH:m:N:P:r:u:U:v \
+			--options A:C:hH:M:N:P:R:u:U:v \
 			-- \
 			"$@")
 	local ret="$?"
@@ -98,7 +98,7 @@ main()
 				age="$2"
 				shift 2
 				;;
-			-c|--collection)
+			-C|--collection)
 				baseColl="$2"
 				shift 2
 				;;
@@ -110,7 +110,7 @@ main()
 				PGHOST="$2"
 				shift 2
 				;;
-			-m|--multiplier)
+			-M|--multiplier)
 				procMult="$2"
 				shift 2
 				;;
@@ -122,7 +122,7 @@ main()
 				PGPORT="$2"
 				shift 2
 				;;
-			-r|--resource)
+			-R|--resource)
 				srcRes="$2"
 				shift 2
 				;;
