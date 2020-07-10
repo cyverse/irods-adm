@@ -14,16 +14,15 @@ and their volume broken down by the storage resource holding the corresponding
 files.
 
 Options:
- -H, --host <host>  connect to the ICAT's DBMS on the host <host> instead of
-                    the PostgreSQL default
- -p, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
-                    instead of the PostgreSQL default
- -U, --user <user>  authorize the DBMS connection as <user> instead of the
-                    PostgreSQL default
-
- -d, --debug    display progress and query time information
- -h, --help     display help text and exit
- -v, --version  display version and exit
+ -d, --debug      display progress and query time information
+ -H, --host HOST  connect to the ICAT's DBMS on the host HOST instead of the
+                  PostgreSQL default
+ -h, --help       display help text and exit
+ -p, --port PORT  connect to the ICAT's DBMS listening on TCP port PORT instead
+                  of the PostgreSQL default
+ -U, --user USER  authorize the DBMS connection as USER instead of the
+                  PostgreSQL default
+ -v, --version    display version and exit
 EOF
 }
 
