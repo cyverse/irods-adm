@@ -33,7 +33,7 @@ EOF
 }
 
 
-set -o nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 
 main()
