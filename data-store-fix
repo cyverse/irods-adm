@@ -2,9 +2,12 @@
 
 show_help()
 {
-  cat <<'EOF'
+  cat <<EOF
 
-Usage: data-store-fix [options] [HOST [PORT [USER [CUTOFF_TIME [DEBUG]]]]]
+$ExecName
+
+Usage:
+ $ExecName [options] [HOST [PORT [USER [CUTOFF_TIME [DEBUG]]]]]
 
 This script generates two reports, one for collections and one for data
 objects. Each report lists all collections or data objects, respectively, that
@@ -22,7 +25,7 @@ value is 'irods'.
 
 CUTOFF_TIME is the upper bound of the creation time for the collections and
 data objects contained in the reports. The format should be the default format
-used by `date`. The default value is today '00:00:00' in the local time zone.
+used by \`date\`. The default value is today '00:00:00' in the local time zone.
 
 DEBUG is any value that, if present, will cause the script to generate
 describing what it is doing. It is not present by default.
@@ -35,11 +38,14 @@ EOF
 
 set -o errexit -o nounset -o pipefail
 
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
+
 
 main()
 {
   local opts
-  if ! opts=$(getopt --name data-store-fix --options h --longoptions help -- "$@")
+  if ! opts=$(getopt --name "$ExecName" --options h --longoptions help -- "$@")
   then
     show_help >&2
     return 1
