@@ -4,7 +4,7 @@ show_help()
 {
   cat <<EOF
 
-$ExecName
+$ExecName version $Version
 
 Usage:
  $ExecName [options] [HOST [PORT [USER [CUTOFF_TIME [DEBUG]]]]]
@@ -31,10 +31,13 @@ DEBUG is any value that, if present, will cause the script to generate
 describing what it is doing. It is not present by default.
 
 Options:
- -h, --help  show help and exit
+ -h, --help     show help and exit
+ -v, --version  show version and exit
 EOF
 }
 
+
+readonly Version=1
 
 set -o errexit -o nounset -o pipefail
 
@@ -45,7 +48,7 @@ readonly ExecName=$(basename "$ExecAbsPath")
 main()
 {
   local opts
-  if ! opts=$(getopt --name "$ExecName" --options h --longoptions help -- "$@")
+  if ! opts=$(getopt --name "$ExecName" --longoptions help,version --options hv -- "$@")
   then
     show_help >&2
     return 1
@@ -58,6 +61,10 @@ main()
     case "$1" in
       -h|--help)
         show_help
+        return 0
+        ;;
+      -v|--version)
+        printf '%s\n' "$Version"
         return 0
         ;;
       --)
