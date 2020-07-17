@@ -15,9 +15,9 @@ files.
 
 Options:
  -d, --debug      display progress and query time information
+ -h, --help       display help text and exit
  -H, --host HOST  connect to the ICAT's DBMS on the host HOST instead of the
                   PostgreSQL default
- -h, --help       display help text and exit
  -p, --port PORT  connect to the ICAT's DBMS listening on TCP port PORT instead
                   of the PostgreSQL default
  -U, --user USER  authorize the DBMS connection as USER instead of the
