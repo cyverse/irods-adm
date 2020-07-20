@@ -28,6 +28,8 @@ EOF
 }
 
 
+set -o errexit -o nounset -o pipefail
+
 readonly ExecName=$(basename "$0")
 readonly Version=1
 
@@ -37,8 +39,6 @@ show_version()
   printf '%s\n' "$Version"
 }
 
-
-set -e
 
 if ! opts=$(getopt --name "$ExecName" --options hj:v --longoptions help,jobs:,version -- "$@")
 then
@@ -128,7 +128,7 @@ FIX()
   while read -r rescHier storeHost filePath
   do
     fixed=
-    
+
     local coordResc="${rescHier%%;*}"
 
     local fixCmd
