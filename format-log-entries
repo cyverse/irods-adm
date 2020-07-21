@@ -9,10 +9,12 @@
 #
 # Here's an example entry:
 #
-#     01-21 18:20:57 pid:17536 ERROR: [-]    iRODS/server/core/src/rsApiHandler.cpp:520:readAndProcClientMsg :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message []\n     [-]     iRODS/lib/core/src/sockComm.cpp:199:readMsgHeader :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [failed to call 'read header']
+#     YEAR-01-21 18:20:57 pid:17536 ERROR: [-]    iRODS/server/core/src/rsApiHandler.cpp:520:readAndProcClientMsg :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message []\n     [-]     iRODS/lib/core/src/sockComm.cpp:199:readMsgHeader :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [failed to call 'read header']
 #
 # All control characters including line feed (new line) are replaced with there
 # escaped hex ASCII code, e.g., line feed => \x0a, carriage return => \x0d, etc.
+
+set -o errexit -o nounset -o pipefail
 
 
 main()
