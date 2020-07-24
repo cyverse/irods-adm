@@ -22,9 +22,9 @@ Options:
  -A, --age <age>    how many days old a data object must be to be replicated.
                     a negative number means no time restriction. default: 1
  -d, --debug        display progress and query time information
+ -h, --help         display help text and exit
  -H, --host <host>  connect to the ICAT's DBMS on the host <host> instead of
                     the PostgreSQL default
- -h, --help         display help text and exit
  -P, --port <port>  connect to the ICAT's DBMS listening on TCP port <port>
                     instead of the PostgreSQL default
  -U, --user <user>  authorize the DBMS connection as user <user> instead of the
