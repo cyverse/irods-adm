@@ -131,7 +131,7 @@ mk_report()
 
   $(inject_debug_msg Gathering unreplicated data)
   CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) AS
-    SELECT d.resc_name, d.resc_hier, d.data_size
+    SELECT d.resc_name, SUBSTRING(d.resc_hier FROM '(%;)*#"%#"' FOR '#'), d.data_size
     FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
     WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
       AND c.coll_name
@@ -146,12 +146,12 @@ mk_report()
   $(inject_debug_newline)
   $(inject_set_title Unreplicated in Storage Resources)
   SELECT
-    SUBSTRING(store_resc FROM '(%;)*#"%#"' FOR '#')  AS "Storage Resource",
-    COUNT(*)                                         AS "Count",
-    ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)    AS "Volume (TiB)"
+    store_resc                                     AS "Storage Resource",
+    COUNT(*)                                       AS "Count",
+    ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)  AS "Volume (TiB)"
   FROM unreplicated_data
   GROUP BY store_resc
-  ORDER BY 1;
+  ORDER BY store_resc;
 
   $(inject_debug_newline)
   $(inject_set_title Unreplicated in Root Resources)
