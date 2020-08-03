@@ -438,7 +438,7 @@ select_cohort()
 
 	if ! CHECK_TIME "$untilTS"
 	then
-		exit "$TIMEDOUT"
+		return "$TIMEDOUT"
 	fi
 
 	local maxSizeB maxSizeMiB minSizeB minSizeMiB
