@@ -19,15 +19,18 @@
 
 set -o errexit -o nounset -o pipefail
 
-if [[ "$#" -lt 2 ]]
-then
-  exit 1
-fi
 
-readonly EraBegin="$1"
-readonly EraEnd="$2"
+main()
+{
+  if [[ "$#" -lt 2 ]]
+  then
+    exit 1
+  fi
 
-awk --assign ERA_BEGIN="$EraBegin" --assign ERA_END="$EraEnd" --file - <(cat) <<'EOF'
+  readonly EraBegin="$1"
+  readonly EraEnd="$2"
+
+  awk --assign ERA_BEGIN="$EraBegin" --assign ERA_END="$EraEnd" --file - <(cat) <<'EOF'
 function validate_era(eraName, eraVal) {
   if (eraVal !~ /^[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-6][0-9]$/) {
     printf "%s has invalid format: '%s'\n", eraName, eraVal > "/dev/stderr";
@@ -53,3 +56,7 @@ BEGIN {
   }
 }
 EOF
+}
+
+
+main "$@"
