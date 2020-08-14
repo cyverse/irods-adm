@@ -131,11 +131,27 @@ mk_report()
 
   $(inject_debug_msg Gathering unreplicated data)
   CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) ON COMMIT DROP AS
+/* Original version -- 8,100 seconds
   SELECT d.resc_name, SUBSTRING(d.resc_hier FROM '(%;)*#"%#"' FOR '#'), d.data_size
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
     AND c.coll_name
       LIKE '/' || (SELECT zone_name FROM r_zone_main WHERE zone_type_name = 'local') || '/home/%'
+    AND $(inject_time_restriction "$age");
+*/
+  SELECT d.resc_name, SUBSTRING(d.resc_hier FROM '(%;)*#"%#"' FOR '#'), d.data_size
+  FROM (
+      SELECT
+        dm.resc_name,
+        dm.resc_hier,
+        dm.data_size,
+        dm.create_ts,
+        COUNT(dm.data_id) OVER (PARTITION BY dm.data_id) AS count
+      FROM r_data_main AS dm JOIN r_coll_main AS cm ON cm.coll_id = dm.coll_id
+      WHERE cm.coll_name
+        LIKE '/' || (SELECT zone_name FROM r_zone_main WHERE zone_type_name = 'local') || '/home/%'
+    ) AS d
+  WHERE d.count = 1
     AND $(inject_time_restriction "$age");
 
   CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
