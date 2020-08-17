@@ -1,11 +1,5 @@
 #!/bin/bash
 
-set -e
-
-readonly EXEC_NAME=$(basename "$0")
-readonly VERSION=1
-
-
 show_help()
 {
   cat << EOF
@@ -37,6 +31,12 @@ Prerequisites:
  2) The user must be initialized with iRODS as an admin user.
 EOF
 }
+
+
+set -e
+
+readonly EXEC_NAME=$(basename "$0")
+readonly VERSION=1
 
 
 show_version()
