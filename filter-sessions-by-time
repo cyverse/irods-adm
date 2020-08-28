@@ -1,21 +1,27 @@
 #!/bin/bash
-#
-# This program filters a list of iRODS sessions for those that overlap with a
-# given time interval. It reads the sessions from standard in and writes the
-# filtered sessions to standard out.
-#
-# USAGE:
-#  filter-sessions-by-time ERA_BEGIN ERA_END
-#
-# PARAMETERS:
-#  ERA_BEGIN:  The beginning time of the interval of interest. The time should
-#              be specified in the form `yyyy-MM-dd hh:mm:ss`.
-#  ERA_END:    The ending time of the interval of interest. The time should be
-#              specified in the form `yyyy-MM-dd hh:mm:ss`.
-#
-# EXAMPLE:
-#  filter-sessions-by-time '2018-01-24 14:08:56' '2018-01-24 14:09:34' \
-#    < irods.sessions
+
+show_help()
+{
+  cat <<'EOF'
+This program filters a list of iRODS sessions for those that overlap with a
+given time interval. It reads the sessions from standard in and writes the
+filtered sessions to standard out.
+
+USAGE:
+ filter-sessions-by-time ERA_BEGIN ERA_END
+
+PARAMETERS:
+ ERA_BEGIN:  The beginning time of the interval of interest. The time should be
+             specified in the form `yyyy-MM-dd hh:mm:ss`.
+ ERA_END:    The ending time of the interval of interest. The time should be
+             specified in the form `yyyy-MM-dd hh:mm:ss`.
+
+EXAMPLE:
+ filter-sessions-by-time '2018-01-24 14:08:56' '2018-01-24 14:09:34' \
+   < irods.sessions
+EOF
+}
+
 
 set -o errexit -o nounset -o pipefail
 
@@ -24,13 +30,14 @@ main()
 {
   if [[ "$#" -lt 2 ]]
   then
+    show_help >&2
     return 1
   fi
 
   local eraBegin="$1"
   local eraEnd="$2"
 
-filter "$eraBegin" "$eraEnd"
+  filter "$eraBegin" "$eraEnd"
 }
 
 
