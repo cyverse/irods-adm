@@ -28,6 +28,9 @@ EOF
 
 
 readonly Version=1
+
+set -e
+
 readonly ExecName=$(basename "$0")
 
 Debug=false
@@ -249,5 +252,4 @@ show_version()
 }
 
 
-set -e
 main "$@"
