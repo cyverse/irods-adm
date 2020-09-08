@@ -30,13 +30,10 @@ CLASS-BASE.src_path_errors holds the paths to data objects that have paths that
 cause \`irepl\` problems.
 
 CLASS-BASE.broken_conn holds the paths to data object where the connection to
-the IES was broken.
+the IES was broken or reset.
 
 CLASS-BASE.chksum_mismatches holds the paths to data objects with checksums that
 differ from the checksums of their respective physical files.
-
-CLASS-BASE.connection_reset holds the paths to data objects where the
-connections were reset during the replication.
 
 CLASS-BASE.missing_file holds the paths to data objects that are missing their
 physical files.
@@ -56,7 +53,7 @@ EOF
 }
 
 
-readonly Version=2
+readonly Version=3
 
 set -o errexit -o nounset -o pipefail
 
@@ -193,17 +190,15 @@ classify_repl_errors()
   local totErrCnt="$2"
   local logBase="$3"
 
-  local sHRLCnt
-  sHRLCnt=$(split_out_repl_class "$replErrorsFile" -4000 SYS_HEADER_READ_LEN_ERR \
-                                 "$logBase".broken_conn)
+  local bcCnt=0
+  bcCnt+=$(split_out_repl_class "$replErrorsFile" -4000 SYS_HEADER_READ_LEN_ERR \
+                                "$logBase".broken_conn)
+  bcCnt+=$(split_out_repl_class "$replErrorsFile" -116104 \
+                                'SYS_SOCK_READ_ERR, Connection reset by peer' \
+                                "$logBase".broken_conn)
 
   local sCLECnt
   sCLECnt=$(split_out_repl_class "$replErrorsFile" -27000 SYS_COPY_LEN_ERR "$logBase".short_file)
-
-  local cRBPCnt
-  cRBPCnt=$(split_out_repl_class "$replErrorsFile" -116104 \
-                                 'SYS_SOCK_READ_ERR, Connection reset by peer' \
-                                 "$logBase".connection_reset)
 
   local sSRTCnt
   sSRTCnt=$(split_out_repl_class "$replErrorsFile" -115000 SYS_SOCK_READ_TIMEDOUT \
@@ -226,9 +221,8 @@ classify_repl_errors()
     mv "$replErrorsFile" "$logBase".unclassified_repl_errors
   fi
 
-  display_error_count 'broken connections' "$sHRLCnt" "$totErrCnt"
+  display_error_count 'broken connections' "$bcCnt" "$totErrCnt"
   display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
-  display_error_count 'connections reset' "$cRBPCnt" "$totErrCnt"
   display_error_count 'file open errors' "$uFOECnt" "$totErrCnt"
   display_error_count 'short files' "$sCLECnt" "$totErrCnt"
   display_error_count timeouts "$sSRTCnt" "$totErrCnt"
@@ -273,7 +267,7 @@ split_out_class()
   if [[ -n "$classifiedErrors" ]]
   then
     comm -2 -3 <(echo "$errors") <(echo "$classifiedErrors") > "$errorsFile"
-    sed "s/$classifier/$substitution/" <<< "$classifiedErrors" > "$classFile"
+    sed "s/$classifier/$substitution/" <<< "$classifiedErrors" >> "$classFile"
     wc --lines <<< "$classifiedErrors"
   else
     printf '0'
