@@ -3,20 +3,23 @@
 show_help()
 {
   cat <<EOF
+
+$ExecName version 1
+
+Usage:
+ $ExecName ERA_BEGIN ERA_END
+
 This program filters a list of iRODS sessions for those that overlap with a
 given time interval. It reads the sessions from standard in and writes the
 filtered sessions to standard out.
 
-USAGE:
- $ExecName ERA_BEGIN ERA_END
-
-PARAMETERS:
+Parameters:
  ERA_BEGIN:  The beginning time of the interval of interest. The time should be
              specified in the form yyyy-MM-dd hh:mm:ss.
  ERA_END:    The ending time of the interval of interest. The time should be
              specified in the form yyyy-MM-dd hh:mm:ss.
 
-EXAMPLE:
+Example:
  $ExecName '2018-01-24 14:08:56' '2018-01-24 14:09:34' < irods.sessions
 EOF
 }
