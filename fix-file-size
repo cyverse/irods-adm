@@ -12,10 +12,10 @@ Usage:
 Updates the ICAT size information for the replicas of a set of data objects
 
 Options:
- -j, --jobs  the number of fixes to perform simultaneously
 
- -h, --help     show help and exit
- -v, --version  show version and exit
+ -h, --help           show help and exit
+ -j, --jobs NUM-JOBS  the number of fixes to perform simultaneously
+ -v, --version        show version and exit
 
 Summary:
 It reads a list of data object paths, one per line, from standard in. For each
