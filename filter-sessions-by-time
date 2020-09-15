@@ -4,7 +4,7 @@ show_help()
 {
   cat <<EOF
 
-$ExecName version 1
+$ExecName version $Version
 
 Usage:
  $ExecName ERA_BEGIN ERA_END
@@ -24,6 +24,8 @@ Example:
 EOF
 }
 
+
+readonly Version=1
 
 set -o errexit -o nounset -o pipefail
 
