@@ -77,7 +77,6 @@ do
   esac
 done
 
-readonly ExecPath=$(readlink --canonicalize "$0")
 export EXEC_DIR
 EXEC_DIR=$(dirname "$ExecPath")
 
