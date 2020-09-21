@@ -32,7 +32,8 @@ readonly Version=1
 
 set -o errexit -o nounset -o pipefail
 
-readonly ExecName=$(basename "$0")
+readonly ExecPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecPath")
 
 
 show_version()
