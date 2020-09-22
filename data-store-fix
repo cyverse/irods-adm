@@ -132,8 +132,8 @@ check_existing_instance()
     for pid in $(pidof -x $ExecName)
     do
         if [ $pid -ne $currPid ]; then
-            printf "\n$ExecName already running at PID $pid\n"
-            printf "exiting\n\n"
+            printf "\n$ExecName already running at PID $pid\n" 1>&2
+            printf "exiting\n\n" 1>&2
             exit 1
         fi
     done
