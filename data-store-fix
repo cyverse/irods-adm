@@ -129,11 +129,10 @@ main()
 check_existing_instance()
 {
     currPid=$$
-    processName=$(basename "$0")
-    for pid in $(pidof -x $processName)
+    for pid in $(pidof -x $ExecName)
     do
         if [ $pid -ne $currPid ]; then
-            printf "\n$processName already running at PID $pid\n"
+            printf "\n$ExecName already running at PID $pid\n"
             printf "exiting\n\n"
             exit 1
         fi
