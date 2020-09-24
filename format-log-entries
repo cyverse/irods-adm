@@ -1,24 +1,36 @@
 #!/bin/bash
-#
-# This program parses the lines from a iRODS log file into log entries.
-#
-# PARAMETERS:
-#  YEAR: The four digit year the log entries where recorded in
-#
-# This program reads from standard input and writes to standard output.
-#
-# Here's an example entry:
-#
-#     YEAR-01-21 18:20:57 pid:17536 ERROR: [-]    iRODS/server/core/src/rsApiHandler.cpp:520:readAndProcClientMsg :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message []\n     [-]     iRODS/lib/core/src/sockComm.cpp:199:readMsgHeader :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [failed to call 'read header']
-#
-# All control characters including line feed (new line) are replaced with there
-# escaped hex ASCII code, e.g., line feed => \x0a, carriage return => \x0d, etc.
+
+show_help()
+{
+  cat <<'EOF'
+This program parses the lines from a iRODS log file into log entries.
+
+PARAMETERS:
+ YEAR: The four digit year the log entries where recorded in
+
+This program reads from standard input and writes to standard output.
+
+Here's an example entry:
+
+ YEAR-01-21 18:20:57 pid:17536 ERROR: [-]    iRODS/server/core/src/rsApiHandler.cpp:520:readAndProcClientMsg :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message []\n     [-]     iRODS/lib/core/src/sockComm.cpp:199:readMsgHeader :  status [SYS_HEADER_READ_LEN_ERR]  errno [] -- message [failed to call 'read header']
+
+All control characters including line feed (new line) are replaced with there
+escaped hex ASCII code, e.g., line feed => \x0a, carriage return => \x0d, etc.
+EOF
+}
+
 
 set -o errexit -o nounset -o pipefail
 
 
 main()
 {
+  if [[ $# -lt 1 ]]
+  then
+    show_help >&2
+    return 1
+  fi
+  
   local year="$1"
 
   iconv -c | format "$year"
