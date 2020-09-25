@@ -61,6 +61,10 @@ export TIMEDOUT=3
 
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
+
+readonly DefaultAge=1
+readonly DefaultMaxThreads=16
+readonly DefaultProcMult=1
 readonly Log=3
 
 
@@ -82,10 +86,10 @@ main()
 
 	eval set -- "$opts"
 
-	local age=1
+	local age="$DefaultAge"
 	local baseColl=
-	local maxThreads=16
-	local procMult=1
+	local maxThreads="$DefaultMaxThreads"
+	local procMult="$DefaultProcMult"
 	local srcResc=
 	local stopTime=
 
