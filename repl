@@ -59,12 +59,11 @@ export PGHOST PGPORT PGUSER
 
 export TIMEDOUT=3
 
-readonly ExecPath=$(readlink --canonicalize "$0")
-readonly ExecName=$(basename "$ExecPath")
-
 readonly DefaultAge=1
 readonly DefaultMaxThreads=16
 readonly DefaultProcMult=1
+readonly ExecPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
 
 
