@@ -541,7 +541,7 @@ select_cohort_by_size()
 
 	if ! CHECK_TIME "$untilTS"
 	then
-		exit "$TIMEDOUT"
+		return "$TIMEDOUT"
 	fi
 
 	local minSizeB=$((minSizeMiB * 1024 ** 2))
