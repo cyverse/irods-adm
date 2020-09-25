@@ -319,14 +319,14 @@ finish()
 
 count()
 {
-	awk 'BEGIN {
-				 RS = "\0"
-				 tot = 0
-			 }
+	local tot=0
 
-			 { tot = tot + 1 }
+	while read -r -d ''
+	do
+		((tot++))
+	done
 
-			 END { print tot }'
+	echo "$tot"
 }
 
 
@@ -342,27 +342,21 @@ partition()
 
 	if [[ -n "$maxSizeB" ]]
 	then
-		awk -v min="$minSizeB" -v max="$maxSizeB" \
-				'BEGIN {
-					 RS = "\0"
-					 FS = " "
-					 ORS = "\0"
-				 }
-
-				 {
-					 if ($1 >= min && $1 < max) { print substr($0, length($1) + 2) }
-				 }'
+		while read -r -d '' size obj
+		do
+			if [[ $size -ge $minSizeB && $size -le $maxSizeB ]]
+			then
+				printf '%s\0' "$obj"
+			fi
+		done
 	else
-		awk -v min="$minSizeB" \
-				'BEGIN {
-					 RS = "\0"
-					 FS = " "
-					 ORS = "\0"
-				 }
-
-				 {
-					 if ($1 >= min) { print substr($0, length($1) + 2) }
-				 }'
+		while read -r -d '' size obj
+		do
+			if [[ $size -ge $minSizeB ]]
+			then
+				printf '%s\0' "$obj"
+			fi
+		done
 	fi
 }
 
