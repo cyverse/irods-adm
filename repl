@@ -7,7 +7,7 @@ show_help()
 $ExecName version $Version
 
 Usage:
- $ExecName [options] DEST-RESC
+ $ExecName [options]
 
 replicates data objects
 
@@ -28,6 +28,8 @@ Options:
                               once, default: 1
  -P, --port PORT              connect to the ICAT's DBMS listening on TCP port
                               PORT instead of the PostgreSQL default
+ -R, --dest-resc DEST-RESC    REQUIRED - replicate data objects to resource
+                              DEST-RESC
  -S, --src-resc SRC-RESC      only replicate the data objects with a file on the
                               resource SRC-RESC
  -u, --until STOP-TIME        the time to stop replication in a format
@@ -85,6 +87,8 @@ main()
 	local srcResc=
 	local stopTime=
 
+	local destResc
+
 	while true
 	do
 		case "$1" in
@@ -116,6 +120,10 @@ main()
 				PGPORT="$2"
 				shift 2
 				;;
+			-R|--dest-resc)
+			  destResc="$2"
+				shift 2
+				;;
 			-S|--src-resc)
 				srcResc="$2"
 				shift 2
@@ -143,22 +151,18 @@ main()
 		esac
 	done
 
-	if [[ "$#" -lt 1 ]]
+  if [[ -z "${destResc-}" ]]
 	then
+		printf 'The -R|--dest-resc option is required\n' >&2
 		show_help >&2
-		exit 1
+		return 1
 	fi
-
-	local destResc="$1"
 
 	if [[ -n "$procMult" ]]
 	then
 		if ! [[ "$procMult" =~ ^[1-9][0-9]* ]]
 		then
-			printf \
-					'The -m option value must be a positive number. The given value was %s.\n' \
-					"$procMult" \
-				>&2
+			printf 'The multiplier must be a positive number. The given value was %s.\n' "$procMult" >&2
 			exit 1
 		fi
 	fi
@@ -293,12 +297,13 @@ main()
 
 format_opts()
 {
-	getopt \
-		--name "$ExecName" \
-		--longoptions \
-			age:,collection:,help,host:,max-threads:,multiplier:,port:,src-resc:,until:,user:,version \
-		--options A:C:hH:M:N:P:S:u:U:v \
-		-- "$@"
+	local longOpts=(
+	  age: collection: help host: max-threads: multiplier: port: dest-resc: src-resc: until: user:
+		version)
+
+	local longOptsStr
+	longOptsStr=$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)
+	getopt --name "$ExecName" --longoptions "$longOptsStr" --options A:C:hH:M:N:P:R:S:u:U:v -- "$@"
 }
 
 
