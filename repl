@@ -70,14 +70,7 @@ readonly Log=3
 main()
 {
 	local opts
-	if ! opts=$( \
-		getopt \
-			--name "$ExecName" \
-			--longoptions \
-				age:,collection:,help,host:,max-threads:,multiplier:,port:,src-resc:,until:,user:,version \
-			--options A:C:hH:M:N:P:S:u:U:v \
-			-- \
-			"$@")
+	if ! opts=$(format_opts "$@")
 	then
 		show_help >&2
 		return 1
@@ -295,6 +288,17 @@ main()
 			select_cohort 0 "$tot" "$destResc" "$procMult" 16 2 -1 -1 "$untilTS" < "$objList" > /dev/null
 		fi
 	fi
+}
+
+
+format_opts()
+{
+	getopt \
+		--name "$ExecName" \
+		--longoptions \
+			age:,collection:,help,host:,max-threads:,multiplier:,port:,src-resc:,until:,user:,version \
+		--options A:C:hH:M:N:P:S:u:U:v \
+		-- "$@"
 }
 
 
