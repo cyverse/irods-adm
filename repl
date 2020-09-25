@@ -11,9 +11,6 @@ Usage:
 
 replicates data objects
 
-Parameters:
- DEST-RESC  the resource where the files will be replicated
-
 Options:
  -A, --age AGE                how many days old a data object must be to be
                               replicated, default: 1
