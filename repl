@@ -28,8 +28,8 @@ Options:
                               once, default: 1
  -P, --port PORT              connect to the ICAT's DBMS listening on TCP port
                               PORT instead of the PostgreSQL default
- -R, --resource RESOURCE      only replicate the data objects with a file on
-                              this resource
+ -S, --src-resc SRC-RESC      only replicate the data objects with a file on the
+                              resource SRC-RESC
  -u, --until STOP-TIME        the time to stop replication in a format
                               understandable by \`date\`
  -U, --user USER              authorize the DBMS connection as user USER instead
@@ -50,7 +50,7 @@ EOF
 }
 
 
-readonly Version=4
+readonly Version=5
 
 set -o errexit -o nounset -o pipefail
 
@@ -71,8 +71,8 @@ main()
 		getopt \
 			--name "$ExecName" \
 			--longoptions \
-				age:,collection:,help,host:,max-threads:,multiplier:,port:,resource:,until:,user:,version \
-			--options A:C:hH:M:N:P:R:u:U:v \
+				age:,collection:,help,host:,max-threads:,multiplier:,port:,src-resc:,until:,user:,version \
+			--options A:C:hH:M:N:P:S:u:U:v \
 			-- \
 			"$@")
 	then
@@ -86,7 +86,7 @@ main()
 	local baseColl=
 	local maxThreads=16
 	local procMult=1
-	local srcRes=
+	local srcResc=
 	local stopTime=
 
 	while true
@@ -120,8 +120,8 @@ main()
 				PGPORT="$2"
 				shift 2
 				;;
-			-R|--resource)
-				srcRes="$2"
+			-S|--src-resc)
+				srcResc="$2"
 				shift 2
 				;;
 			-u|--until)
@@ -213,9 +213,9 @@ main()
 	maxCreateTime=$(date --date "$maxCreateDate" '+%s')
 
 	local resCond
-	if [[ -n "$srcRes" ]]
+	if [[ -n "$srcResc" ]]
 	then
-		resCond="d.resc_name = '$srcRes'"
+		resCond="d.resc_name = '$srcResc'"
 	else
 		resCond="d.resc_name != '$destResc'"
 	fi
