@@ -248,36 +248,36 @@ main()
 			local cnt=0
 
 			# Small non-zero byte files
-			cnt=$(select_cohort "$cnt" "$tot" "${destResc-}" "$procMult" 16 512 0 1 "$untilTS" \
+			cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "${destResc-}" "$procMult" 16 512 0 1 "$untilTS" \
 			  < "$objList")    # 16 1-threaded transfers
 
       if [[ "$maxThreads" -ge 2 ]]
 			then
-				cnt=$(select_cohort "$cnt" "$tot" "${destResc-}" "$procMult"  8 128 1 2 "$untilTS" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "${destResc-}" "$procMult"  8 128 1 2 "$untilTS" \
 				  < "$objList")  # 8 2-threaded
       fi
 
 			if [[ "$maxThreads" -ge 3 ]]
       then
-				cnt=$(select_cohort "$cnt" "$tot" "${destResc-}" "$procMult"  6  72 2 3 "$untilTS" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "${destResc-}" "$procMult"  6  72 2 3 "$untilTS" \
 					< "$objList")  # 6 3-threaded
 			fi
 
 			if [[ "$maxThreads" -ge 5 ]]
       then
-				cnt=$(select_cohort "$cnt" "$tot" "${destResc-}" "$procMult"  4  32 3 5 "$untilTS" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "${destResc-}" "$procMult"  4  32 3 5 "$untilTS" \
 				  < "$objList")  # 4 4--5-threaded
 			fi
 
 			if [[ "$maxThreads" -ge 7 ]]
 			then
-				cnt=$(select_cohort "$cnt" "$tot" "${destResc-}" "$procMult"  3  18 5 7 "$untilTS" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "${destResc-}" "$procMult"  3  18 5 7 "$untilTS" \
 				  < "$objList")  # 3 6--7-threaded
 			fi
 
 			if [[ "$maxThreads" -ge 15 ]]
 			then
-				cnt=$(select_cohort "$cnt" "$tot" "${destResc-}" "$procMult"  2   8 7 15 "$untilTS" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "${destResc-}" "$procMult"  2   8 7 15 "$untilTS" \
 				  < "$objList")  # 2 8--15-threaded
 			fi
 
@@ -288,19 +288,19 @@ main()
 			if [[ "$minSize" -lt 480 ]]
 			then
 				cnt=$(select_cohort_by_size \
-						"$cnt" "$tot" "${destResc-}" "$procMult" "$maxThreads" "$untilTS" "$minSize" 480 \
+						"$cnt" "$tot" "$srcResc"  "${destResc-}" "$procMult" "$maxThreads" "$untilTS" "$minSize" 480 \
 					< "$objList")  # < 480 MiB transfers
 			fi
 
 			cnt=$(select_cohort_by_size \
-					"$cnt" "$tot" "${destResc-}" "$procMult" "$maxThreads" "$untilTS" 480 \
+					"$cnt" "$tot" "$srcResc" "${destResc-}" "$procMult" "$maxThreads" "$untilTS" 480 \
 				< "$objList")  # >= 480 MiB transfers
 
 			# zero byte files
-			cnt=$(select_cohort "$cnt" "$tot" "${destResc-}" "$procMult" 16 512 0 0 "$untilTS" \
+			cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "${destResc-}" "$procMult" 16 512 0 0 "$untilTS" \
 			  < "$objList")  # 16 1-threaded transfers
 		else
-			select_cohort 0 "$tot" "${destResc-}" "$procMult" 16 2 -1 -1 "$untilTS" < "$objList" \
+			select_cohort 0 "$tot" "$srcResc" "${destResc-}" "$procMult" 16 2 -1 -1 "$untilTS" < "$objList" \
 			  > /dev/null
 		fi
 	fi
@@ -446,13 +446,14 @@ select_cohort()
 {
 	local cnt="$1"
 	local tot="$2"
-	local destResc="$3"
-	local procMult="$4"
-	local maxProcs="$5"
-	local maxArgs="$6"
-	local minThreads="$7"
-	local maxThreads="$8"
-	local untilTS="$9"
+	local srcResc="$3"
+	local destResc="$4"
+	local procMult="$5"
+	local maxProcs="$6"
+	local maxArgs="$7"
+	local minThreads="$8"
+	local maxThreads="$9"
+	local untilTS="${10}"
 
 	if ! CHECK_TIME "$untilTS"
 	then
@@ -518,7 +519,7 @@ select_cohort()
 		maxProcs=$((maxProcs * procMult))
 
 		parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
-					REPL_BATCH "'$destResc'" "'$maxThreads'" "'$untilTS'" \
+					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$Log" \
 			| tee >(cat >&"$Log") \
@@ -537,16 +538,17 @@ select_cohort_by_size()
 {
 	local cnt="$1"
 	local tot="$2"
-	local destResc="$3"
-	local procMult="$4"
-	local maxThreads="$5"
-	local untilTS="$6"
-	local minSizeMiB="$7"
+	local srcResc="$3"
+	local destResc="$4"
+	local procMult="$5"
+	local maxThreads="$6"
+	local untilTS="$7"
+	local minSizeMiB="$8"
 
 	local maxSizeMiB=
-	if [[ "$#" -ge 8 ]]
+	if [[ "$#" -ge 9 ]]
 	then
-		maxSizeMiB="$8"
+		maxSizeMiB="$9"
 	fi
 
 	local maxProcs=1
@@ -587,7 +589,7 @@ select_cohort_by_size()
 		maxProcs=$((maxProcs * procMult))
 
 		parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
-					REPL_BATCH "'$destResc'" "'$maxThreads'" "'$untilTS'" \
+					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$Log" \
 			| tee >(cat >&"$Log") \
@@ -612,20 +614,28 @@ REPL_BATCH()
 {
 	set -o errexit -o nounset -o pipefail
 
-	local destResc="$1"
-	local maxThreads="$2"
-	local untilTS="$3"
-	shift 3
+  local srcResc="$1"
+	local destResc="$2"
+	local maxThreads="$3"
+	local untilTS="$4"
+	shift 4
 
 	CHECK_TIME "$untilTS"
 
-	local replStatus=0
+  local replArgs=(-B -M -T -v -N "$maxThreads")
+
 	if [[ -n "$destResc" ]]
 	then
-	  irepl -B -M -T -v -N "$maxThreads" -R "$destResc" "$@" || replStatus="$?"
-  else
-		irepl -B -M -T -v -N "$maxThreads" "$@" || replStatus="$?"
+		replArgs+=(-R "$destResc")
 	fi
+
+	if [[ -n "$srcResc" ]]
+	then
+		replArgs+=(-S "$srcResc")
+	fi
+
+	local replStatus=0
+	irepl "${replArgs[@]}" "$@" || replStatus="$?"
 
 	# TODO: Trying to figure out the irepl error code for when irepl logs a
 	# '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is
