@@ -166,7 +166,7 @@ main()
 	fi
 
 	local untilTS
-		if [[ -n "${stopTime-}" ]]
+	if [[ -n "${stopTime-}" ]]
 	then
 		if ! untilTS=$(date --date="$stopTime" '+%s')
 		then
