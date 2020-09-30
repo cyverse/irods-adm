@@ -111,6 +111,8 @@ main()
     readonly DEBUG=
   fi
 
+  check_existing_instance
+
   readonly ErrorLog=$(mktemp)
 
   display_problems | strip_noise | fix_problems 2>"$ErrorLog"
@@ -124,6 +126,18 @@ main()
   rm --force "$ErrorLog"
 }
 
+check_existing_instance()
+{
+    currPid=$$
+    for pid in $(pidof -x $ExecName)
+    do
+        if [ $pid -ne $currPid ]; then
+            printf "\n$ExecName already running at PID $pid\n" 1>&2
+            printf "exiting\n\n" 1>&2
+            exit 1
+        fi
+    done
+}
 
 inject_debug_stmt()
 {
