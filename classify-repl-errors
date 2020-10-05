@@ -204,6 +204,9 @@ classify_repl_errors()
   sSRTCnt=$(split_out_repl_class "$replErrorsFile" -115000 SYS_SOCK_READ_TIMEDOUT \
                                  "$logBase".timeout)
 
+  local uSCECnt
+  uSCECnt=$(split_out_repl_class "$replErrorsFile" -305101 USER_SOCK_CONNECT_ERR "$logBase".network)
+
   local uCMCnt
   uCMCnt=$(split_out_repl_class "$replErrorsFile" -314000 USER_CHKSUM_MISMATCH \
                                 "$logBase".chksum_mismatches)
@@ -225,6 +228,7 @@ classify_repl_errors()
   display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
   display_error_count 'file open errors' "$uFOECnt" "$totErrCnt"
   display_error_count 'short files' "$sCLECnt" "$totErrCnt"
+  display_error_count 'network unreacable' "$uSCECnt" "$totErrCnt"
   display_error_count timeouts "$sSRTCnt" "$totErrCnt"
   display_error_count 'unclassified replication errors' "$unclassifiedReplErrCnt" "$totErrCnt"
 }
