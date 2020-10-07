@@ -128,15 +128,18 @@ main()
 
 check_existing_instance()
 {
-    currPid=$$
-    for pid in $(pidof -x "$ExecName")
-    do
-        if [ "$pid" -ne $currPid ]; then
-            printf "\n%s already running at PID %s\n" "$ExecName" "$pid" 1>&2
-            printf "exiting\n\n" 1>&2
-            exit 1
-        fi
-    done
+  local pidofExec
+  pidofExec=$(which pidof)
+
+  currPid=$$
+  for pid in $("${pidofExec:-/sbin/pidof}" -x "$ExecName")
+  do
+    if [ "$pid" -ne $currPid ]; then
+      printf "\n%s already running at PID %s\n" "$ExecName" "$pid" 1>&2
+      printf "exiting\n\n" 1>&2
+      exit 1
+    fi
+  done
 }
 
 inject_debug_stmt()
