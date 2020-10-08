@@ -132,7 +132,7 @@ main()
 check_existing_instance()
 {
   local pidofExec
-  pidofExec=$(which pidof)
+  pidofExec=$(which pidof 2> /dev/null)
 
   currPid=$$
   for pid in $("${pidofExec:-/sbin/pidof}" -x "$ExecName")
