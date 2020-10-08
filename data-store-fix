@@ -27,7 +27,7 @@ Parameters:
 
  CUTOFF-TIME  the upper bound of the creation time for the collections and data
               objects contained in the reports. The format should be the default
-              format used by \`date\`. The default value is today '00:00:00' in
+              format used by \`date\`. The default value is today at 00:00:00 in
               the local time zone.
 
  DEBUG        any value that, if present, will cause the script to generate
