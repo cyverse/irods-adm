@@ -132,10 +132,13 @@ main()
 check_existing_instance()
 {
   local pidofExec
-  pidofExec=$(which pidof 2> /dev/null)
+  if ! pidofExec=$(which pidof 2> /dev/null)
+  then
+    pidofExec=/sbin/pidof
+  fi
 
   currPid=$$
-  for pid in $("${pidofExec:-/sbin/pidof}" -x "$ExecName")
+  for pid in $("$pidofExec" -x "$ExecName")
   do
     if [ "$pid" -ne $currPid ]; then
       printf "\n%s already running at PID %s\n" "$ExecName" "$pid" 1>&2
