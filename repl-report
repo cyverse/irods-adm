@@ -19,17 +19,19 @@ The caller must have an initialized iRODS session, i.e., called \`iinit\` to ope
 an iRODS session with a cached authentication credentials.
 
 Options:
- -A, --age AGE    how many days old a data object must be to be replicated. A
-                  negative number means no time restriction. default: 1
- -d, --debug      display progress and query time information
- -h, --help       display help text and exit
- -H, --host HOST  connect to the ICAT's DBMS on the host HOST instead of the
-                  PostgreSQL default
- -P, --port PORT  connect to the ICAT's DBMS listening on TCP port PORT instead
-                  of the PostgreSQL default
- -U, --user USER  authorize the DBMS connection as user USER instead of the
-                  default
- -v, --version    display version and exit
+ -A, --age AGE                how many days old a data object must be to be
+                              replicated. A negative number means no time
+                              restriction. default: 1
+ -C, --collection COLLECTION  only consider data objects in this collection
+ -d, --debug                  display progress and query time information
+ -h, --help                   display help text and exit
+ -H, --host HOST              connect to the ICAT's DBMS on the host HOST
+                              instead of the PostgreSQL default
+ -P, --port PORT              connect to the ICAT's DBMS listening on TCP port
+                              PORT instead of the PostgreSQL default
+ -U, --user USER              authorize the DBMS connection as user USER instead
+                              of the default
+ -v, --version                display version and exit
 EOF
 }
 
@@ -60,11 +62,17 @@ main()
 
   local age="$DefaultAge"
 
+  local collection
+
   while true
   do
     case "$1" in
       -A|--age)
         age="$2"
+        shift 2
+        ;;
+      -C|--collection)
+        collection="$2"
         shift 2
         ;;
       -d|--debug)
@@ -102,15 +110,15 @@ main()
     esac
   done
 
-  mk_report "$age"
+  mk_report "$age" "${collection-}"
 }
 
 
 prep_opts()
 {
   getopt \
-    --longoptions age:,debug,help,host:,port:,user:,version \
-    --options A:dhH:P:U:v \
+    --longoptions age:,collection:,debug,help,host:,port:,user:,version \
+    --options A:C:dhH:P:U:v \
     --name "$ExecName" \
     -- \
     "$@"
@@ -120,6 +128,7 @@ prep_opts()
 mk_report()
 {
   local age="$1"
+  local collection="$2"
 
   psql --quiet ICAT \
 <<EOSQL
@@ -134,9 +143,8 @@ mk_report()
   SELECT d.resc_name, SUBSTRING(d.resc_hier FROM '(%;)*#"%#"' FOR '#'), d.data_size
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
-    AND c.coll_name
-      LIKE '/' || (SELECT zone_name FROM r_zone_main WHERE zone_type_name = 'local') || '/home/%'
-    AND $(inject_time_restriction "$age");
+    AND ($(inject_collection_restriction c "$collection"))
+    AND ($(inject_time_restriction d "$age"));
 
   CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
   CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
@@ -214,9 +222,25 @@ inject_set_title()
 }
 
 
+inject_collection_restriction()
+{
+  local collTable="$1"
+  local collection="$2"
+
+  if [[ -n "$collection" ]]
+  then
+    local colName="$collTable".coll_name
+    printf $'%s = \'%s\' OR %s LIKE \'%s/%%\'' "$colName" "$collection" "$colName" "$collection"
+  else
+    printf TRUE
+  fi
+}
+
+
 inject_time_restriction()
 {
-  local age="$1"
+  local dataTable="$1"
+  local age="$2"
 
   if [[ "$age" -lt 0 ]]
   then
@@ -231,7 +255,7 @@ inject_time_restriction()
 
     local supCreateTs
     supCreateTs=$(date --date "$supCreateDate" '+%s')
-    printf $'d.create_ts < \'%011d\'' "$supCreateTs"
+    printf $'%s.create_ts < \'%011d\'' "$dataTable" "$supCreateTs"
   fi
 }
 
