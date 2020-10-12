@@ -201,6 +201,29 @@ main()
 	 return 1
 	fi
 
+  replicate \
+		"$objList" \
+		"$age"  \
+		"$maxThreads" \
+		"$procMult" \
+		"${baseColl-}" \
+		"${srcResc-}" \
+		"${destResc-}" \
+		"${untilTS-}"
+}
+
+
+replicate()
+{
+	local objList="$1"
+	local age="$2"
+	local maxThreads="$3"
+	local procMult="$4"
+	local baseColl="$5"
+	local srcResc="$6"
+	local destResc="$7"
+	local untilTS="$8"
+	
 	printf 'Retrieving data objects to replicate...\n' >&2
 
 	local maxCreateDate
@@ -210,10 +233,10 @@ main()
 	maxCreateTime=$(date --date "$maxCreateDate" '+%s')
 
 	local resCond
-	if [[ -n "${srcResc-}" ]]
+	if [[ -n "$srcResc" ]]
 	then
 		resCond="d.resc_name = '$srcResc'"
-	elif [[ -n "${destResc-}" ]]
+	elif [[ -n "$destResc" ]]
 	then
 		resCond="d.resc_name != '$destResc'"
 	else
@@ -221,7 +244,7 @@ main()
 	fi
 
 	local baseCond
-	if [[ -n "${baseColl-}" ]]
+	if [[ -n "$baseColl" ]]
 	then
 		baseCond="c.coll_name = '$baseColl' OR c.coll_name LIKE '$baseColl/%'"
 	else
@@ -248,42 +271,36 @@ main()
 			local cnt=0
 
 			# Small non-zero byte files
-			cnt=$(select_cohort \
-					"$cnt" "$tot" "${srcResc-}" "${destResc-}" "$procMult" 16 512 0 1 "${untilTS-}" \
+			cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 16 512 0 1 "$untilTS" \
 			  < "$objList")    # 16 1-threaded transfers
 
       if [[ "$maxThreads" -ge 2 ]]
 			then
-				cnt=$(select_cohort \
-						"$cnt" "$tot" "${srcResc-}" "${destResc-}" "$procMult" 8 128 1 2 "${untilTS-}" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 8 128 1 2 "$untilTS" \
 				  < "$objList")  # 8 2-threaded
       fi
 
 			if [[ "$maxThreads" -ge 3 ]]
       then
-				cnt=$(select_cohort \
-						"$cnt" "$tot" "${srcResc-}" "${destResc-}" "$procMult" 6 72 2 3 "${untilTS-}" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 6 72 2 3 "$untilTS" \
 					< "$objList")  # 6 3-threaded
 			fi
 
 			if [[ "$maxThreads" -ge 5 ]]
       then
-				cnt=$(select_cohort \
-						"$cnt" "$tot" "${srcResc-}" "${destResc-}" "$procMult" 4 32 3 5 "${untilTS-}" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 4 32 3 5 "$untilTS" \
 				  < "$objList")  # 4 4--5-threaded
 			fi
 
 			if [[ "$maxThreads" -ge 7 ]]
 			then
-				cnt=$(select_cohort \
-						"$cnt" "$tot" "${srcResc-}" "${destResc-}" "$procMult" 3 18 5 7 "${untilTS-}" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 3 18 5 7 "$untilTS" \
 				  < "$objList")  # 3 6--7-threaded
 			fi
 
 			if [[ "$maxThreads" -ge 15 ]]
 			then
-				cnt=$(select_cohort \
-						"$cnt" "$tot" "${srcResc-}" "${destResc-}" "$procMult" 2 8 7 15 "${untilTS-}" \
+				cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 2 8 7 15 "$untilTS" \
 				  < "$objList")  # 2 8--15-threaded
 			fi
 
@@ -296,27 +313,25 @@ main()
 				cnt=$(select_cohort_by_size \
 						"$cnt" \
 						"$tot" \
-						"${srcResc-}" \
-						"${destResc-}" \
+						"$srcResc" \
+						"$destResc" \
 						"$procMult" \
 						"$maxThreads" \
-						"${untilTS-}" \
+						"$untilTS" \
 						"$minSize" \
 						480 \
 					< "$objList")  # < 480 MiB transfers
 			fi
 
 			cnt=$(select_cohort_by_size \
-					"$cnt" "$tot" "${srcResc-}" "${destResc-}" "$procMult" "$maxThreads" "${untilTS-}" 480 \
+					"$cnt" "$tot" "$srcResc" "$destResc" "$procMult" "$maxThreads" "$untilTS" 480 \
 				< "$objList")  # >= 480 MiB transfers
 
 			# zero byte files
-			cnt=$(select_cohort \
-					"$cnt" "$tot" "${srcResc-}" "${destResc-}" "$procMult" 16 512 0 0 "${untilTS-}" \
+			cnt=$(select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 16 512 0 0 "$untilTS" \
 			  < "$objList")  # 16 1-threaded transfers
 		else
-			select_cohort 0 "$tot" "${srcResc-}" "${destResc-}" "$procMult" 16 2 -1 -1 "${untilTS-}" \
-				< "$objList" \
+			select_cohort 0 "$tot" "$srcResc" "$destResc" "$procMult" 16 2 -1 -1 "$untilTS" < "$objList" \
 				> /dev/null
 		fi
 	fi
