@@ -223,7 +223,7 @@ replicate()
 	local srcResc="$6"
 	local destResc="$7"
 	local untilTS="$8"
-	
+
 	printf 'Retrieving data objects to replicate...\n' >&2
 
 	local maxCreateDate
@@ -395,7 +395,7 @@ partition()
 	then
 		while read -r -d '' size obj
 		do
-			if [[ $size -ge $minSizeB && $size -le $maxSizeB ]]
+			if [[ $size -ge $minSizeB && $size -lt $maxSizeB ]]
 			then
 				printf '%s\0' "$obj"
 			fi
