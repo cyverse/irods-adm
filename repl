@@ -68,6 +68,15 @@ readonly Log=3
 
 main()
 {
+	declare -A optMap=(
+		[age]="$DefaultAge"
+		[collection]=''
+		[dest-resc]=''
+		[max-threads]="$DefaultMaxThreads"
+		[multiplier]="$DefaultProcMult"
+		[src-resc]=''
+		[until]='' )
+
 	local opts
 	if ! opts=$(format_opts "$@")
 	then
@@ -77,24 +86,15 @@ main()
 
 	eval set -- "$opts"
 
-	local age="$DefaultAge"
-	local maxThreads="$DefaultMaxThreads"
-	local procMult="$DefaultProcMult"
-
-	local baseColl
-	local destResc
-	local srcResc
-	local stopTime
-
 	while true
 	do
 		case "$1" in
 			-A|--age)
-				age="$2"
+				optMap[age]="$2"
 				shift 2
 				;;
 			-C|--collection)
-				baseColl="$2"
+				optMap[collection]="$3"
 				shift 2
 				;;
 			-h|--help)
@@ -106,11 +106,11 @@ main()
 				shift 2
 				;;
 			-M|--multiplier)
-				procMult="$2"
+				optMap[multiplier]="$2"
 				shift 2
 				;;
 			-N|--max-threads)
-			  maxThreads="$2"
+			  optMap[max-threads]="$2"
 				shift 2
 				;;
 			-P|--port)
@@ -118,15 +118,15 @@ main()
 				shift 2
 				;;
 			-R|--dest-resc)
-			  destResc="$2"
+			  optMap[dest-resc]="$2"
 				shift 2
 				;;
 			-S|--src-resc)
-				srcResc="$2"
+				optMap[src-resc]="$2"
 				shift 2
 				;;
 			-u|--until)
-				stopTime="$2"
+				optMap[until]="$2"
 				shift 2
 				;;
 			-U|--user)
@@ -148,29 +148,33 @@ main()
 		esac
 	done
 
-	if [[ -n "$procMult" ]]
+	if [[ -n "${optMap[multiplier]}" ]]
 	then
-		if ! [[ "$procMult" =~ ^[1-9][0-9]* ]]
+		if ! [[ "${optMap[multiplier]}" =~ ^[1-9][0-9]* ]]
 		then
-			printf 'The multiplier must be a positive number. The given value was %s.\n' "$procMult" >&2
+			printf 'The multiplier must be a positive number. The given value was %s.\n' \
+			    "${optMap[multiplier]}" \
+				>&2
+
 			return 1
 		fi
 	fi
 
-  if [[ -n "${destResc-}" && "${srcResc-}" == "$destResc" ]]
+  if [[ -n "${optMap[dest-resc]}" && "${optMap[src-resc]}" == "${optMap[dest-resc]}" ]]
 	then
 		printf 'The destination resource, %s, cannot be the same as the source resource, %s.\n' \
-		    "$destResc" "$srcResc" \
+		    "${optMap[dest-resc]}" "${optMap[src-resc]}" \
 			>&2
+
 		return 1
 	fi
 
 	local untilTS
-	if [[ -n "${stopTime-}" ]]
+	if [[ -n "${optMap[until]}" ]]
 	then
-		if ! untilTS=$(date --date="$stopTime" '+%s')
+		if ! untilTS=$(date --date="${optMap[until]}" '+%s')
 		then
-			printf '%s is not a valid date format\n' "$stopTime"
+			printf '"%s" is not a valid date format\n' "${optMap[until]}"
 			return 1
 		fi
 	fi
@@ -203,12 +207,12 @@ main()
 
   replicate \
 		"$objList" \
-		"$age"  \
-		"$maxThreads" \
-		"$procMult" \
-		"${baseColl-}" \
-		"${srcResc-}" \
-		"${destResc-}" \
+		"${optMap[age]}"  \
+		"${optMap[max-threads]}" \
+		"${optMap[multiplier]}" \
+		"${optMap[collection]}" \
+		"${optMap[src-resc]}" \
+		"${optMap[dest-resc]}" \
 		"${untilTS-}"
 }
 
