@@ -96,7 +96,7 @@ main()
 				shift 2
 				;;
 			-C|--collection)
-				optMap[collection]="$3"
+				optMap[collection]="$2"
 				shift 2
 				;;
 			-h|--help)
