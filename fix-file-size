@@ -42,44 +42,6 @@ show_version()
 }
 
 
-if ! opts=$(getopt --name "$ExecName" --options hJ:v --longoptions help,jobs:,version -- "$@")
-then
-  printf '\n' >&2
-  show_help >&2
-  exit 1
-fi
-
-eval set -- "$opts"
-
-while true
-do
-  case "$1" in
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -J|--jobs)
-      readonly Jobs="$2"
-      shift 2
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      show_help >&2
-      exit 1
-      ;;
-  esac
-done
-
-export EXEC_DIR
-EXEC_DIR=$(dirname "$ExecPath")
-
 
 EXEC_ON_RS()
 {
@@ -148,6 +110,44 @@ FIX()
 }
 export -f FIX
 
+
+if ! opts=$(getopt --name "$ExecName" --options hJ:v --longoptions help,jobs:,version -- "$@")
+then
+  printf '\n' >&2
+  show_help >&2
+  exit 1
+fi
+
+eval set -- "$opts"
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -J|--jobs)
+      readonly Jobs="$2"
+      shift 2
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      show_help >&2
+      exit 1
+      ;;
+  esac
+done
+
+export EXEC_DIR
+EXEC_DIR=$(dirname "$ExecPath")
 
 if [ -n "$Jobs" ]
 then
