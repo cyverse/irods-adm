@@ -36,7 +36,7 @@ EOF
 }
 
 
-readonly Version=7
+readonly Version=8
 
 set -o errexit -o nounset -o pipefail
 
@@ -63,6 +63,7 @@ main()
   local age="$DefaultAge"
 
   local collection
+  local version
 
   while true
   do
@@ -96,8 +97,8 @@ main()
         shift 2
         ;;
       -v|--version)
-        printf '%s\n' "$Version"
-        return 0
+        version=version
+        shift
         ;;
       --)
         shift
@@ -109,6 +110,12 @@ main()
         ;;
     esac
   done
+
+  if [[ -n "${version-}" ]]
+  then
+    printf '%s\n' "$Version"
+    return 0
+  fi
 
   mk_report "$age" "${collection-}"
 }
