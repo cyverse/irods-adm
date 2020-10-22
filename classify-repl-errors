@@ -190,12 +190,16 @@ classify_repl_errors()
   local totErrCnt="$2"
   local logBase="$3"
 
-  local bcCnt=0
-  bcCnt+=$(split_out_repl_class "$replErrorsFile" -4000 SYS_HEADER_READ_LEN_ERR \
-                                "$logBase".broken_conn)
-  bcCnt+=$(split_out_repl_class "$replErrorsFile" -116104 \
-                                'SYS_SOCK_READ_ERR, Connection reset by peer' \
-                                "$logBase".broken_conn)
+  local shrlCnt
+  shrlCnt=$(split_out_repl_class "$replErrorsFile" -4000 SYS_HEADER_READ_LEN_ERR \
+                               "$logBase".broken_conn)
+
+  local ssrCnt
+  ssrCnt+=$(split_out_repl_class "$replErrorsFile" -116104 \
+                                 'SYS_SOCK_READ_ERR, Connection reset by peer' \
+                                 "$logBase".broken_conn)
+
+  local bcCnt=$(( shrlCnt + ssrCnt ))
 
   local sCLECnt
   sCLECnt=$(split_out_repl_class "$replErrorsFile" -27000 SYS_COPY_LEN_ERR "$logBase".short_file)
