@@ -271,7 +271,7 @@ split_out_class()
   if [[ -n "$classifiedErrors" ]]
   then
     comm -2 -3 <(echo "$errors") <(echo "$classifiedErrors") > "$errorsFile"
-    sed "s/$classifier/$substitution/" <<< "$classifiedErrors" >> "$classFile"
+    echo "${classifiedErrors//$classifier/$substitution}" >> "$classFile"
     wc --lines <<< "$classifiedErrors"
   else
     printf '0'
