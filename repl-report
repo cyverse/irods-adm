@@ -63,6 +63,7 @@ main()
   local age="$DefaultAge"
 
   local collection
+  local help
   local version
 
   while true
@@ -81,8 +82,8 @@ main()
         shift
         ;;
       -h|--help)
-        show_help
-        return 0
+        help=help
+        shift
         ;;
       -H|--host)
         PGHOST="$2"
@@ -110,6 +111,12 @@ main()
         ;;
     esac
   done
+
+  if [[ -n "${help-}" ]]
+  then
+    show_help
+    return 0
+  fi
 
   if [[ -n "${version-}" ]]
   then
