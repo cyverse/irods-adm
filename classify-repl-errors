@@ -53,7 +53,7 @@ EOF
 }
 
 
-readonly Version=3
+readonly Version=4
 
 set -o errexit -o nounset -o pipefail
 
@@ -74,6 +74,8 @@ main()
 
   eval set -- "$opts"
 
+  local version
+
   while true
   do
     case "$1" in
@@ -82,8 +84,8 @@ main()
         return 0
         ;;
       -v|--version)
-        printf '%s\n' "$Version"
-        return 0
+        version=version
+        shift
         ;;
       --)
         shift
@@ -95,6 +97,12 @@ main()
         ;;
     esac
   done
+
+  if [[ -n "${version-}" ]]
+  then
+    printf '%s\n' "$Version"
+    return 0
+  fi
 
   if [[ "$#" -lt 1 ]]
   then
