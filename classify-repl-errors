@@ -74,14 +74,15 @@ main()
 
   eval set -- "$opts"
 
+  local help
   local version
 
   while true
   do
     case "$1" in
       -h|--help)
-        show_help
-        return 0
+        help=help
+        shift
         ;;
       -v|--version)
         version=version
@@ -97,6 +98,12 @@ main()
         ;;
     esac
   done
+
+  if [[ -n "${help-}" ]]
+  then
+    show_help
+    return 0
+  fi
 
   if [[ -n "${version-}" ]]
   then
