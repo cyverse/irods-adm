@@ -63,6 +63,7 @@ main()
   local age="$DefaultAge"
 
   local collection
+  local debug
   local help
   local version
 
@@ -78,7 +79,7 @@ main()
         shift 2
         ;;
       -d|--debug)
-        Debug=debug
+        debug=debug
         shift
         ;;
       -h|--help)
@@ -111,6 +112,11 @@ main()
         ;;
     esac
   done
+
+  if [[ -n "${debug-}" ]]
+  then
+    Debug="$debug"
+  fi
 
   if [[ -n "${help-}" ]]
   then
