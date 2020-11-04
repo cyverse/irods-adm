@@ -73,10 +73,13 @@ main()
 		[collection]=''
 		[dest-resc]=''
 		[help]=''
+		[host]=''
 		[max-threads]="$DefaultMaxThreads"
 		[multiplier]="$DefaultProcMult"
+		[port]=''
 		[src-resc]=''
 		[until]=''
+		[user]=''
 		[version]='' )
 
 	local opts
@@ -104,7 +107,7 @@ main()
 				shift 1
 				;;
 			-H|--host)
-				PGHOST="$2"
+				optMap[host]="$2"
 				shift 2
 				;;
 			-M|--multiplier)
@@ -116,7 +119,7 @@ main()
 				shift 2
 				;;
 			-P|--port)
-				PGPORT="$2"
+				optMap[port]="$2"
 				shift 2
 				;;
 			-R|--dest-resc)
@@ -132,7 +135,7 @@ main()
 				shift 2
 				;;
 			-U|--user)
-				PGUSER="$2"
+				optMap[user]="$2"
 				shift 2
 				;;
 			-v|--version)
@@ -160,6 +163,21 @@ main()
 	then
 		printf '%s\n' "$Version"
 		return 0
+	fi
+
+  if [[ -n "${optMap[host]}" ]]
+	then
+		PGHOST="${optMap[host]}"
+	fi
+
+	if [[ -n "${optMap[port]}" ]]
+	then
+		PGPORT="${optMap[port]}"
+	fi
+
+	if [[ -n "${optMap[user]}" ]]
+	then
+		PGUSER="${optMap[user]}"
 	fi
 
 	if [[ -n "${optMap[multiplier]}" ]]
