@@ -82,76 +82,11 @@ main()
 		[user]=''
 		[version]='' )
 
-	local opts
-	if ! opts=$(format_opts "$@")
+  if ! resolve_opts optMap "$@"
 	then
 		show_help >&2
 		return 1
 	fi
-
-	eval set -- "$opts"
-
-	while true
-	do
-		case "$1" in
-			-A|--age)
-				optMap[age]="$2"
-				shift 2
-				;;
-			-C|--collection)
-				optMap[collection]="$2"
-				shift 2
-				;;
-			-h|--help)
-				optMap[help]=help
-				shift 1
-				;;
-			-H|--host)
-				optMap[host]="$2"
-				shift 2
-				;;
-			-M|--multiplier)
-				optMap[multiplier]="$2"
-				shift 2
-				;;
-			-N|--max-threads)
-			  optMap[max-threads]="$2"
-				shift 2
-				;;
-			-P|--port)
-				optMap[port]="$2"
-				shift 2
-				;;
-			-R|--dest-resc)
-			  optMap[dest-resc]="$2"
-				shift 2
-				;;
-			-S|--src-resc)
-				optMap[src-resc]="$2"
-				shift 2
-				;;
-			-u|--until)
-				optMap[until]="$2"
-				shift 2
-				;;
-			-U|--user)
-				optMap[user]="$2"
-				shift 2
-				;;
-			-v|--version)
-  			optMap[version]=version
-				shift 1
-				;;
-			--)
-				shift
-				break
-				;;
-			*)
-  			show_help >&2
-	  		return 1
-				;;
-		esac
-	done
 
   if [[ -n "${optMap[help]}" ]]
 	then
@@ -246,6 +181,83 @@ main()
 		"${optMap[src-resc]}" \
 		"${optMap[dest-resc]}" \
 		"${untilTS-}"
+}
+
+
+resolve_opts()
+{
+	local mapVar="$1"
+	shift
+
+	local opts
+	if ! opts=$(format_opts "$@")
+	then
+		return 1
+	fi
+
+	eval set -- "$opts"
+
+	while true
+	do
+		case "$1" in
+			-A|--age)
+				eval "$mapVar""[age]='$2'"
+				shift 2
+				;;
+			-C|--collection)
+				eval "$mapVar""[collection]='$2'"
+				shift 2
+				;;
+			-h|--help)
+				eval "$mapVar"'[help]=help'
+				shift 1
+				;;
+			-H|--host)
+				eval "$mapVar""[host]='$2'"
+				shift 2
+				;;
+			-M|--multiplier)
+				eval "$mapVar""[multiplier]='$2'"
+				shift 2
+				;;
+			-N|--max-threads)
+				eval "$mapVar""[max-threads]='$2'"
+				shift 2
+				;;
+			-P|--port)
+				eval "$mapVar""[port]='$2'"
+				shift 2
+				;;
+			-R|--dest-resc)
+				eval "$mapVar""[dest-resc]='$2'"
+				shift 2
+				;;
+			-S|--src-resc)
+				eval "$mapVar""[src-resc]='$2'"
+				shift 2
+				;;
+			-u|--until)
+				eval "$mapVar""[until]='$2'"
+				shift 2
+				;;
+			-U|--user)
+				eval "$mapVar""[user]='$2'"
+				shift 2
+				;;
+			-v|--version)
+				eval "$mapVar"'[version]=version'
+				shift 1
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+  			printf 'INTERNAL ERROR: Failed to resolve command line options\n' >&2
+				return 1
+				;;
+		esac
+	done
 }
 
 
