@@ -18,7 +18,7 @@ exits with status code 2.
 
 The rodsLog will show a connection from the host where this is run with the proxy
 user set to $ExecName. If SERVICE is specified, the client user will be set to
-SERVICE instead of $ExecName. If ZONE is specificed, the zone for both users 
+SERVICE instead of $ExecName. If ZONE is specificed, the zone for both users
 will be ZONE.
 
 If ips happens to be called while this is program is connected to iRODS, ips
@@ -38,6 +38,9 @@ Options:
  -V, --verbose  show the XML message returned from HOST instead of default
                 response
  -v, --version  show version and exit
+
+© 2019, The Arizona Board of Regents on behalf of The University of Arizona. For
+license information, see https://cyverse.org/license.
 EOF
 }
 
