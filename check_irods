@@ -28,16 +28,16 @@ Parameters:
  HOST  the FQDN or IP address of the server hosting the service
 
 Options:
- -P, --port PORT        the TCP port the iRODS listens to on HOST (default 1247)
+ -h, --help             show help and exit
+ -P, --port PORT        the TCP port the iRODS iserver listens to on HOST
+                        (default 1247)
  -S, --service SERVICE  the name of the service checking iRODS, identified as
                         client user to iRODS
+ -V, --verbose          show the XML message returned from HOST instead of
+                        default response
+ -v, --version          show version and exit
  -Z, --zone ZONE        the name of the zone to tell iRODS this program and
                         SERVICE belong to.
-
- -h, --help     show help and exit
- -V, --verbose  show the XML message returned from HOST instead of default
-                response
- -v, --version  show version and exit
 
 © 2019, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
