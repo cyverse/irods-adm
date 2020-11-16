@@ -73,13 +73,10 @@ main()
 		[collection]=''
 		[dest-resc]=''
 		[help]=''
-		[host]=''
 		[max-threads]="$DefaultMaxThreads"
 		[multiplier]="$DefaultProcMult"
-		[port]=''
 		[src-resc]=''
 		[until]=''
-		[user]=''
 		[version]='' )
 
   if ! resolve_opts optMap "$@"
@@ -98,21 +95,6 @@ main()
 	then
 		printf '%s\n' "$Version"
 		return 0
-	fi
-
-  if [[ -n "${optMap[host]}" ]]
-	then
-		PGHOST="${optMap[host]}"
-	fi
-
-	if [[ -n "${optMap[port]}" ]]
-	then
-		PGPORT="${optMap[port]}"
-	fi
-
-	if [[ -n "${optMap[user]}" ]]
-	then
-		PGUSER="${optMap[user]}"
 	fi
 
 	if [[ -n "${optMap[multiplier]}" ]]
@@ -213,7 +195,7 @@ resolve_opts()
 				shift 1
 				;;
 			-H|--host)
-				eval "$mapVar""[host]='$2'"
+				PGHOST="$2"
 				shift 2
 				;;
 			-M|--multiplier)
@@ -225,7 +207,7 @@ resolve_opts()
 				shift 2
 				;;
 			-P|--port)
-				eval "$mapVar""[port]='$2'"
+				PGPORT="$2"
 				shift 2
 				;;
 			-R|--dest-resc)
@@ -241,7 +223,7 @@ resolve_opts()
 				shift 2
 				;;
 			-U|--user)
-				eval "$mapVar""[user]='$2'"
+				PGUSER="$2"
 				shift 2
 				;;
 			-v|--version)
