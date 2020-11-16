@@ -125,6 +125,11 @@ close_conn()
 }
 
 
+# Decodes a serialized iRODS protocol packet header length
+# Input:
+#   the serialized length
+# Output:
+#   the decimal value to stdout.
 decode_header_len()
 {
   local lenHex
