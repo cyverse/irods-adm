@@ -353,11 +353,16 @@ process_perm_issue()
 
 	if [ "${issue// /}" = t ]
 	then
-		if ichmod -M own rodsadmin "$entity" > /dev/null
+		local err
+		if err=$(ichmod -M own rodsadmin "$entity" > /dev/null 2>&1)
 		then
 			printf '%s' "${issue/%  /✓ }"
+		elif [[ "$err" =~ CAT_INVALID_ARGUMENT ]]
+		then
+			return 1
 		else
 			printf '%s' "${issue/%  /✗ }"
+			echo "$err" >&2
 			printf 'FAILED TO ADD RODSADMIN OWN PERMISSION!! - %s\n' "$entity" >&2
 		fi
 	else
@@ -375,47 +380,113 @@ process_uuid_issue()
 	uuidCntField=${uuidCnt#  }
 	declare -i cnt=$uuidCntField
 
-	case $cnt in
-		0)
-			if [ "$entityType" = coll ]
-			then
-				local flag=-c
-			else
-				local flag=-d
-			fi
+  if [[ $cnt -eq 1 ]]
+	then
+		printf '%s  ' "$uuidCntField"
+		return 0
+	fi
 
-			if imeta set "$flag" "$entity" ipc_UUID "$(uuidgen -t)"
+  local imetaFlag
+	if [ "$entityType" = coll ]
+	then
+		local imetaFlag=-c
+	else
+		local imetaFlag=-d
+	fi
+
+  local success
+	if [[ $cnt -eq 0 ]]
+	then
+		success=$(add_missing_uuid "$entity" "$imetaFlag")
+	else
+		success=$(rm_extra_uuids "$entity" "$imetaFlag")
+	fi
+
+	if [[ -n "${success-}" ]]
+	then
+		printf '%s✓ ' "$uuidCntField"
+	else
+		printf '%s✗ ' "$uuidCntField"
+  fi
+}
+
+
+add_missing_uuid()
+{
+  local entity="$1"
+	local imetaFlag="$2"
+
+	local uuid
+	uuid=$(uuidgen -t)
+
+	local err
+	if err=$(imeta set "$imetaFlag" "$entity" ipc_UUID "$uuid" 2>&1)
+	then
+		printf success
+	else
+		if [[ "$err" =~ (CAT_UNKNOWN_COLLECTION|CAT_UNKNOWN_FILE) ]]
+		then
+			return 1
+		else
+			echo "$err" >&2
+			printf 'FAILED TO ADD UUID!! - %s\n' "$entity" >&2
+		fi
+	fi
+}
+
+
+rm_extra_uuids()
+{
+	local entity="$1"
+	local imetaFlag="$2"
+
+  local failed
+
+	local uuidMap
+	if ! uuidMap=$(get_meta_id_uuid_map "$entity" "$imetaFlag" 2>&1)
+	then
+		failed=failed
+
+		if [[ "$uuidMap" = UNKNOWN_ENTITY ]]
+		then
+			return 1
+		else
+			echo "$uuidMap" >&2
+		fi
+	else
+		local cnt=0
+
+		local uuid
+		while read -r _ uuid
+		do
+			# The first UUID created will have the first DB Id
+			if [[ $((++cnt)) -gt 1 ]]
 			then
-				printf '%s✓ ' "$uuidCntField"
-			else
-				printf '%s✗ ' "$uuidCntField"
-				printf 'FAILED TO ADD UUID!! - %s\n' "$entity" >&2
+				if ! imeta rm "$imetaFlag" "$entityPath" ipc_UUID "$uuid"
+				then
+					failed=failed
+				fi
 			fi
-			;;
-		1)
-			printf '%s  ' "$uuidCntField"
-			;;
-		*)
-			if get_meta_id_uuid_map "$entityType" "$entity" | rm_extra_uuids "$entityType" "$entity"
-			then
-				printf '%s✓ ' "$uuidCntField"
-			else
-				printf '%s✗ ' "$uuidCntField"
-				printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
-			fi
-			;;
-	esac
+		done <<< "$uuidMap"
+  fi
+
+  if [[ -z "${failed-}" ]]
+	then
+	  printf success
+	else
+		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
+  fi
 }
 
 
 # Retrieve UUIDs for an entity sorted by the metdata's DB Ids
 get_meta_id_uuid_map()
 {
-	local entityType="$1"
-	local entityPath="$2"
+	local entityPath="$1"
+	local imetaFlag="$2"
 
 	local query
-	if [[ "$entityType" = coll ]]
+	if [[ "$imetaFlag" = -c ]]
 	then
 		query="
 			select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
@@ -434,34 +505,16 @@ get_meta_id_uuid_map()
 				and DATA_NAME = '$objName'"
 	fi
 
-	iquest --no-page '%s %s' "$query"
-}
+  local results
+	results=$(iquest --no-page '%s %s' "$query")
 
-
-rm_extra_uuids()
-{
-	local entityType="$1"
-	local entityPath="$2"
-
-	local flag
-	if [ "$entityType" = coll ]
+	if [[ "$results" =~ CAT_NO_ROWS_FOUND ]]
 	then
-		flag=-c
-	else
-		flag=-d
+		printf UNKNOWN_ENTITY >&2
+		return 1
 	fi
 
-	local cnt=0
-
-	local uuid
-	while read -r _ uuid
-	do
-		# The first UUID created will have the first DB Id
-		if [[ $((++cnt)) -gt 1 ]]
-		then
-			imeta rm "$flag" "$entityPath" ipc_UUID "$uuid"
-		fi
-	done
+	echo "$results"
 }
 
 
@@ -478,6 +531,11 @@ process_chksum_issue()
 		local err retCode
 		err=$(ichksum --silent -R "$resc" "$obj" 2>&1 > /dev/null)
 		retCode="$?"
+
+    if [[ "$err" =~ 'does not exist' ]]
+		then
+			return 1
+		fi
 
 		if [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]
 		then
@@ -521,8 +579,16 @@ fix_collection_problems()
 		local coll
 		coll=$(unescape "$escColl")
 
-		permIssue=$(process_perm_issue "$permIssue" "$coll")
-		uuidCnt=$(process_uuid_issue "$uuidCnt" coll "$coll")
+		if ! permIssue=$(process_perm_issue "$permIssue" "$coll")
+		then
+			continue
+		fi
+
+		if ! uuidCnt=$(process_uuid_issue "$uuidCnt" coll "$coll")
+		then
+			continue
+		fi
+
 		printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
 	done
 }
@@ -547,19 +613,30 @@ fix_object_problems()
 			printf '%s\n' "$permIssue"
 			break
 		fi
-		
+
 		local escObj
 		escObj=$(trim "$objField")
-		
+
 		local obj
 		obj=$(unescape "$escObj")
 
 		local resc
 		resc=$(trim "$rescField")
 
-		permIssue=$(process_perm_issue "$permIssue" "$obj")
-		missingChksum=$(process_chksum_issue "$missingChksum" "$resc" "$obj")
-		uuidCnt=$(process_uuid_issue "$uuidCnt" obj "$obj")
+		if ! permIssue=$(process_perm_issue "$permIssue" "$obj")
+		then
+			continue
+		fi
+
+		if ! missingChksum=$(process_chksum_issue "$missingChksum" "$resc" "$obj")
+		then
+			continue
+		fi
+
+		if ! uuidCnt=$(process_uuid_issue "$uuidCnt" obj "$obj")
+    then
+			continue
+		fi
 
 		printf '%s|%s|%s|%s|%s|%s|%s\n' \
 			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$rescField" "$createTime" "$objField"
