@@ -2,7 +2,7 @@
 
 show_help()
 {
-  cat <<EOF
+	cat <<EOF
 
 $ExecName version $Version
 
@@ -54,243 +54,236 @@ readonly ExecName=$(basename "$ExecAbsPath")
 
 main()
 {
-  local opts
-  if ! opts=$(getopt --name "$ExecName" --longoptions help,version --options hv -- "$@")
-  then
-    show_help >&2
-    return 1
-  fi
+	local opts
+	if ! opts=$(getopt --name "$ExecName" --longoptions help,version --options hv -- "$@")
+	then
+		show_help >&2
+		return 1
+	fi
 
-  eval set -- "$opts"
+	eval set -- "$opts"
 
-  while true
-  do
-    case "$1" in
-      -h|--help)
-        show_help
-        return 0
-        ;;
-      -v|--version)
-        printf '%s\n' "$Version"
-        return 0
-        ;;
-      --)
-        shift
-        break
-        ;;
-      *)
-        show_help >&2
-        return 1
-        ;;
-    esac
-  done
+	while true
+	do
+		case "$1" in
+			-h|--help)
+				show_help
+				return 0
+				;;
+			-v|--version)
+				printf '%s\n' "$Version"
+				return 0
+				;;
+			--)
+ 				shift
+ 				break
+ 				;;
+			*)
+				show_help >&2
+				return 1
+				;;
+		esac
+	done
 
-  if [ "$#" -ge 1 ]
-  then
-    PGHOST="$1"
-  fi
+	if [ "$#" -ge 1 ]
+	then
+		PGHOST="$1"
+	fi
 
-  if [ "$#" -ge 2 ]
-  then
-    PGPORT="$2"
-  fi
+	if [ "$#" -ge 2 ]
+	then
+		PGPORT="$2"
+	fi
 
-  if [ "$#" -ge 3 ]
-  then
-    PGUSER="$3"
-  fi
+	if [ "$#" -ge 3 ]
+	then
+		PGUSER="$3"
+	fi
 
-  if [ "$#" -ge 4 ]
-  then
-    readonly CUTOFF_TIME="$4"
-  else
-    readonly CUTOFF_TIME=$(date -I --date=today)
-  fi
+	if [ "$#" -ge 4 ]
+ 	then
+		readonly CUTOFF_TIME="$4"
+	else
+		readonly CUTOFF_TIME=$(date -I --date=today)
+	fi
 
-  if [ "$#" -ge 5 ]
-  then
-    readonly DEBUG=1
-  else
-    readonly DEBUG=
-  fi
+	if [ "$#" -ge 5 ]
+	then
+		readonly DEBUG=1
+	else
+		readonly DEBUG=
+	fi
 
-  check_existing_instance
+	check_existing_instance
 
-  readonly ErrorLog=$(mktemp)
+	readonly ErrorLog=$(mktemp)
 
-  display_problems | strip_noise | fix_problems 2>"$ErrorLog"
+	display_problems | strip_noise | fix_problems 2>"$ErrorLog"
 
-  if [ -s "$ErrorLog" ]
-  then
-    printf '\n\nErrors Occuring While Attempting to Fix Problems\n\n'
-    cat "$ErrorLog"
-  fi
+	if [ -s "$ErrorLog" ]
+	then
+		printf '\n\nErrors Occuring While Attempting to Fix Problems\n\n'
+		cat "$ErrorLog"
+	fi
 
-  rm --force "$ErrorLog"
+	rm --force "$ErrorLog"
 }
 
 check_existing_instance()
 {
-  local pidofExec
-  if ! pidofExec=$(which pidof 2> /dev/null)
-  then
-    pidofExec=/sbin/pidof
-  fi
+	local pidofExec
+	if ! pidofExec=$(which pidof 2> /dev/null)
+	then
+		pidofExec=/sbin/pidof
+	fi
 
-  currPid=$$
-  for pid in $("$pidofExec" -x "$ExecName")
-  do
-    if [ "$pid" -ne $currPid ]; then
-      printf "\n%s already running at PID %s\n" "$ExecName" "$pid" 1>&2
-      printf "exiting\n\n" 1>&2
-      exit 1
-    fi
-  done
+	currPid=$$
+	for pid in $("$pidofExec" -x "$ExecName")
+	do
+		if [ "$pid" -ne $currPid ]; then
+			printf "\n%s already running at PID %s\n" "$ExecName" "$pid" 1>&2
+			printf "exiting\n\n" 1>&2
+			exit 1
+		fi
+	done
 }
 
 inject_debug_stmt()
 {
-  local stmt="$*"
+	local stmt="$*"
 
-  if [ -n "$DEBUG" ]
-  then
-    printf '%s\n' "$stmt"
-  fi
+	if [ -n "$DEBUG" ]
+	then
+		printf '%s\n' "$stmt"
+	fi
 }
 
 
 inject_debug_newline()
 {
-  inject_debug_stmt "\\echo ''"
+	inject_debug_stmt "\\echo ''"
 }
 
 
 inject_debug_msg()
 {
-  local msg="$*"
+	local msg="$*"
 
-  inject_debug_newline
-  inject_debug_stmt "\\echo '$msg'"
+	inject_debug_newline
+	inject_debug_stmt "\\echo '$msg'"
 }
 
 
 display_problems()
 {
-  local cutoffTS
-  cutoffTS=$(date --date="$CUTOFF_TIME" '+0%s')
+	local cutoffTS
+	cutoffTS=$(date --date="$CUTOFF_TIME" '+0%s')
 
-  psql ICAT <<EOF
+	psql ICAT <<EOF
 $(inject_debug_stmt '\timing on')
 $(inject_debug_newline)
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 $(inject_debug_msg creating owned_by_rodsadmin)
-CREATE TEMPORARY TABLE owned_by_rodsadmin
-AS
-  SELECT a.object_id
-  FROM r_objt_access AS a JOIN r_user_main AS u ON u.user_id = a.user_id
-  WHERE u.user_name = 'rodsadmin'
-    AND a.access_type_id =
-      (SELECT token_id
-       FROM r_tokn_main
-       WHERE token_namespace = 'access_type' AND token_name = 'own');
+CREATE TEMPORARY TABLE owned_by_rodsadmin AS
+SELECT a.object_id
+FROM r_objt_access AS a JOIN r_user_main AS u ON u.user_id = a.user_id
+WHERE u.user_name = 'rodsadmin'
+	AND a.access_type_id = (
+		SELECT token_id
+		FROM r_tokn_main
+		WHERE token_namespace = 'access_type' AND token_name = 'own');
 CREATE INDEX idx_owned_by_rodsadmin ON owned_by_rodsadmin (object_id);
 
 $(inject_debug_msg creating coll_perm_probs)
-CREATE TEMPORARY TABLE coll_perm_probs
-AS
-  SELECT coll_id
-  FROM r_coll_main AS c
-  WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
-    AND c.coll_name LIKE '/iplant/%/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS';
+CREATE TEMPORARY TABLE coll_perm_probs AS
+SELECT coll_id
+FROM r_coll_main AS c
+WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
+	AND c.coll_name LIKE '/iplant/%/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS';
 CREATE INDEX idx_coll_perm_probs ON coll_perm_probs(coll_id);
 
 -- This may overestimate the number of problems, since it may find objects not in the iplant zone.
 $(inject_debug_msg creating data_perm_probs)
-CREATE TEMPORARY TABLE data_perm_probs
-AS
-  SELECT DISTINCT data_id
-  FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-  WHERE c.coll_name LIKE '/iplant/%'
-    AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
-    AND d.create_ts < '$cutoffTS';
+CREATE TEMPORARY TABLE data_perm_probs AS
+SELECT DISTINCT data_id
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE c.coll_name LIKE '/iplant/%'
+	AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
+	AND d.create_ts < '$cutoffTS';
 CREATE INDEX idx_data_perm_probs ON data_perm_probs(data_id);
 
 $(inject_debug_msg creating uuid_attrs)
-CREATE TEMPORARY TABLE uuid_attrs
-AS
-  SELECT o.object_id
-  FROM r_objt_metamap AS o JOIN r_meta_main AS m ON m.meta_id = o.meta_id
-  WHERE m.meta_attr_name = 'ipc_UUID';
+CREATE TEMPORARY TABLE uuid_attrs AS
+SELECT o.object_id
+FROM r_objt_metamap AS o JOIN r_meta_main AS m ON m.meta_id = o.meta_id
+WHERE m.meta_attr_name = 'ipc_UUID';
 CREATE INDEX idx_uuid_attrs ON uuid_attrs (object_id);
 
 $(inject_debug_msg creating coll_uuid_probs)
-CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count)
-AS
-  SELECT c.coll_id, COUNT(u.object_id)
-  FROM r_coll_main AS c LEFT JOIN uuid_attrs AS u ON u.object_id = c.coll_id
-  WHERE c.coll_name LIKE '/iplant/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS'
-  GROUP BY c.coll_id
-  HAVING COUNT(u.object_id) != 1;
+CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count) AS
+SELECT c.coll_id, COUNT(u.object_id)
+FROM r_coll_main AS c LEFT JOIN uuid_attrs AS u ON u.object_id = c.coll_id
+WHERE c.coll_name LIKE '/iplant/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS'
+GROUP BY c.coll_id
+HAVING COUNT(u.object_id) != 1;
 CREATE INDEX idx_coll_uuid_probs ON coll_uuid_probs (coll_id);
 
 -- This may overestimate the number of problems, since it may find objects not in the iplant zone.
 $(inject_debug_msg creating data_uuid_probs)
-CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count)
-AS
-  SELECT DISTINCT d.data_id, COUNT(u.object_id)
-  FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
-  WHERE d.create_ts < '$cutoffTS'
-  GROUP BY d.data_id, d.data_repl_num
-    -- data_repl_num prevents counting uuids for multiple repls in a single count
-  HAVING COUNT(u.object_id) != 1;
+CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count) AS
+SELECT DISTINCT d.data_id, COUNT(u.object_id)
+FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
+WHERE d.create_ts < '$cutoffTS'
+GROUP BY d.data_id, d.data_repl_num
+	-- data_repl_num prevents counting uuids for multiple repls in a single count
+HAVING COUNT(u.object_id) != 1;
 CREATE INDEX idx_data_uuid_probs ON data_uuid_probs(data_id);
 
 -- This may overestimate the number of problems, since it may find objects not in the iplant zone.
 $(inject_debug_msg creating data_checksum_probs)
-CREATE TEMPORARY TABLE data_chksum_probs
-AS
-  SELECT DISTINCT data_id
-  FROM r_data_main
-  WHERE create_ts < '$cutoffTS' AND (data_checksum IS NULL OR data_checksum = '');
+CREATE TEMPORARY TABLE data_chksum_probs AS
+SELECT DISTINCT data_id
+FROM r_data_main
+WHERE create_ts < '$cutoffTS' AND (data_checksum IS NULL OR data_checksum = '');
 
 $(inject_debug_newline)
 \echo '1. Problem Collections Created Before $CUTOFF_TIME:'
 \echo ''
 SELECT
-  coll_id IN (SELECT * FROM coll_perm_probs)                           AS "Permission Issue",
-  COALESCE((SELECT cu.uuid_count FROM coll_uuid_probs AS cu WHERE cu.coll_id = c.coll_id), 1)
-    AS "UUID Count",
-  coll_owner_name || '#' || coll_owner_zone                            AS "Owner",
-  TO_TIMESTAMP(CAST(create_ts AS INTEGER))                             AS "Create Time",
-  REPLACE(REPLACE(coll_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')  AS "Collection"
+	coll_id IN (SELECT * FROM coll_perm_probs)                           AS "Permission Issue",
+	COALESCE((SELECT cu.uuid_count FROM coll_uuid_probs AS cu WHERE cu.coll_id = c.coll_id), 1)
+		AS "UUID Count",
+	coll_owner_name || '#' || coll_owner_zone                            AS "Owner",
+	TO_TIMESTAMP(CAST(create_ts AS INTEGER))                             AS "Create Time",
+	REPLACE(REPLACE(coll_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')  AS "Collection"
 FROM r_coll_main AS c
 WHERE coll_id IN (SELECT * FROM coll_perm_probs UNION SELECT coll_id FROM coll_uuid_probs)
-  AND coll_name LIKE '/iplant/%'
-  AND coll_type != 'linkPoint'
-  AND create_ts < '$cutoffTS'
+	AND coll_name LIKE '/iplant/%'
+	AND coll_type != 'linkPoint'
+	AND create_ts < '$cutoffTS'
 ORDER BY create_ts;
 
 \echo ''
 \echo '2. Problem Data Objects Created Before $CUTOFF_TIME:'
 \echo ''
 SELECT
-  d.data_id IN (SELECT * FROM data_perm_probs)     AS "Permission Issue",
-  d.data_checksum IS NULL OR d.data_checksum = ''  AS "Missing Checksum",
-  COALESCE((SELECT du.uuid_count FROM data_uuid_probs AS du WHERE du.data_id = d.data_id), 1)
-    AS "UUID Count",
-  d.data_owner_name || '#' || d.data_owner_zone    AS "Owner",
-  d.resc_hier                                      AS "Resource",
-  TO_TIMESTAMP(CAST(d.create_ts AS INTEGER))       AS "Create Time",
-  REPLACE(REPLACE(c.coll_name || '/' || d.data_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')
-    AS "Data Object"
+	d.data_id IN (SELECT * FROM data_perm_probs)     AS "Permission Issue",
+	d.data_checksum IS NULL OR d.data_checksum = ''  AS "Missing Checksum",
+	COALESCE((SELECT du.uuid_count FROM data_uuid_probs AS du WHERE du.data_id = d.data_id), 1)
+		AS "UUID Count",
+	d.data_owner_name || '#' || d.data_owner_zone    AS "Owner",
+	d.resc_hier                                      AS "Resource",
+	TO_TIMESTAMP(CAST(d.create_ts AS INTEGER))       AS "Create Time",
+	REPLACE(REPLACE(c.coll_name || '/' || d.data_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')
+		AS "Data Object"
 FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
 WHERE c.coll_name LIKE '/iplant/%'
-  AND d.create_ts < '$cutoffTS'
-  AND d.data_id IN (
-    SELECT * FROM data_perm_probs
-    UNION SELECT data_id FROM data_uuid_probs
-    UNION SELECT data_id FROM data_chksum_probs)
+	AND d.create_ts < '$cutoffTS'
+	AND d.data_id IN (
+		SELECT * FROM data_perm_probs
+		UNION SELECT data_id FROM data_uuid_probs
+		UNION SELECT data_id FROM data_chksum_probs)
 ORDER BY d.create_ts;
 
 $(inject_debug_newline)
@@ -301,313 +294,315 @@ EOF
 
 pass_hdr_thru()
 {
-  for i in {1..3}
-  do
-    read -r
-    printf '%s\n' "$REPLY"
-  done
+	for i in {1..3}
+	do
+		read -r
+		printf '%s\n' "$REPLY"
+	done
 }
 
 
 trim()
 {
-  local str="$*"
-  str="${str#"${str%%[![:space:]]*}"}"
-  str="${str%"${str##*[![:space:]]}"}"
-  printf '%s' "$str"
+	local str="$*"
+	str="${str#"${str%%[![:space:]]*}"}"
+	str="${str%"${str##*[![:space:]]}"}"
+	printf '%s' "$str"
 }
 
 
 unescape()
 {
-  local escEntity="$*"
+	local escEntity="$*"
 
-  local entity=
-  local escaped=0
+	local entity=
+	local escaped=0
 
-  for i in $(seq 0 $((${#escEntity} - 1)))
-  do
-    local curChar="${escEntity:$i:1}"
+	for i in $(seq 0 $((${#escEntity} - 1)))
+	do
+		local curChar="${escEntity:$i:1}"
 
-    if [ $escaped -eq 1 ]
-    then
-      if [ "$curChar" = n ]
-      then
-        printf -v entity '%s\n' "$entity"
-      else
-        entity="$entity$curChar"
-      fi
+		if [ $escaped -eq 1 ]
+		then
+			if [ "$curChar" = n ]
+			then
+				printf -v entity '%s\n' "$entity"
+			else
+				entity="$entity$curChar"
+			fi
 
-      escaped=0
-    else
-      if [ "$curChar" = \\ ]
-      then
-        escaped=1
-      else
-        entity="$entity$curChar"
-      fi
-    fi
-  done
+			escaped=0
+		else
+			if [ "$curChar" = \\ ]
+			then
+				escaped=1
+			else
+				entity="$entity$curChar"
+			fi
+		fi
+	done
 
-  printf '%s' "$entity"
+	printf '%s' "$entity"
 }
 
 
 process_perm_issue()
 {
-  local issue="$1"
-  local entity="$2"
+	local issue="$1"
+	local entity="$2"
 
-  if [ "${issue// /}" = t ]
-  then
-    if ichmod -M own rodsadmin "$entity" > /dev/null
-    then
-      printf '%s' "${issue/%  /✓ }"
-    else
-      printf '%s' "${issue/%  /✗ }"
-      printf 'FAILED TO ADD RODSADMIN OWN PERMISSION!! - %s\n' "$entity" >&2
-    fi
-  else
-    printf '%s' "$issue"
-  fi
+	if [ "${issue// /}" = t ]
+	then
+		if ichmod -M own rodsadmin "$entity" > /dev/null
+		then
+			printf '%s' "${issue/%  /✓ }"
+		else
+			printf '%s' "${issue/%  /✗ }"
+			printf 'FAILED TO ADD RODSADMIN OWN PERMISSION!! - %s\n' "$entity" >&2
+		fi
+	else
+		printf '%s' "$issue"
+	fi
 }
 
 
 process_uuid_issue()
 {
-  local uuidCntField="$1"
-  local entityType="$2"
-  local entity="$3"
+	local uuidCntField="$1"
+	local entityType="$2"
+	local entity="$3"
 
-  uuidCntField=${uuidCnt#  }
-  declare -i cnt=$uuidCntField
+	uuidCntField=${uuidCnt#  }
+	declare -i cnt=$uuidCntField
 
-  case $cnt in
-    0)
-      if [ "$entityType" = coll ]
-      then
-        local flag=-c
-      else
-        local flag=-d
-      fi
+	case $cnt in
+		0)
+			if [ "$entityType" = coll ]
+			then
+				local flag=-c
+			else
+				local flag=-d
+			fi
 
-      if imeta set "$flag" "$entity" ipc_UUID "$(uuidgen -t)"
-      then
-        printf '%s✓ ' "$uuidCntField"
-      else
-        printf '%s✗ ' "$uuidCntField"
-        printf 'FAILED TO ADD UUID!! - %s\n' "$entity" >&2
-      fi
-      ;;
-    1)
-      printf '%s  ' "$uuidCntField"
-      ;;
-    *)
-      if get_meta_id_uuid_map "$entityType" "$entity" | rm_extra_uuids "$entityType" "$entity"
-      then
-        printf '%s✓ ' "$uuidCntField"
-      else
-        printf '%s✗ ' "$uuidCntField"
-        printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
-      fi
-      ;;
-   esac
+			if imeta set "$flag" "$entity" ipc_UUID "$(uuidgen -t)"
+			then
+				printf '%s✓ ' "$uuidCntField"
+			else
+				printf '%s✗ ' "$uuidCntField"
+				printf 'FAILED TO ADD UUID!! - %s\n' "$entity" >&2
+			fi
+			;;
+		1)
+			printf '%s  ' "$uuidCntField"
+			;;
+		*)
+			if get_meta_id_uuid_map "$entityType" "$entity" | rm_extra_uuids "$entityType" "$entity"
+			then
+				printf '%s✓ ' "$uuidCntField"
+			else
+				printf '%s✗ ' "$uuidCntField"
+				printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
+			fi
+			;;
+	esac
 }
 
 
 # Retrieve UUIDs for an entity sorted by the metdata's DB Ids
 get_meta_id_uuid_map()
 {
-  local entityType="$1"
-  local entityPath="$2"
+	local entityType="$1"
+	local entityPath="$2"
 
-  local query
-  if [[ "$entityType" = coll ]]
-  then
-    query="select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
-           where META_COLL_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$entityPath'"
-  else
-    local collPath
-    collPath=$(dirname "$entityPath")
+	local query
+	if [[ "$entityType" = coll ]]
+	then
+		query="
+			select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
+			where META_COLL_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$entityPath'"
+	else
+		local collPath
+		collPath=$(dirname "$entityPath")
 
-    local objName
-    objName=$(basename "$entityPath")
+		local objName
+		objName=$(basename "$entityPath")
 
-    query="select order(META_DATA_ATTR_ID), META_DATA_ATTR_VALUE
-           where META_DATA_ATTR_NAME = 'ipc_UUID'
-             and COLL_NAME = '$collPath'
-             and DATA_NAME = '$objName'"
-  fi
+		query="
+			select order(META_DATA_ATTR_ID), META_DATA_ATTR_VALUE
+			where META_DATA_ATTR_NAME = 'ipc_UUID'
+				and COLL_NAME = '$collPath'
+				and DATA_NAME = '$objName'"
+	fi
 
-  iquest --no-page '%s %s' "$query"
+	iquest --no-page '%s %s' "$query"
 }
 
 
 rm_extra_uuids()
 {
-  local entityType="$1"
-  local entityPath="$2"
+	local entityType="$1"
+	local entityPath="$2"
 
-  local flag
-  if [ "$entityType" = coll ]
-  then
-    flag=-c
-  else
-    flag=-d
-  fi
+	local flag
+	if [ "$entityType" = coll ]
+	then
+		flag=-c
+	else
+		flag=-d
+	fi
 
-  local cnt=0
+	local cnt=0
 
-  local uuid
-  while read -r _ uuid
-  do
-    # The first UUID created will have the first DB Id
-    if [[ $((++cnt)) -gt 1 ]]
-    then
-      imeta rm "$flag" "$entityPath" ipc_UUID "$uuid"
-    fi
-  done
+	local uuid
+	while read -r _ uuid
+	do
+		# The first UUID created will have the first DB Id
+		if [[ $((++cnt)) -gt 1 ]]
+		then
+			imeta rm "$flag" "$entityPath" ipc_UUID "$uuid"
+		fi
+	done
 }
 
 
 process_chksum_issue()
 {
-  local issue="$1"
-  local resc="$2"
-  local obj="$3"
+	local issue="$1"
+	local resc="$2"
+	local obj="$3"
 
-  resc="${resc%%;*}"
+	resc="${resc%%;*}"
 
-  if [ "${issue// /}" = t ]
-  then
-    local err retCode
-    err=$(ichksum --silent -R "$resc" "$obj" 2>&1 > /dev/null)
-    retCode="$?"
+	if [ "${issue// /}" = t ]
+	then
+		local err retCode
+		err=$(ichksum --silent -R "$resc" "$obj" 2>&1 > /dev/null)
+		retCode="$?"
 
-    if [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]
-    then
-      printf '%s' "${issue/%  /✓ }"
-    else
-      if [[ -n "$err" ]]
-      then
-        echo "$err" >&2
-      fi
+		if [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]
+		then
+			printf '%s' "${issue/%  /✓ }"
+		else
+			if [[ -n "$err" ]]
+			then
+				echo "$err" >&2
+			fi
 
-      printf '%s' "${issue/%  /✗ }"
-      printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
-    fi
-  else
-    printf '%s' "$issue"
-  fi
+			printf '%s' "${issue/%  /✗ }"
+			printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
+		fi
+	else
+		printf '%s' "$issue"
+	fi
 }
 
 
 fix_collection_problems()
 {
-  pass_hdr_thru
+	pass_hdr_thru
 
-  local permIssue
-  local uuidCnt
-  local owner
-  local createTime
-  local collField
+	local permIssue
+	local uuidCnt
+	local owner
+	local createTime
+	local collField
 
-  while IFS='|' read -r permIssue uuidCnt owner createTime collField
-  do
-    if [ -z "$collField" ]
-    then
-      printf '%s\n' "$permIssue"
-      break
-    fi
+	while IFS='|' read -r permIssue uuidCnt owner createTime collField
+	do
+		if [ -z "$collField" ]
+		then
+			printf '%s\n' "$permIssue"
+			break
+		fi
 
-    local escColl
-    escColl=$(trim "$collField")
+		local escColl
+		escColl=$(trim "$collField")
 
-    local coll
-    coll=$(unescape "$escColl")
+		local coll
+		coll=$(unescape "$escColl")
 
-    permIssue=$(process_perm_issue "$permIssue" "$coll")
-    uuidCnt=$(process_uuid_issue "$uuidCnt" coll "$coll")
-    printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
-  done
+		permIssue=$(process_perm_issue "$permIssue" "$coll")
+		uuidCnt=$(process_uuid_issue "$uuidCnt" coll "$coll")
+		printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
+	done
 }
 
 
 fix_object_problems()
 {
-  pass_hdr_thru
+	pass_hdr_thru
 
-  local permIssue
-  local missingChksum
-  local uuidCnt
-  local owner
-  local rescField
-  local createTime
-  local objField
+	local permIssue
+	local missingChksum
+	local uuidCnt
+	local owner
+	local rescField
+	local createTime
+	local objField
 
-  while IFS='|' read -r permIssue missingChksum uuidCnt owner rescField createTime objField
-  do
-    if [ -z "$objField" ]
-    then
-      printf '%s\n' "$permIssue"
-      break
-    fi
+	while IFS='|' read -r permIssue missingChksum uuidCnt owner rescField createTime objField
+	do
+		if [ -z "$objField" ]
+		then
+			printf '%s\n' "$permIssue"
+			break
+		fi
+		
+		local escObj
+		escObj=$(trim "$objField")
+		
+		local obj
+		obj=$(unescape "$escObj")
 
-    local escObj
-    escObj=$(trim "$objField")
+		local resc
+		resc=$(trim "$rescField")
 
-    local obj
-    obj=$(unescape "$escObj")
+		permIssue=$(process_perm_issue "$permIssue" "$obj")
+		missingChksum=$(process_chksum_issue "$missingChksum" "$resc" "$obj")
+		uuidCnt=$(process_uuid_issue "$uuidCnt" obj "$obj")
 
-    local resc
-    resc=$(trim "$rescField")
-
-    permIssue=$(process_perm_issue "$permIssue" "$obj")
-    missingChksum=$(process_chksum_issue "$missingChksum" "$resc" "$obj")
-    uuidCnt=$(process_uuid_issue "$uuidCnt" obj "$obj")
-
-    printf '%s|%s|%s|%s|%s|%s|%s\n' \
-           "$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$rescField" "$createTime" "$objField"
-  done
+		printf '%s|%s|%s|%s|%s|%s|%s\n' \
+			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$rescField" "$createTime" "$objField"
+	done
 }
 
 
 fix_problems()
 {
-  while IFS= read -r
-  do
-    case "$REPLY" in
-      1.*)
-        fix_collection_problems
-        ;;
-      2.*)
-        fix_object_problems
-        ;;
-      *)
-        printf '%s\n' "$REPLY"
-        ;;
-    esac
-  done
+	while IFS= read -r
+	do
+		case "$REPLY" in
+			1.*)
+				fix_collection_problems
+				;;
+			2.*)
+				fix_object_problems
+				;;
+			*)
+				printf '%s\n' "$REPLY"
+				;;
+		esac
+	done
 }
 
 
 strip_noise()
 {
-  while IFS= read -r
-  do
-    if [ -n "$DEBUG" ]
-    then
-      printf '%s\n' "$REPLY"
-    else
-      case "$REPLY" in
-        BEGIN|CREATE*|SELECT*|ROLLBACK)
-          ;;
-        *)
-          printf '%s\n' "$REPLY"
-          ;;
-      esac
-    fi
-  done
+	while IFS= read -r
+	do
+		if [ -n "$DEBUG" ]
+		then
+			printf '%s\n' "$REPLY"
+		else
+			case "$REPLY" in
+				BEGIN|CREATE*|SELECT*|ROLLBACK)
+					;;
+				*)
+					printf '%s\n' "$REPLY"
+					;;
+			esac
+		fi
+	done
 }
 
 
