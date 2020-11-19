@@ -132,7 +132,7 @@ main()
 check_existing_instance()
 {
 	local pidofExec
-	if ! pidofExec=$(which pidof 2> /dev/null)
+	if ! pidofExec=$(command -v pidof)
 	then
 		pidofExec=/sbin/pidof
 	fi
@@ -640,6 +640,7 @@ fix_object_problems()
 
 		printf '%s|%s|%s|%s|%s|%s|%s\n' \
 			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$rescField" "$createTime" "$objField"
+
 	done
 }
 
