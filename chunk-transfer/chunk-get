@@ -1,0 +1,45 @@
+#!/bin/bash
+
+set -o errexit -o -nounset -o pipefail
+
+
+main()
+{
+  if [[ "$#" -lt 1 ]]
+  then
+    printf 'The absolute path to the chunk collection is required\n' >&2
+    return 1
+  fi
+
+  local src="$1"
+
+  local dest=.
+  if [[ "$#" -ge 2 ]]
+  then
+    dest="$2"
+  fi
+
+  iquest --no-page '%s' "select DATA_NAME where COLL_NAME = '$src'" \
+    | sed 's/^\(.\+\)-..$/\1/' \
+    | sort --unique \
+    | parallel --max-args=1 --max-procs=5 GET_SERVER_SET "$dest" "$src"
+}
+
+
+GET_SERVER_SET()
+{
+  local dest="$1"
+  local src="$2"
+  local setPrefix="$3"
+
+  iquest --no-page \
+      '%s/%s' \
+      "select COLL_NAME, order(DATA_NAME)
+       where COLL_NAME = '$src' and DATA_NAME like '$setPrefix-%'" \
+    | xargs --replace=CHUNK iget -T -v CHUNK - \
+    | tar --extract --no-overwrite-dir --directory="$dest"
+}
+export -f GET_SERVER_SET
+
+
+main "$@"

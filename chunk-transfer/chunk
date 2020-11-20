@@ -1,0 +1,78 @@
+#!/bin/bash
+
+set -o errexit -o -nounset -o pipefail
+
+export IRODS_SVC_ACNT=irods
+
+
+main()
+{
+  if [[ "$#" -lt 1 ]]
+  then
+    printf 'The absolute path to the collection to chunk is required\n' >&2
+    return 1
+  fi
+
+  local srcColl="$1"
+
+  local destColl="$srcColl".chunked
+  imkdir "$destColl"
+
+  local user perm
+  while read -r user perm
+  do
+    ichmod -M "$perm" "$user" "$destColl"
+  done < <(get_acl "$srcColl")
+
+  ichmod inherit "$destColl"
+
+  local resc
+  while read -r resc
+  do
+    local svr
+    svr=$(iquest '%s' "select RESC_LOC where RESC_NAME = '$resc'")
+
+    ssh -q -t "$svr" \
+      sudo --background --login --user "$IRODS_SVC_ACNT" \
+        setsid chunk-resc "$resc" "$srcColl" "$destColl" /tmp/chunk-"$resc".log
+
+    printf 'Launched on %s\n' "$svr"
+  done < <(get_resources "$srcColl")
+}
+
+
+get_resources()
+{
+  local coll="$1"
+
+  iquest \
+      '%s' \
+      "select DATA_RESC_HIER
+       where DATA_RESC_NAME = 'CyVerseRes' and COLL_NAME = '$coll' || like '$coll/%'" \
+    | sed '/^CAT_NO_ROWS_FOUND: /d;s/.*;//'
+}
+
+
+get_acl()
+{
+  local coll="$1"
+
+  iquest '%s %s' "select COLL_ACCESS_USER_ID, COLL_ACCESS_NAME where COLL_NAME = '$coll'" \
+    | sed '/^CAT_NO_ROWS_FOUND: /d;s/read object/read/;s/modify object/write/' \
+    | resolve_user_names
+}
+
+
+resolve_user_names()
+{
+  local userId perm
+  while read -r userId perm
+  do
+    local userName
+    userName=$(iquest '%s' "select USER_NAME where USER_ID = '$userId'")
+    printf '%s %s\n' "$userName" "$perm"
+  done
+}
+
+
+main "$@"

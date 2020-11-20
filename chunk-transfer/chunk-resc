@@ -1,0 +1,74 @@
+#!/bin/bash
+
+set -o errexit -o -nounset -o pipefail
+
+
+main()
+{
+  if [[ "$#" -lt 3 ]]
+  then
+    printf 'Wrong number of input parameters\n' >&2
+    return 1
+  fi
+
+  local resc="$1"
+  local srcColl="$2"
+  local destColl="$3"
+
+  local log=/dev/stdout
+  if [[ "$#" -ge 4 ]]
+  then
+    log="$4"
+  fi
+
+  chunk "$resc" "$srcColl" "$destColl" &> "$log"
+}
+
+
+chunk()
+{
+  local resc="$1"
+  local srcColl="$2"
+  local destColl="$3"
+
+  local svr vault
+  #shellcheck disable=SC2046
+  read -r svr vault \
+    <<< $(iquest '%s %s' "select RESC_LOC, RESC_VAULT_PATH where RESC_NAME = '$resc'")
+
+  if [[ "$svr" = CAT_NO_ROWS_FOUND: || "$svr" != EMPTY_RESC_HOST ]]
+  then
+    printf '"%s" is not a storage resource\n' "$resc" >&2
+    return 1
+  fi
+
+  local zone
+  zone=$(iquest '%s' "select ZONE_NAME where ZONE_TYPE = 'local'")
+
+  local srcDir="${srcColl/\/$zone/$vault}"
+
+  if [[ -d "$srcDir" ]]
+  then
+    local srcParentDir
+    srcParentDir=$(dirname "$srcDir")
+
+    local collName
+    collName=$(basename "$srcColl")
+
+    local destDir="${destColl/\/$zone/$vault}"
+    mkdir --parents "$destDir"
+    cd "$destDir"
+
+    printf 'Chunking data set %s\n' "$srcColl"
+    tar --create --directory "$srcParentDir" "$collName" \
+      | split --verbose --bytes 100G - "$collName"."$resc"-
+
+    printf '\nRegistering chunks into %s\n' "$destColl"
+    ireg -C -f -v -R "$resc" "$destDir" "$destColl"
+  fi
+
+  printf 'DONE\n'
+}
+
+
+main "$@"
