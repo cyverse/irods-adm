@@ -421,21 +421,26 @@ partition()
 		maxSizeB="$2"
 	fi
 
+	local size
 	if [[ -n "$maxSizeB" ]]
 	then
-		while read -r -d '' size obj
+		while IFS= read -r -d ''
 		do
+			size="${REPLY%% *}"
+
 			if [[ $size -ge $minSizeB && $size -lt $maxSizeB ]]
 			then
-				printf '%s\0' "$obj"
+				printf '%s\0' "${REPLY#* }"
 			fi
 		done
 	else
-		while read -r -d '' size obj
+		while IFS= read -r -d ''
 		do
+			size="${REPLY%% *}"
+
 			if [[ $size -ge $minSizeB ]]
 			then
-				printf '%s\0' "$obj"
+				printf '%s\0' "${REPLY#* }"
 			fi
 		done
 	fi
