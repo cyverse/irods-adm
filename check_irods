@@ -47,18 +47,18 @@ EOF
 
 set -o nounset -o pipefail
 
-readonly ExecAbsPath=$(readlink --canonicalize "$0")
-readonly ExecName=$(basename "$ExecAbsPath")
+readonly ExecAbsPath="$(readlink --canonicalize "$0")"
+readonly ExecName="$(basename "$ExecAbsPath")"
 readonly Version=2
 
-readonly ReqStore=$(mktemp)
+readonly ReqStore="$(mktemp)"
 trap 'rm -rf "$ReqStore"' EXIT
 
 
 main()
 {
   local opts
-  if ! opts=$(format_opts "$@")
+  if ! opts="$(format_opts "$@")"
   then
     exit_with_help
   fi
@@ -133,7 +133,7 @@ close_conn()
 decode_header_len()
 {
   local lenHex
-  lenHex=$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')
+  lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"
 
   printf '%d' $((16#$lenHex))
 }
@@ -203,7 +203,7 @@ mk_req()
   fi
 
   local header
-  header=$(mk_header "$msgType" ${#msg})
+  header="$(mk_header "$msgType" ${#msg})"
 
   encode_header_len ${#header} > "$ReqStore"
   printf '%s%s' "$header" "$msg" >> "$ReqStore"
@@ -234,7 +234,7 @@ EOX
 parse_resp()
 {
   local headerLen
-  headerLen=$(decode_header_len)
+  headerLen="$(decode_header_len)"
 
   local header
   read -r -d '' -n "$headerLen" header
@@ -262,7 +262,7 @@ ping()
   local zone="$5"
 
   local startTime
-  startTime=$(date +'%s.%N')
+  startTime="$(date +'%s.%N')"
 
   if ! exec 3<>/dev/tcp/"$ies"/"$port"
   then
@@ -271,15 +271,15 @@ ping()
   fi
 
   local connMsgBody
-  connMsgBody=$(mk_startup_pack "$service" "$zone")
+  connMsgBody="$(mk_startup_pack "$service" "$zone")"
 
   if mk_req RODS_CONNECT "$connMsgBody" >&3
   then
     local respMsg
-    if respMsg=$(parse_resp <&3)
+    if respMsg="$(parse_resp <&3)"
     then
       local stopTime
-      stopTime=$(date +'%s.%N')
+      stopTime="$(date +'%s.%N')"
 
       mk_req RODS_DISCONNECT >&3
       close_conn
@@ -287,7 +287,8 @@ ping()
       if [ "$verbose" -eq 0 ]
       then
         local dt
-        dt=$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN{print (STOP-START)}')
+        dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
+          'BEGIN { print (STOP - START) }')"
 
         printf 'up|time=%ss\n' "$dt"
       else
