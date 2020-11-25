@@ -2,7 +2,7 @@
 
 show_help()
 {
-  cat <<EOF
+	cat <<EOF
 
 $ExecName version $Version
 
@@ -57,71 +57,71 @@ trap 'rm -rf "$ReqStore"' EXIT
 
 main()
 {
-  local opts
-  if ! opts="$(format_opts "$@")"
-  then
-    exit_with_help
-  fi
+	local opts
+	if ! opts="$(format_opts "$@")"
+	then
+		exit_with_help
+	fi
 
-  eval set -- "$opts"
+	eval set -- "$opts"
 
-  local port=1247
-  local service="$ExecName"
-  local verbose=0
-  local zone=
+	local port=1247
+	local service="$ExecName"
+	local verbose=0
+	local zone=
 
-  while true
-  do
-    case "$1" in
-      -h|--help)
-        show_help
-        return 0
-        ;;
-      -P|--port)
-        port="$2"
-        shift 2
-        ;;
-      -S|--service)
-        service="$2"
-        shift 2
-        ;;
-      -V|--verbose)
-        verbose=1
-        shift
-        ;;
-      -v|--version)
-        show_version
-        return 0
-        ;;
-      -Z|--zone)
-        zone="$2"
-        shift 2
-        ;;
-      --)
-        shift
-        break
-        ;;
-      *)
-        exit_with_help
-        ;;
-    esac
-  done
+	while true
+	do
+		case "$1" in
+			-h|--help)
+				show_help
+				return 0
+				;;
+			-P|--port)
+				port="$2"
+				shift 2
+				;;
+			-S|--service)
+				service="$2"
+				shift 2
+				;;
+			-V|--verbose)
+				verbose=1
+				shift
+				;;
+			-v|--version)
+				show_version
+				return 0
+				;;
+			-Z|--zone)
+				zone="$2"
+				shift 2
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				exit_with_help
+				;;
+		esac
+	done
 
-  if [ "$#" -lt 1 ]
-  then
-    exit_with_help
-  fi
+	if [ "$#" -lt 1 ]
+	then
+		exit_with_help
+	fi
 
-  local ies="$1"
+	local ies="$1"
 
-  ping "$verbose" "$ies" "$port" "$service" "$zone"
+	ping "$verbose" "$ies" "$port" "$service" "$zone"
 }
 
 
 close_conn()
 {
-  exec 3<&-
-  exec 3>&-
+	exec 3<&-
+	exec 3>&-
 }
 
 
@@ -132,61 +132,61 @@ close_conn()
 #   the decimal value to stdout.
 decode_header_len()
 {
-  local lenHex
-  lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"
+	local lenHex
+	lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"
 
-  printf '%d' $((16#$lenHex))
+	printf '%d' $((16#$lenHex))
 }
 
 
 display_resp()
 {
-  local verbose="$1"
+	local verbose="$1"
 
-  if [ "$verbose" -ne 0 ]
-  then
-    cat
-    printf '\n'
-  fi
+	if [ "$verbose" -ne 0 ]
+	then
+		cat
+		printf '\n'
+	fi
 }
 
 
 encode_header_len()
 {
-  local len="$1"
+	local len="$1"
 
-  printf '0: %.8x' "$len" | xxd -revert -g 0
+	printf '0: %.8x' "$len" | xxd -revert -g 0
 }
 
 
 exit_with_help()
 {
-  show_help >&2
-  exit 1
+	show_help >&2
+	exit 1
 }
 
 
 format_opts()
 {
-  getopt \
-    --longoptions help,port:,service:,verbose,version,zone: \
-    --name "$ExecName" \
-    --options hP:S:VvZ: \
-    -- "$@"
+	getopt \
+		--longoptions help,port:,service:,verbose,version,zone: \
+		--name "$ExecName" \
+		--options hP:S:VvZ: \
+		-- "$@"
 }
 
 
 mk_header()
 {
-  local type="$1"
-  local msgLen="$2"
+	local type="$1"
+	local msgLen="$2"
 
-  cat <<EOX
+	cat <<EOX
 <MsgHeader_PI>
-  <type>$type</type>
-  <msgLen>$msgLen</msgLen>
-  <errorLen>0</errorLen>
-  <bsLen>0</bsLen>
+	<type>$type</type>
+	<msgLen>$msgLen</msgLen>
+	<errorLen>0</errorLen>
+	<bsLen>0</bsLen>
 </MsgHeader_PI>
 EOX
 }
@@ -194,38 +194,38 @@ EOX
 
 mk_req()
 {
-  local msgType="$1"
+	local msgType="$1"
 
-  local msg=
-  if [ $# -ge 2 ]
-  then
-    msg="$2"
-  fi
+	local msg=
+	if [ $# -ge 2 ]
+	then
+		msg="$2"
+	fi
 
-  local header
-  header="$(mk_header "$msgType" ${#msg})"
+	local header
+	header="$(mk_header "$msgType" ${#msg})"
 
-  encode_header_len ${#header} > "$ReqStore"
-  printf '%s%s' "$header" "$msg" >> "$ReqStore"
-  cat "$ReqStore"
+	encode_header_len ${#header} > "$ReqStore"
+	printf '%s%s' "$header" "$msg" >> "$ReqStore"
+	cat "$ReqStore"
 }
 
 
 mk_startup_pack()
 {
-  local clientUser="$1"
-  local rcatZone="$2"
+	local clientUser="$1"
+	local rcatZone="$2"
 
-  cat <<EOX
+	cat <<EOX
 <StartupPack_PI>
-  <connectCnt>0</connectCnt>
-  <proxyUser>$ExecName</proxyUser>
-  <proxyRcatZone>$rcatZone</proxyRcatZone>
-  <clientUser>$clientUser</clientUser>
-  <clientRcatZone>$rcatZone</clientRcatZone>
-  <relVersion></relVersion>
-  <apiVersion></apiVersion>
-  <option>$ExecName</option>
+	<connectCnt>0</connectCnt>
+	<proxyUser>$ExecName</proxyUser>
+	<proxyRcatZone>$rcatZone</proxyRcatZone>
+	<clientUser>$clientUser</clientUser>
+	<clientRcatZone>$rcatZone</clientRcatZone>
+	<relVersion></relVersion>
+	<apiVersion></apiVersion>
+	<option>$ExecName</option>
 </StartupPack_PI>
 EOX
 }
@@ -233,81 +233,81 @@ EOX
 
 parse_resp()
 {
-  local headerLen
-  headerLen="$(decode_header_len)"
+	local headerLen
+	headerLen="$(decode_header_len)"
 
-  local header
-  read -r -d '' -n "$headerLen" header
+	local header
+	read -r -d '' -n "$headerLen" header
 
-  if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]
-  then
-    return 1
-  fi
+	if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]
+	then
+		return 1
+	fi
 
-  local msgLen="${header#*<msgLen>}"
-  msgLen="${msgLen%%<*}"
+	local msgLen="${header#*<msgLen>}"
+	msgLen="${msgLen%%<*}"
 
-  local msg
-  read -r -d '' -n "$msgLen" msg
-  printf '%s' "$msg"
+	local msg
+	read -r -d '' -n "$msgLen" msg
+	printf '%s' "$msg"
 }
 
 
 ping()
 {
-  local verbose="$1"
-  local ies="$2"
-  local port="$3"
-  local service="$4"
-  local zone="$5"
+	local verbose="$1"
+	local ies="$2"
+	local port="$3"
+	local service="$4"
+	local zone="$5"
 
-  local startTime
-  startTime="$(date +'%s.%N')"
+	local startTime
+	startTime="$(date +'%s.%N')"
 
-  if ! exec 3<>/dev/tcp/"$ies"/"$port"
-  then
-    printf 'down\n'
-    return 1
-  fi
+	if ! exec 3<>/dev/tcp/"$ies"/"$port"
+	then
+		printf 'down\n'
+		return 1
+	fi
 
-  local connMsgBody
-  connMsgBody="$(mk_startup_pack "$service" "$zone")"
+	local connMsgBody
+	connMsgBody="$(mk_startup_pack "$service" "$zone")"
 
-  if mk_req RODS_CONNECT "$connMsgBody" >&3
-  then
-    local respMsg
-    if respMsg="$(parse_resp <&3)"
-    then
-      local stopTime
-      stopTime="$(date +'%s.%N')"
+	if mk_req RODS_CONNECT "$connMsgBody" >&3
+	then
+		local respMsg
+		if respMsg="$(parse_resp <&3)"
+		then
+			local stopTime
+			stopTime="$(date +'%s.%N')"
 
-      mk_req RODS_DISCONNECT >&3
-      close_conn
+			mk_req RODS_DISCONNECT >&3
+			close_conn
 
-      if [ "$verbose" -eq 0 ]
-      then
-        local dt
-        dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
-          'BEGIN { print (STOP - START) }')"
+			if [ "$verbose" -eq 0 ]
+			then
+				local dt
+				dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
+					'BEGIN { print (STOP - START) }')"
 
-        printf 'up|time=%ss\n' "$dt"
-      else
-        printf '%s\n' "$respMsg"
-      fi
+				printf 'up|time=%ss\n' "$dt"
+			else
+				printf '%s\n' "$respMsg"
+			fi
 
-      return 0
-    fi
-  fi
+			return 0
+		fi
+	fi
 
-  close_conn
-  printf 'not iRODS\n'
-  return 2
+	close_conn
+	printf 'not iRODS\n'
+	return 2
 }
 
 
 show_version()
 {
-  printf '%s\n' "$Version"
+	printf '%s\n' "$Version"
 }
 
 
