@@ -2,7 +2,7 @@
 
 show_help()
 {
-  cat <<EOF
+	cat <<EOF
 
 $ExecName version $Version
 
@@ -51,226 +51,226 @@ declare Debug
 
 main()
 {
-  local opts
-  if ! opts=$(prep_opts "$@")
-  then
-    show_help >&2
-    return 1
-  fi
+	local opts
+	if ! opts=$(prep_opts "$@")
+	then
+		show_help >&2
+		return 1
+	fi
 
-  eval set -- "$opts"
+	eval set -- "$opts"
 
-  local age="$DefaultAge"
+	local age="$DefaultAge"
 
-  local collection
-  local help
-  local version
+	local collection
+	local help
+	local version
 
-  while true
-  do
-    case "$1" in
-      -A|--age)
-        age="$2"
-        shift 2
-        ;;
-      -C|--collection)
-        collection="$2"
-        shift 2
-        ;;
-      -d|--debug)
-        Debug=debug
-        shift
-        ;;
-      -h|--help)
-        help=help
-        shift
-        ;;
-      -H|--host)
-        PGHOST="$2"
-        shift 2
-        ;;
-      -P|--port)
-        PGPORT="$2"
-        shift 2
-        ;;
-      -U|--user)
-        PGUSER="$2"
-        shift 2
-        ;;
-      -v|--version)
-        version=version
-        shift
-        ;;
-      --)
-        shift
-        break
-        ;;
-      *)
-        show_help >&2
-        return 1
-        ;;
-    esac
-  done
+	while true
+	do
+		case "$1" in
+			-A|--age)
+				age="$2"
+				shift 2
+				;;
+			-C|--collection)
+				collection="$2"
+				shift 2
+				;;
+			-d|--debug)
+				Debug=debug
+				shift
+				;;
+				-h|--help)
+				help=help
+				shift
+				;;
+			-H|--host)
+				PGHOST="$2"
+				shift 2
+				;;
+			-P|--port)
+				PGPORT="$2"
+				shift 2
+				;;
+			-U|--user)
+				PGUSER="$2"
+				shift 2
+				;;
+			-v|--version)
+				version=version
+				shift
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				show_help >&2
+				return 1
+				;;
+		esac
+	done
 
-  if [[ -n "${help-}" ]]
-  then
-    show_help
-    return 0
-  fi
+	if [[ -n "${help-}" ]]
+	then
+		show_help
+		return 0
+	fi
 
-  if [[ -n "${version-}" ]]
-  then
-    printf '%s\n' "$Version"
-    return 0
-  fi
+	if [[ -n "${version-}" ]]
+	then
+		printf '%s\n' "$Version"
+		return 0
+	fi
 
-  mk_report "$age" "${collection-}"
+	mk_report "$age" "${collection-}"
 }
 
 
 prep_opts()
 {
-  getopt \
-    --longoptions age:,collection:,debug,help,host:,port:,user:,version \
-    --options A:C:dhH:P:U:v \
-    --name "$ExecName" \
-    -- \
-    "$@"
+	getopt \
+		--longoptions age:,collection:,debug,help,host:,port:,user:,version \
+		--options A:C:dhH:P:U:v \
+		--name "$ExecName" \
+		-- \
+		"$@"
 }
 
 
 mk_report()
 {
-  local age="$1"
-  local collection="$2"
+	local age="$1"
+	local collection="$2"
 
-  psql --quiet ICAT \
+	psql --quiet ICAT \
 <<EOSQL
-  \\pset footer off
-  $(inject_debug_stmt \\timing on)
-  $(inject_debug_quiet off)
+\\pset footer off
+$(inject_debug_stmt \\timing on)
+$(inject_debug_quiet off)
 
-  BEGIN;
+BEGIN;
 
-  $(inject_debug_msg Gathering unreplicated data)
-  CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) ON COMMIT DROP AS
-  SELECT d.resc_name, SUBSTRING(d.resc_hier FROM '(%;)*#"%#"' FOR '#'), d.data_size
-  FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-  WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
-    AND ($(inject_collection_restriction c "$collection"))
-    AND ($(inject_time_restriction d "$age"));
+$(inject_debug_msg Gathering unreplicated data)
+CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) ON COMMIT DROP AS
+SELECT d.resc_name, SUBSTRING(d.resc_hier FROM '(%;)*#"%#"' FOR '#'), d.data_size
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
+	AND ($(inject_collection_restriction c "$collection"))
+	AND ($(inject_time_restriction d "$age"));
 
-  CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
-  CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
+CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
+CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
 
-  \\echo
+\\echo
 
-  $(inject_debug_newline)
-  $(inject_set_title Unreplicated in Storage Resources)
-  SELECT
-    store_resc                                     AS "Storage Resource",
-    COUNT(*)                                       AS "Count",
-    ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)  AS "Volume (TiB)"
-  FROM unreplicated_data
-  GROUP BY store_resc
-  ORDER BY store_resc;
+$(inject_debug_newline)
+$(inject_set_title Unreplicated in Storage Resources)
+SELECT
+	store_resc                                     AS "Storage Resource",
+	COUNT(*)                                       AS "Count",
+	ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)  AS "Volume (TiB)"
+FROM unreplicated_data
+GROUP BY store_resc
+ORDER BY store_resc;
 
-  $(inject_debug_newline)
-  $(inject_set_title Unreplicated in Root Resources)
-  SELECT
-    root_resc                                      AS "Root Resource",
-    COUNT(*)                                       AS "Count",
-    ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)  AS "Volume (TiB)"
-  FROM unreplicated_data
-  GROUP BY root_resc
-  ORDER BY root_resc;
+$(inject_debug_newline)
+$(inject_set_title Unreplicated in Root Resources)
+SELECT
+	root_resc                                      AS "Root Resource",
+	COUNT(*)                                       AS "Count",
+	ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)  AS "Volume (TiB)"
+	FROM unreplicated_data
+GROUP BY root_resc
+ORDER BY root_resc;
 
-  $(inject_debug_newline)
-  $(inject_debug_newline)
-  ROLLBACK;
+$(inject_debug_newline)
+$(inject_debug_newline)
+ROLLBACK;
 EOSQL
 }
 
 
 inject_debug_msg()
 {
-  local msg="$*"
+	local msg="$*"
 
-  inject_debug_newline
-  inject_debug_stmt "\echo '$msg'"
+	inject_debug_newline
+	inject_debug_stmt "\echo '$msg'"
 }
 
 
 inject_debug_newline()
 {
-  inject_debug_stmt \\echo
+	inject_debug_stmt \\echo
 }
 
 
 inject_debug_quiet()
 {
-  local state="$1"
+	local state="$1"
 
-  inject_debug_stmt \\set QUIET "$state"
+	inject_debug_stmt \\set QUIET "$state"
 }
 
 
 inject_debug_stmt()
 {
-  local stmt="$*"
+	local stmt="$*"
 
-  if [[ -n "${Debug-}" ]]
-  then
-    printf '%s\n' "$stmt"
-  fi
+	if [[ -n "${Debug-}" ]]
+	then
+		printf '%s\n' "$stmt"
+	fi
 }
 
 
 inject_set_title()
 {
-  local title="$*"
+	local title="$*"
 
-  inject_debug_quiet on
-  printf $'\pset title \'%s\'\n' "$title"
-  inject_debug_quiet off
+	inject_debug_quiet on
+	printf $'\pset title \'%s\'\n' "$title"
+	inject_debug_quiet off
 }
 
 
 inject_collection_restriction()
 {
-  local collTable="$1"
-  local collection="$2"
+	local collTable="$1"
+	local collection="$2"
 
-  if [[ -n "$collection" ]]
-  then
-    local colName="$collTable".coll_name
-    printf $'%s = \'%s\' OR %s LIKE \'%s/%%\'' "$colName" "$collection" "$colName" "$collection"
-  else
-    printf TRUE
-  fi
+	if [[ -n "$collection" ]]
+	then
+		local colName="$collTable".coll_name
+		printf $'%s = \'%s\' OR %s LIKE \'%s/%%\'' "$colName" "$collection" "$colName" "$collection"
+	else
+		printf TRUE
+	fi
 }
 
 
 inject_time_restriction()
 {
-  local dataTable="$1"
-  local age="$2"
+	local dataTable="$1"
+	local age="$2"
 
-  if [[ "$age" -lt 0 ]]
-  then
-    # No time restriction
+	if [[ "$age" -lt 0 ]]
+	then
+		# No time restriction
 
-    printf TRUE
-  else
-    # Determine midnight of the desired day.
+ 		printf TRUE
+	else
+		# Determine midnight of the desired day.
 
-    local supCreateDate
-    supCreateDate=$(date --iso-8601 --date "$age days ago")
+		local supCreateDate
+		supCreateDate=$(date --iso-8601 --date "$age days ago")
 
-    local supCreateTs
-    supCreateTs=$(date --date "$supCreateDate" '+%s')
-    printf $'%s.create_ts < \'%011d\'' "$dataTable" "$supCreateTs"
-  fi
+		local supCreateTs
+		supCreateTs=$(date --date "$supCreateDate" '+%s')
+		printf $'%s.create_ts < \'%011d\'' "$dataTable" "$supCreateTs"
+	fi
 }
 
 
