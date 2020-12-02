@@ -1,7 +1,6 @@
 #!/bin/bash
 
-show_help()
-{
+show_help() {
 	cat <<EOF
 
 $ExecName version $Version
@@ -55,8 +54,7 @@ readonly ReqStore="$(mktemp)"
 trap 'rm -rf "$ReqStore"' EXIT
 
 
-main()
-{
+main() {
 	local opts
 	if ! opts="$(format_opts "$@")"
 	then
@@ -118,8 +116,7 @@ main()
 }
 
 
-close_conn()
-{
+close_conn() {
 	exec 3<&-
 	exec 3>&-
 }
@@ -130,8 +127,7 @@ close_conn()
 #   the serialized length
 # Output:
 #   the decimal value to stdout.
-decode_header_len()
-{
+decode_header_len() {
 	local lenHex
 	lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"
 
@@ -139,8 +135,7 @@ decode_header_len()
 }
 
 
-display_resp()
-{
+display_resp() {
 	local verbose="$1"
 
 	if [ "$verbose" -ne 0 ]
@@ -151,23 +146,20 @@ display_resp()
 }
 
 
-encode_header_len()
-{
+encode_header_len() {
 	local len="$1"
 
 	printf '0: %.8x' "$len" | xxd -revert -g 0
 }
 
 
-exit_with_help()
-{
+exit_with_help() {
 	show_help >&2
 	exit 1
 }
 
 
-format_opts()
-{
+format_opts() {
 	getopt \
 		--longoptions help,port:,service:,verbose,version,zone: \
 		--name "$ExecName" \
@@ -176,8 +168,7 @@ format_opts()
 }
 
 
-mk_header()
-{
+mk_header() {
 	local type="$1"
 	local msgLen="$2"
 
@@ -192,8 +183,7 @@ EOX
 }
 
 
-mk_req()
-{
+mk_req() {
 	local msgType="$1"
 
 	local msg=
@@ -211,8 +201,7 @@ mk_req()
 }
 
 
-mk_startup_pack()
-{
+mk_startup_pack() {
 	local clientUser="$1"
 	local rcatZone="$2"
 
@@ -231,8 +220,7 @@ EOX
 }
 
 
-parse_resp()
-{
+parse_resp() {
 	local headerLen
 	headerLen="$(decode_header_len)"
 
@@ -253,8 +241,7 @@ parse_resp()
 }
 
 
-ping()
-{
+ping() {
 	local verbose="$1"
 	local ies="$2"
 	local port="$3"
@@ -305,8 +292,7 @@ ping()
 }
 
 
-show_version()
-{
+show_version() {
 	printf '%s\n' "$Version"
 }
 
