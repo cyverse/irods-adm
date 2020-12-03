@@ -2,7 +2,6 @@
 
 A collection of scripts for administering an iRODS grid
 
-
 ## iRODS Sessions
 
 A session is a group of log messages that occurred during a single connection.
