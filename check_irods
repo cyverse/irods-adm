@@ -55,8 +55,7 @@ trap 'rm -rf "$ReqStore"' EXIT
 
 main() {
 	local opts
-	if ! opts="$(format_opts "$@")"
-	then
+	if ! opts="$(format_opts "$@")"; then
 		exit_with_help
 	fi
 
@@ -67,8 +66,7 @@ main() {
 	local verbose=0
 	local zone=
 
-	while true
-	do
+	while true; do
 		case "$1" in
 			-h|--help)
 				show_help
@@ -104,8 +102,7 @@ main() {
 		esac
 	done
 
-	if [ "$#" -lt 1 ]
-	then
+	if [ "$#" -lt 1 ]; then
 		exit_with_help
 	fi
 
@@ -137,8 +134,7 @@ decode_header_len() {
 display_resp() {
 	local verbose="$1"
 
-	if [ "$verbose" -ne 0 ]
-	then
+	if [ "$verbose" -ne 0 ]; then
 		cat
 		printf '\n'
 	fi
@@ -186,8 +182,7 @@ mk_req() {
 	local msgType="$1"
 
 	local msg=
-	if [ $# -ge 2 ]
-	then
+	if [ $# -ge 2 ]; then
 		msg="$2"
 	fi
 
@@ -226,8 +221,7 @@ parse_resp() {
 	local header
 	read -r -d '' -n "$headerLen" header
 
-	if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]
-	then
+	if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]; then
 		return 1
 	fi
 
@@ -250,8 +244,7 @@ ping() {
 	local startTime
 	startTime="$(date +'%s.%N')"
 
-	if ! exec 3<>/dev/tcp/"$ies"/"$port"
-	then
+	if ! exec 3<>/dev/tcp/"$ies"/"$port"; then
 		printf 'down\n'
 		return 1
 	fi
@@ -259,19 +252,16 @@ ping() {
 	local connMsgBody
 	connMsgBody="$(mk_startup_pack "$service" "$zone")"
 
-	if mk_req RODS_CONNECT "$connMsgBody" >&3
-	then
+	if mk_req RODS_CONNECT "$connMsgBody" >&3; then
 		local respMsg
-		if respMsg="$(parse_resp <&3)"
-		then
+		if respMsg="$(parse_resp <&3)"; then
 			local stopTime
 			stopTime="$(date +'%s.%N')"
 
 			mk_req RODS_DISCONNECT >&3
 			close_conn
 
-			if [ "$verbose" -eq 0 ]
-			then
+			if [ "$verbose" -eq 0 ]; then
 				local dt
 				dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
 					'BEGIN { print (STOP - START) }')"
