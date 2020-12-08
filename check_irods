@@ -63,8 +63,9 @@ main() {
 
 	local port=1247
 	local service="$ExecName"
-	local verbose=0
 	local zone=
+
+	local verbose
 
 	while true; do
 		case "$1" in
@@ -81,7 +82,7 @@ main() {
 				shift 2
 				;;
 			-V|--verbose)
-				verbose=1
+				verbose=verbose
 				shift
 				;;
 			-v|--version)
@@ -108,7 +109,7 @@ main() {
 
 	local ies="$1"
 
-	ping "$verbose" "$ies" "$port" "$service" "$zone"
+	ping "${verbose-}" "$ies" "$port" "$service" "$zone"
 }
 
 
@@ -134,7 +135,7 @@ decode_header_len() {
 display_resp() {
 	local verbose="$1"
 
-	if [ "$verbose" -ne 0 ]; then
+	if [ -n "$verbose" ]; then
 		cat
 		printf '\n'
 	fi
@@ -261,7 +262,7 @@ ping() {
 			mk_req RODS_DISCONNECT >&3
 			close_conn
 
-			if [ "$verbose" -eq 0 ]; then
+			if [ -n "$verbose" ]; then
 				local dt
 				dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
 					'BEGIN { print (STOP - START) }')"
