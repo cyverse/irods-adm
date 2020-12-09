@@ -63,9 +63,9 @@ main() {
 
 	local port=1247
 	local service="$ExecName"
-	local zone=
 
 	local verbose
+	local zone
 
 	while true; do
 		case "$1" in
@@ -109,7 +109,7 @@ main() {
 
 	local ies="$1"
 
-	ping "${verbose-}" "$ies" "$port" "$service" "$zone"
+	ping "${verbose-}" "$ies" "$port" "$service" "${zone-}"
 }
 
 
