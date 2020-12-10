@@ -47,7 +47,7 @@ EOF
 set -o errexit -o nounset -o pipefail
 
 readonly ExecName="$(basename "$(realpath --canonicalize-missing "$0")")"
-readonly Version=2
+readonly Version=3
 
 readonly ReqStore="$(mktemp)"
 trap 'rm -rf "$ReqStore"' EXIT
@@ -65,6 +65,7 @@ main() {
 	local service="$ExecName"
 
 	local verbose
+	local version
 	local zone
 
 	while true; do
@@ -86,8 +87,8 @@ main() {
 				shift
 				;;
 			-v|--version)
-				show_version
-				return 0
+				version=version
+				shift
 				;;
 			-Z|--zone)
 				zone="$2"
@@ -103,6 +104,11 @@ main() {
 		esac
 	done
 
+  if [[ -n "${version-}" ]]; then
+		show_version
+		return 0
+	fi
+	
 	if [ "$#" -lt 1 ]; then
 		exit_with_help
 	fi
