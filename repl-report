@@ -1,7 +1,6 @@
 #!/bin/bash
 
-show_help()
-{
+show_help() {
 	cat <<EOF
 
 $ExecName version $Version
@@ -49,8 +48,7 @@ readonly DefaultAge=1
 declare Debug
 
 
-main()
-{
+main() {
 	local opts
 	if ! opts=$(prep_opts "$@")
 	then
@@ -128,8 +126,7 @@ main()
 }
 
 
-prep_opts()
-{
+prep_opts() {
 	getopt \
 		--longoptions age:,collection:,debug,help,host:,port:,user:,version \
 		--options A:C:dhH:P:U:v \
@@ -139,8 +136,7 @@ prep_opts()
 }
 
 
-mk_report()
-{
+mk_report() {
 	local age="$1"
 	local collection="$2"
 
@@ -192,8 +188,7 @@ EOSQL
 }
 
 
-inject_debug_msg()
-{
+inject_debug_msg() {
 	local msg="$*"
 
 	inject_debug_newline
@@ -201,22 +196,19 @@ inject_debug_msg()
 }
 
 
-inject_debug_newline()
-{
+inject_debug_newline() {
 	inject_debug_stmt \\echo
 }
 
 
-inject_debug_quiet()
-{
+inject_debug_quiet() {
 	local state="$1"
 
 	inject_debug_stmt \\set QUIET "$state"
 }
 
 
-inject_debug_stmt()
-{
+inject_debug_stmt() {
 	local stmt="$*"
 
 	if [[ -n "${Debug-}" ]]
@@ -226,8 +218,7 @@ inject_debug_stmt()
 }
 
 
-inject_set_title()
-{
+inject_set_title() {
 	local title="$*"
 
 	inject_debug_quiet on
@@ -236,8 +227,7 @@ inject_set_title()
 }
 
 
-inject_collection_restriction()
-{
+inject_collection_restriction() {
 	local collTable="$1"
 	local collection="$2"
 
@@ -251,8 +241,7 @@ inject_collection_restriction()
 }
 
 
-inject_time_restriction()
-{
+inject_time_restriction() {
 	local dataTable="$1"
 	local age="$2"
 
