@@ -1,7 +1,6 @@
 #!/bin/bash
 
-show_help()
-{
+show_help() {
 	cat <<EOF
 
 $ExecName version $Version
@@ -66,8 +65,7 @@ readonly ExecName=$(basename "$ExecPath")
 readonly Log=3
 
 
-main()
-{
+main() {
 	declare -A optMap=(
 		[age]="$DefaultAge"
 		[collection]=''
@@ -166,8 +164,7 @@ main()
 }
 
 
-resolve_opts()
-{
+resolve_opts() {
 	local mapVar="$1"
 	shift
 
@@ -243,8 +240,7 @@ resolve_opts()
 }
 
 
-replicate()
-{
+replicate() {
 	local objList="$1"
 	local age="$2"
 	local maxThreads="$3"
@@ -368,8 +364,7 @@ replicate()
 }
 
 
-format_opts()
-{
+format_opts() {
 	local longOpts=(
 	  age: collection: help host: max-threads: multiplier: port: dest-resc: src-resc: until: user:
 		version)
@@ -380,8 +375,7 @@ format_opts()
 }
 
 
-finish()
-{
+finish() {
 	local exitCode="$1"
 	local objList="$2"
 
@@ -398,8 +392,7 @@ finish()
 }
 
 
-count()
-{
+count() {
 	local tot=0
 
 	while read -r -d ''
@@ -411,8 +404,7 @@ count()
 }
 
 
-partition()
-{
+partition() {
 	local minSizeB="$1"
 
 	local maxSizeB=
@@ -447,8 +439,7 @@ partition()
 }
 
 
-mk_prog_msg()
-{
+mk_prog_msg() {
 	local count="$1"
 	local total="$2"
 	local subCount="$3"
@@ -459,8 +450,7 @@ mk_prog_msg()
 }
 
 
-mk_repl_query()
-{
+mk_repl_query() {
 	local maxTime="$1"
 	local baseCond="$2"
 	local resCond="$3"
@@ -476,8 +466,7 @@ EOSQL
 }
 
 
-track_prog()
-{
+track_prog() {
 	local cnt="$1"
 	local tot="$2"
 	local subTot="$3"
@@ -508,8 +497,7 @@ track_prog()
 }
 
 
-select_cohort()
-{
+select_cohort() {
 	local cnt="$1"
 	local tot="$2"
 	local srcResc="$3"
@@ -600,8 +588,7 @@ select_cohort()
 
 # This is intended for large files. irepl will be run on at most two files at a
 # time.
-select_cohort_by_size()
-{
+select_cohort_by_size() {
 	local cnt="$1"
 	local tot="$2"
 	local srcResc="$3"
@@ -668,16 +655,14 @@ select_cohort_by_size()
 }
 
 
-threads_to_MB()
-{
+threads_to_MB() {
   local threads="$1"
 
 	echo $(( threads * 32 ))
 }
 
 
-REPL_BATCH()
-{
+REPL_BATCH() {
 	set -o errexit -o nounset -o pipefail
 
   local srcResc="$1"
@@ -719,8 +704,7 @@ REPL_BATCH()
 export -f REPL_BATCH
 
 
-CHECK_TIME()
-{
+CHECK_TIME() {
 	local untilTS="$1"
 
 	if [[ -n "$untilTS" ]] && [[ "$(date '+%s')" -ge "$untilTS" ]]
