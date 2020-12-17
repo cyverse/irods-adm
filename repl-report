@@ -41,8 +41,8 @@ set -o errexit -o nounset -o pipefail
 
 export PGHOST PGPORT PGUSER
 
-readonly ExecPath=$(readlink --canonicalize "$0")
-readonly ExecName=$(basename "$ExecPath")
+readonly ExecPath="$(readlink --canonicalize "$0")"
+readonly ExecName="$(basename "$ExecPath")"
 readonly DefaultAge=1
 
 declare Debug
@@ -50,7 +50,7 @@ declare Debug
 
 main() {
 	local opts
-	if ! opts=$(prep_opts "$@")
+	if ! opts="$(prep_opts "$@")"
 	then
 		show_help >&2
 		return 1
@@ -254,10 +254,10 @@ inject_time_restriction() {
 		# Determine midnight of the desired day.
 
 		local supCreateDate
-		supCreateDate=$(date --iso-8601 --date "$age days ago")
+		supCreateDate="$(date --iso-8601 --date "$age days ago")"
 
 		local supCreateTs
-		supCreateTs=$(date --date "$supCreateDate" '+%s')
+		supCreateTs="$(date --date "$supCreateDate" '+%s')"
 		printf $'%s.create_ts < \'%011d\'' "$dataTable" "$supCreateTs"
 	fi
 }
