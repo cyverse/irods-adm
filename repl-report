@@ -150,7 +150,7 @@ BEGIN;
 
 $(inject_debug_msg Gathering unreplicated data)
 CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) ON COMMIT DROP AS
-SELECT d.resc_name, SUBSTRING(d.resc_hier FROM '(%;)*#"%#"' FOR '#'), d.data_size
+SELECT d.resc_name, SUBSTRING(d.resc_hier FROM '(%;)*#"[^;]+#"' FOR '#'), d.data_size
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
 	AND ($(inject_collection_restriction c "$collection"))
