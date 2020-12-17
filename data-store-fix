@@ -542,17 +542,17 @@ process_chksum_issue() {
 fix_collection_problems() {
 	pass_hdr_thru
 
+  local cnt=0
+
 	local permIssue
 	local uuidCnt
 	local owner
 	local createTime
 	local collField
-
 	while IFS='|' read -r permIssue uuidCnt owner createTime collField
 	do
 		if [ -z "$collField" ]
 		then
-			printf '%s\n' "$permIssue"
 			break
 		fi
 
@@ -573,12 +573,17 @@ fix_collection_problems() {
 		fi
 
 		printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
+		cnt=$((cnt + 1))
 	done
+
+	printf '(%d rows)' "$cnt"
 }
 
 
 fix_object_problems() {
 	pass_hdr_thru
+
+  local cnt=0
 
 	local permIssue
 	local missingChksum
@@ -592,7 +597,6 @@ fix_object_problems() {
 	do
 		if [ -z "$objField" ]
 		then
-			printf '%s\n' "$permIssue"
 			break
 		fi
 
@@ -623,7 +627,10 @@ fix_object_problems() {
 		printf '%s|%s|%s|%s|%s|%s|%s\n' \
 			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$rescField" "$createTime" "$objField"
 
+		cnt=$((cnt + 1))
 	done
+
+	printf '(%d rows)' "$cnt"
 }
 
 
