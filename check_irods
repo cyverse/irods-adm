@@ -64,6 +64,7 @@ main() {
 	local port=1247
 	local service="$ExecName"
 
+	local help
 	local verbose
 	local version
 	local zone
@@ -71,8 +72,8 @@ main() {
 	while true; do
 		case "$1" in
 			-h|--help)
-				show_help
-				return 0
+				help=help
+				shift
 				;;
 			-P|--port)
 				port="$2"
@@ -104,11 +105,16 @@ main() {
 		esac
 	done
 
+	if [[ -n "${help-}" ]]; then
+		show_help
+		return 0
+	fi
+
   if [[ -n "${version-}" ]]; then
 		show_version
 		return 0
 	fi
-	
+
 	if [ "$#" -lt 1 ]; then
 		exit_with_help
 	fi
