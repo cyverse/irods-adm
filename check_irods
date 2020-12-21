@@ -56,8 +56,9 @@ trap 'rm -rf "$ReqStore"' EXIT
 main() {
 	local opts
 	if ! opts="$(format_opts "$@")"; then
-		exit_with_help
-	fi
+		show_help >&2
+		return 1
+ 	fi
 
 	eval set -- "$opts"
 
@@ -100,7 +101,8 @@ main() {
 				break
 				;;
 			*)
-				exit_with_help
+				show_help >&2
+				return 1
 				;;
 		esac
 	done
@@ -116,7 +118,8 @@ main() {
 	fi
 
 	if [ "$#" -lt 1 ]; then
-		exit_with_help
+		show_help >&2
+		return 1
 	fi
 
 	local ies="$1"
@@ -158,12 +161,6 @@ encode_header_len() {
 	local len="$1"
 
 	printf '0: %.8x' "$len" | xxd -revert -g 0
-}
-
-
-exit_with_help() {
-	show_help >&2
-	exit 1
 }
 
 
