@@ -41,7 +41,7 @@ set -o errexit -o nounset -o pipefail
 
 export PGHOST PGPORT PGUSER
 
-readonly ExecPath="$(readlink --canonicalize "$0")"
+readonly ExecPath="$(realpath --canonicalize-missing "$0")"
 readonly ExecName="$(basename "$ExecPath")"
 readonly DefaultAge=1
 
