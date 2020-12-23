@@ -31,6 +31,9 @@ Options:
  -U, --user USER              authorize the DBMS connection as user USER instead
                               of the default
  -v, --version                display version and exit
+
+© 2020, The Arizona Board of Regents on behalf of The University of Arizona. For
+license information, see https://cyverse.org/license.
 EOF
 }
 
