@@ -1,7 +1,6 @@
 #!/bin/bash
 
-show_help()
-{
+show_help() {
 	cat <<EOF
 
 $ExecName version $Version
@@ -63,8 +62,7 @@ readonly ExecName=$(basename "$ExecAbsPath")
 declare -a TempFiles
 
 
-main()
-{
+main() {
 	local opts
 	if ! opts=$(getopt --name "$ExecName" --options hv --longoptions help,version -- "$@")
 	then
@@ -124,8 +122,7 @@ main()
 }
 
 
-remove_temp_files()
-{
+remove_temp_files() {
 	if [[ "${#TempFiles[@]}" -gt 0 ]]
 	then
 		rm --force "${TempFiles[@]}"
@@ -133,8 +130,7 @@ remove_temp_files()
 }
 
 
-process_input()
-{
+process_input() {
 	local logBase="$1"
 
 	local errorsFile
@@ -151,8 +147,7 @@ process_input()
 }
 
 
-filter_errors ()
-{
+filter_errors () {
 	sed --quiet --file - <(cat) <<'EOF'
 /.*ERROR: [^\[].*$/ {
   s/.*ERROR: \([^\[].*$\)/\1/
@@ -165,8 +160,7 @@ EOF
 }
 
 
-classify_errors()
-{
+classify_errors() {
 	local errorsFile="$1"
 	local errCnt="$2"
 	local logBase="$3"
@@ -200,8 +194,7 @@ classify_errors()
 }
 
 
-classify_repl_errors()
-{
+classify_repl_errors() {
 	local replErrorsFile="$1"
 	local totErrCnt="$2"
 	local logBase="$3"
@@ -267,8 +260,7 @@ classify_repl_errors()
 }
 
 
-display_error_count()
-{
+display_error_count() {
 	local label="$1"
 	local count="$2"
 	local total="$3"
@@ -277,8 +269,7 @@ display_error_count()
 }
 
 
-split_out_repl_class()
-{
+split_out_repl_class() {
 	local errorsFile="$1"
 	local status="$2"
 	local error="$3"
@@ -288,8 +279,7 @@ split_out_repl_class()
 }
 
 
-split_out_class()
-{
+split_out_class() {
 	local errorsFile="$1"
 	local classifier="$2"
 	local substitution="$3"
