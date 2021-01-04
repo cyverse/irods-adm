@@ -48,6 +48,9 @@ related errors that couldn't be classified.
 
 CLASS-BASE.unclassified_errors holds the full log messages for errors that
 couldn't be classified at all.
+
+© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+license information, see https://cyverse.org/license.
 EOF
 }
 
