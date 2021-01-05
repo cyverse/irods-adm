@@ -113,7 +113,7 @@ main() {
 	fi
 
   if [[ -n "${version-}" ]]; then
-		show_version
+		printf '%s\n' "$Version"
 		return 0
 	fi
 
@@ -288,11 +288,6 @@ ping() {
 	close_conn
 	printf 'not iRODS\n'
 	return 2
-}
-
-
-show_version() {
-	printf '%s\n' "$Version"
 }
 
 
