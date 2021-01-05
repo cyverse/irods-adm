@@ -100,10 +100,6 @@ main() {
 				shift
 				break
 				;;
-			*)
-				show_help >&2
-				return 1
-				;;
 		esac
 	done
 
