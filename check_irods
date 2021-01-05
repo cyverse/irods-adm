@@ -65,11 +65,8 @@ main() {
 	local port=1247
 	local service="$ExecName"
 
-	local help
-	local verbose
-	local version
-	local zone
-
+	local help verbose version zone
+	
 	while true; do
 		case "$1" in
 			-h|--help)
