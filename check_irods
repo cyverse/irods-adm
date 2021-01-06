@@ -44,16 +44,25 @@ EOF
 }
 
 
+readonly Version=3
+
 set -o errexit -o nounset -o pipefail
 
 readonly ExecName="$(basename "$(realpath --canonicalize-missing "$0")")"
-readonly Version=3
 
 readonly ReqStore="$(mktemp)"
 trap 'rm -rf "$ReqStore"' EXIT
 
 
 main() {
+	declare -A optMap=(
+		[help]=''
+		[port]=1247
+		[service]="$ExecName"
+		[verbose]=''
+		[version]=''
+		[zone]='' )
+
 	local opts
 	if ! opts="$(format_opts "$@")"; then
 		show_help >&2
@@ -62,35 +71,30 @@ main() {
 
 	eval set -- "$opts"
 
-	local port=1247
-	local service="$ExecName"
-
-	local help verbose version zone
-	
 	while true; do
 		case "$1" in
 			-h|--help)
-				help=help
+				optMap[help]=help
 				shift
 				;;
 			-P|--port)
-				port="$2"
+				optMap[port]="$2"
 				shift 2
 				;;
 			-S|--service)
-				service="$2"
+				optMap[service]="$2"
 				shift 2
 				;;
 			-V|--verbose)
-				verbose=verbose
+				optMap[verbose]=verbose
 				shift
 				;;
 			-v|--version)
-				version=version
+				optMap[version]=version
 				shift
 				;;
 			-Z|--zone)
-				zone="$2"
+				optMap[zone]="$2"
 				shift 2
 				;;
 			--)
@@ -100,12 +104,12 @@ main() {
 		esac
 	done
 
-	if [[ -n "${help-}" ]]; then
+	if [[ -n "${optMap[help]}" ]]; then
 		show_help
 		return 0
 	fi
 
-  if [[ -n "${version-}" ]]; then
+  if [[ -n "${optMap[version]}" ]]; then
 		printf '%s\n' "$Version"
 		return 0
 	fi
@@ -117,7 +121,7 @@ main() {
 
 	local ies="$1"
 
-	ping "${verbose-}" "$ies" "$port" "$service" "${zone-}"
+	ping "${optMap[verbose]}" "$ies" "${optMap[port]}" "${optMap[service]}" "${optMap[zone]}"
 }
 
 
