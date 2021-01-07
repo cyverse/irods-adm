@@ -1,7 +1,7 @@
 #!/bin/bash
 
 show_help() {
-  cat <<EOF
+	cat <<EOF
 
 $ExecName - version $Version
 
@@ -49,18 +49,18 @@ readonly Version=3
 # Output:
 #   The formatted arguments
 format_opts() {
-  getopt --name "$ExecName" --options hj:R:v --longoptions help,jobs:,resource:,version -- "$@"
+	getopt --name "$ExecName" --options hj:R:v --longoptions help,jobs:,resource:,version -- "$@"
 }
 
 
 show_version() {
-  printf '%s\n' "$Version"
+	printf '%s\n' "$Version"
 }
 
 
 exit_with_help() {
-  show_help >&2
-  exit 1
+	show_help >&2
+	exit 1
 }
 
 
@@ -68,44 +68,44 @@ set -e
 
 if ! opts="$(format_opts "$@")"
 then
-  printf '\n' >&2
-  exit_with_help
+	printf '\n' >&2
+	exit_with_help
 fi
 
 eval set -- "$opts"
 
 while true
 do
-  case "$1" in
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -j|--jobs)
-      readonly Jobs="$2"
-      shift 2
-      ;;
-    -R|--resource)
-      readonly Resc="$2"
-      shift 2
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      exit_with_help
-      ;;
-  esac
+	case "$1" in
+		-h|--help)
+			show_help
+			exit 0
+			;;
+		-j|--jobs)
+			readonly Jobs="$2"
+			shift 2
+			;;
+		-R|--resource)
+			readonly Resc="$2"
+			shift 2
+			;;
+		-v|--version)
+			show_version
+			exit 0
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			exit_with_help
+			;;
+	esac
 done
 
 if [ "$#" -lt 1 ]
 then
-  exit_with_help
+	exit_with_help
 fi
 
 readonly ClassBase="$1"
@@ -124,16 +124,16 @@ export ERR_LOG="$ClassBase".errors
 # Output:
 #   the output of the command
 EXEC_ON_RS() {
-  local rs="$1"
-  local cmd="$2"
+	local rs="$1"
+	local cmd="$2"
 
-  #shellcheck disable=SC2087
-  ssh -q -t "$rs" <<EOSSH
+	#shellcheck disable=SC2087
+	ssh -q -t "$rs" <<EOSSH
 if [[ "\$USER" = irods ]]
 then
-  $cmd
+	$cmd
 else
-  sudo -i -u irods <<'EOSUDO'
+	sudo -i -u irods <<'EOSUDO'
 $cmd
 EOSUDO
 fi
@@ -143,54 +143,54 @@ export -f EXEC_ON_RS
 
 
 CHECK_OBJ() {
-  local resc="$1"
-  local objPath="$2"
+	local resc="$1"
+	local objPath="$2"
 
-  while read -r rescHier storeHost filePath
-  do
-    if [[ "$rescHier" =~ ^${resc}(;.*)?$ ]]
-    then
-      local resp
-      resp="$(EXEC_ON_RS "$storeHost" "ifsck -K '$filePath'" 2>> "$ERR_LOG")"
+	while read -r rescHier storeHost filePath
+	do
+		if [[ "$rescHier" =~ ^${resc}(;.*)?$ ]]
+		then
+			local resp
+			resp="$(EXEC_ON_RS "$storeHost" "ifsck -K '$filePath'" 2>> "$ERR_LOG")"
 
-      local reason
-      if [[ "$resp" =~ size\.$ ]]
-      then
-        reason=size
-      elif [[ "$resp" =~ checksum\.$ ]]
-      then
-        reason=checksum
-      fi
+			local reason
+			if [[ "$resp" =~ size\.$ ]]
+			then
+				reason=size
+			elif [[ "$resp" =~ checksum\.$ ]]
+			then
+				reason=checksum
+			fi
 
-      if [[ -n "$reason" ]]
-      then
-        printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
-      fi
-    fi
-  done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
+			if [[ -n "$reason" ]]
+			then
+				printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
+			fi
+		fi
+	done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 }
 export -f CHECK_OBJ
 
 
 log() {
-  while read -r reason rescHier objPath
-  do
-    printf -v entry '%s %s\n' "$rescHier" "$objPath"
+	while read -r reason rescHier objPath
+	do
+		printf -v entry '%s %s\n' "$rescHier" "$objPath"
 
-    if [ "$reason" = size ]
-    then
-      printf '%s' "$entry" >> "$ClassBase".bad_size
-    elif [ "$reason" = checksum ]
-    then
-      printf '%s' "$entry" >> "$ClassBase".bad_chksum
-    fi
-  done
+		if [ "$reason" = size ]
+		then
+			printf '%s' "$entry" >> "$ClassBase".bad_size
+		elif [ "$reason" = checksum ]
+		then
+			printf '%s' "$entry" >> "$ClassBase".bad_chksum
+		fi
+	done
 }
 
 
 if [ -n "$Jobs" ]
 then
-  readonly JobsOpt="-j$Jobs"
+	readonly JobsOpt="-j$Jobs"
 fi
 
 parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" CHECK_OBJ "${Resc-}" | log
