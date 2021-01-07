@@ -57,6 +57,7 @@ trap 'rm -rf "$ReqStore"' EXIT
 main() {
 	declare -A optMap=(
 		[help]=''
+		[ies]=''
 		[port]=1247
 		[service]="$ExecName"
 		[verbose]=''
@@ -119,9 +120,9 @@ main() {
 		return 1
 	fi
 
-	local ies="$1"
+	optMap[ies]="$1"
 
-	ping "${optMap[verbose]}" "$ies" "${optMap[port]}" "${optMap[service]}" "${optMap[zone]}"
+	ping "${optMap[verbose]}" "${optMap[ies]}" "${optMap[port]}" "${optMap[service]}" "${optMap[zone]}"
 }
 
 
