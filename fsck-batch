@@ -1,7 +1,6 @@
 #!/bin/bash
 
-show_help()
-{
+show_help() {
   cat <<EOF
 
 $ExecName - version $Version
@@ -42,14 +41,12 @@ readonly ExecName=$(basename "$0")
 readonly Version=2
 
 
-show_version()
-{
+show_version() {
   printf '%s\n' "$Version"
 }
 
 
-exit_with_help()
-{
+exit_with_help() {
   show_help >&2
   exit 1
 }
@@ -110,8 +107,7 @@ export ERR_LOG="$ClassBase".errors
 #   cmd  the command to execute
 # Output:
 #   the output of the command
-EXEC_ON_RS()
-{
+EXEC_ON_RS() {
   local rs="$1"
   local cmd="$2"
 
@@ -130,8 +126,7 @@ EOSSH
 export -f EXEC_ON_RS
 
 
-CHECK_OBJ()
-{
+CHECK_OBJ() {
   local objPath="$1"
 
   while read -r rescHier storeHost filePath
@@ -157,8 +152,7 @@ CHECK_OBJ()
 export -f CHECK_OBJ
 
 
-log()
-{
+log() {
   while read -r reason rescHier objPath
   do
     printf -v entry '%s %s\n' "$rescHier" "$objPath"
