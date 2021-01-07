@@ -1,9 +1,5 @@
 #!/bin/bash
 
-readonly ExecName=$(basename "$0")
-readonly Version=2
-
-
 show_help()
 {
   cat <<EOF
@@ -40,6 +36,10 @@ Non error log entries have the following form.
 <rescource hierarchy> <data object path>
 EOF
 }
+
+
+readonly ExecName=$(basename "$0")
+readonly Version=2
 
 
 show_version()
