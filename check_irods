@@ -57,7 +57,7 @@ trap 'rm -rf "$ReqStore"' EXIT
 
 
 main() {
-	declare -A optMap=(
+	declare -A argMap=(
 		[help]=''
 		[ies]=''
 		[port]="$DefaultPort"
@@ -77,27 +77,27 @@ main() {
 	while true; do
 		case "$1" in
 			-h|--help)
-				optMap[help]=help
+				argMap[help]=help
 				shift
 				;;
 			-P|--port)
-				optMap[port]="$2"
+				argMap[port]="$2"
 				shift 2
 				;;
 			-S|--service)
-				optMap[service]="$2"
+				argMap[service]="$2"
 				shift 2
 				;;
 			-V|--verbose)
-				optMap[verbose]=verbose
+				argMap[verbose]=verbose
 				shift
 				;;
 			-v|--version)
-				optMap[version]=version
+				argMap[version]=version
 				shift
 				;;
 			-Z|--zone)
-				optMap[zone]="$2"
+				argMap[zone]="$2"
 				shift 2
 				;;
 			--)
@@ -107,12 +107,12 @@ main() {
 		esac
 	done
 
-	if [[ -n "${optMap[help]}" ]]; then
+	if [[ -n "${argMap[help]}" ]]; then
 		show_help
 		return 0
 	fi
 
-  if [[ -n "${optMap[version]}" ]]; then
+  if [[ -n "${argMap[version]}" ]]; then
 		printf '%s\n' "$Version"
 		return 0
 	fi
@@ -122,9 +122,9 @@ main() {
 		return 1
 	fi
 
-	optMap[ies]="$1"
+	argMap[ies]="$1"
 
-	ping "${optMap[verbose]}" "${optMap[ies]}" "${optMap[port]}" "${optMap[service]}" "${optMap[zone]}"
+	ping "${argMap[verbose]}" "${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}"
 }
 
 
