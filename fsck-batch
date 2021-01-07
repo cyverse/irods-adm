@@ -104,6 +104,32 @@ EXEC_DIR=$(dirname "$ExecPath")
 export ERR_LOG="$ClassBase".errors
 
 
+# executed a command on a resource server as the irods user
+# Arguments:
+#   rs   the name of the resource server
+#   cmd  the command to execute
+# Output:
+#   the output of the command
+EXEC_ON_RS()
+{
+  local rs="$1"
+  local cmd="$2"
+
+  #shellcheck disable=SC2087
+  ssh -q -t "$rs" <<EOSSH
+if [[ "\$USER" = irods ]]
+then
+  $cmd
+else
+  sudo -i -u irods <<'EOSUDO'
+$cmd
+EOSUDO
+fi
+EOSSH
+}
+export -f EXEC_ON_RS
+
+
 CHECK_OBJ()
 {
   local objPath="$1"
@@ -112,7 +138,7 @@ CHECK_OBJ()
   do
     local reason
     local resp
-    resp=$(ssh -q "$storeHost" ifsck -K \'"$filePath"\' 2>> "$ERR_LOG")
+    resp="$(EXEC_ON_RS "$storeHost" "ifsck -K '$filePath'" 2>> "$ERR_LOG")"
 
     if [[ "$resp" =~ size\.$ ]]
     then
