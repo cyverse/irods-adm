@@ -153,7 +153,7 @@ decode_header_len() {
 display_resp() {
 	local verbose="$1"
 
-	if [ -n "$verbose" ]; then
+	if [[ -n "$verbose" ]]; then
 		cat
 		printf '\n'
 	fi
@@ -195,7 +195,7 @@ mk_req() {
 	local msgType="$1"
 
 	local msg=
-	if [ $# -ge 2 ]; then
+	if [[ $# -ge 2 ]]; then
 		msg="$2"
 	fi
 
@@ -274,7 +274,7 @@ ping() {
 			mk_req RODS_DISCONNECT >&3
 			close_conn
 
-			if [ -n "$verbose" ]; then
+			if [[ -n "$verbose" ]]; then
 				local dt
 				dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
 					'BEGIN { print (STOP - START) }')"
