@@ -3,35 +3,35 @@
 show_help() {
 	cat <<EOF
 
-$ExecName - version $Version
+$ExecName version $Version
 
 Usage:
- $ExecName [options] <class_base>
+ $ExecName [options] CLASS-BASE
 
 checks data object replicas for correct sizes and checksums
 
 Parameters:
- <class_base>  the common basename of the files that hold the data objects with
-               incorrect checksums or sizes
+ CLASS-BASE  the common basename of the files that hold the data objects with
+             incorrect checksums or sizes
 
 Options:
- -j, --jobs <n>         perform <n> checks simultaneously, default is the number
-                        of CPUs
- -R, --resource <resc>  only check replicas on resource <resc>
-
- -h, --help     display help text and exit
- -v, --version  display version and exit
+ -h, --help           display help text and exit
+ -j, --jobs N         perform N checks simultaneously, default is the number of
+                      CPUs
+ -R, --resource RESC  only check replicas on resource RESC
+ -v, --version        display version and exit
 
 Summary:
 The script reads a list of iRODS data object paths from standard in, one per
 line, and checks to see if any of the replicas have an incorrect checksum or
 size. The ones with incorrect sizes are appended to the file
-<class_base>.bad_size. The ones with incorrect checksums are appended to the
-file <class_base>.bad_chksum. In either case, only one log entry will be logged
-per line. If an error occurs while checking a replica, the error is written to
-<class_base>.errors.
+\`CLASS-BASE.bad_size\`. The ones with incorrect checksums are appended to the
+file \`CLASS-BASE.bad_chksum\`. If an error occurs while checking a replica, the
+error is written to \`CLASS-BASE\`.errors. In any case, at most one log entry
+will be logged per line.
 
-Non error log entries have the following form.
+\`CLASS-BASE.bad_chksum\` and \`CLASS-BASE.bad_size\` file entries have the
+following form.
 
 <rescource hierarchy> <data object path>
 EOF
