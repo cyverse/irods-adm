@@ -152,14 +152,22 @@ export -f EXEC_ON_RS
 CHECK_CMD() {
 	local filePath="$1"
 
-TODO substitute file path for file name in ifsck stdout and stderr
+	local dirPath fileName escFName escFPath
+	dirPath="$(dirname "$filePath")"
+	fileName="$(basename "$filePath")"
+	escFName="$(echo "$fileName" | sed 's/[]\/$*.^[]/\\&/g')"
+	escFPath="$(echo "$filePath" | sed 's/[\/&]/\\&/g')"
+
   cat <<EOCMD
-if ! cd "\$(dirname '$filePath')"
+name_to_path() { sed 's/$escFName/$escFPath/g' }
+
+if ! cd '$dirPath' 2> /dev/null
 then
 	printf 'ERROR: fsckObj: %s does not exist\n' '$filePath' >&2
 	exit 184
 fi
-ifsck -K "\$(basename '$filePath')"
+
+ifsck -K '$fileName' > >(name_to_path) 2> >(name_to_path >&2)
 EOCMD
 }
 export -f CHECK_CMD
