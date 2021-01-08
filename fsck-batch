@@ -16,7 +16,7 @@ Parameters:
 
 Options:
  -h, --help           display help text and exit
- -j, --jobs N         perform N checks simultaneously, default is the number of
+ -J, --jobs N         perform N checks simultaneously, default is the number of
                       CPUs
  -R, --resource RESC  only check replicas on resource RESC
  -v, --version        display version and exit
@@ -39,7 +39,7 @@ EOF
 
 
 readonly ExecName=$(basename "$0")
-readonly Version=3
+readonly Version=4
 
 
 # formats the command line arguments for getopt style
@@ -49,7 +49,7 @@ readonly Version=3
 # Output:
 #   The formatted arguments
 format_opts() {
-	getopt --name "$ExecName" --options hj:R:v --longoptions help,jobs:,resource:,version -- "$@"
+	getopt --name "$ExecName" --options hJ:R:v --longoptions help,jobs:,resource:,version -- "$@"
 }
 
 
@@ -81,7 +81,7 @@ do
 			show_help
 			exit 0
 			;;
-		-j|--jobs)
+		-J|--jobs)
 			readonly Jobs="$2"
 			shift 2
 			;;
