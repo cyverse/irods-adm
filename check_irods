@@ -107,6 +107,10 @@ main() {
 		esac
 	done
 
+  if [[ "$#" -ge 1 ]]; then
+		argMap[ies]="$1"
+	fi
+
 	if [[ -n "${argMap[help]}" ]]; then
 		show_help
 		return 0
@@ -117,12 +121,11 @@ main() {
 		return 0
 	fi
 
-	if [ "$#" -lt 1 ]; then
+	if [[ -z "${argMap[ies]}" ]]; then
+		printf 'IES required\n' >&2
 		show_help >&2
 		return 1
 	fi
-
-	argMap[ies]="$1"
 
 	ping "${argMap[verbose]}" "${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}"
 }

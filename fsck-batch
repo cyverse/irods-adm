@@ -142,6 +142,29 @@ EOSSH
 export -f EXEC_ON_RS
 
 
+# build the ifsck call to check a replica
+# Arguments:
+#  filePath: The path to the replica on the resource server
+# Output:
+#  The output of the ifsck call
+# Returns:
+#  The exit status of the ifsck call
+CHECK_CMD() {
+	local filePath="$1"
+
+TODO substitute file path for file name in ifsck stdout and stderr
+  cat <<EOCMD
+if ! cd "\$(dirname '$filePath')"
+then
+	printf 'ERROR: fsckObj: %s does not exist\n' '$filePath' >&2
+	exit 184
+fi
+ifsck -K "\$(basename '$filePath')"
+EOCMD
+}
+export -f CHECK_CMD
+
+
 CHECK_OBJ() {
 	local resc="$1"
 	local objPath="$2"
@@ -151,7 +174,7 @@ CHECK_OBJ() {
 		if [[ "$rescHier" =~ ^${resc}(;.*)?$ ]]
 		then
 			local resp
-			resp="$(EXEC_ON_RS "$storeHost" "ifsck -K '$filePath'" 2>> "$ERR_LOG")"
+			resp="$(EXEC_ON_RS "$storeHost" "$(CHECK_CMD "$filePath")" 2>> "$ERR_LOG")"
 
 			local reason
 			if [[ "$resp" =~ size\.$ ]]
