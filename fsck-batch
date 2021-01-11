@@ -209,10 +209,10 @@ log() {
 	do
 		if [ "$reason" = size ]
 		then
-			printf '%s' "$entry" >> "$ClassBase".bad_size
+			printf '%s\n' "$entry" >> "$ClassBase".bad_size
 		elif [ "$reason" = checksum ]
 		then
-			printf '%s' "$entry" >> "$ClassBase".bad_chksum
+			printf '%s\n' "$entry" >> "$ClassBase".bad_chksum
 		else
 			printf '%s %s\n' "$reason" "$entry" >> "$ERR_LOG"
 		fi
