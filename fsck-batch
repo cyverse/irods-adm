@@ -110,95 +110,94 @@ fi
 
 readonly ClassBase="$1"
 
-readonly ExecPath=$(readlink --canonicalize "$0")
-export EXEC_DIR
-EXEC_DIR=$(dirname "$ExecPath")
-
 export ERR_LOG="$ClassBase".errors
 
 
-# executed a command on a resource server as the irods user
+# For a given data object, this fuction retrieves the size, checksum, resource,
+# and file path for each of its replicas.
 # Arguments:
-#   rs   the name of the resource server
-#   cmd  the command to execute
+#  dataObj   the absolute path the the data object
+#  rescName  if not empty, restricts the replicas to belonging to this root
+#            resource
 # Output:
-#   the output of the command
-EXEC_ON_RS() {
-	local rs="$1"
-	local cmd="$2"
+#  To stdout, it writes one line per replica. Each line as the form
+#  `<size> <checksum> <resource hierarchy> <file path>`.
+GET_CAT_INFO() {
+	local dataObj="$1"
+	local rescName="${2-}"
+
+	local collName dataName
+	collName="$(dirname "$dataObj")"
+	dataName="$(basename "$dataObj")"
+
+	local query="
+		select DATA_SIZE, DATA_CHECKSUM, DATA_RESC_HIER, DATA_PATH
+		where COLL_NAME = '$collName' and DATA_NAME = '$dataName'"
+
+	if [[ -n "$rescName" ]]
+	then
+		query+=" and DATA_RESC_NAME = '$rescName'"
+	fi
+
+	iquest '%s %s %s %s' "$query" | sed '/CAT_NO_ROWS_FOUND/d'
+}
+export -f GET_CAT_INFO
+
+
+# For a given file on a given host, this function retrieves the file's size and
+# checksum.
+# Arguments:
+#  storeHost  The FQDN or IP address of the host
+#  filePath   The absolute path to the file on storeHost
+# Output:
+#  To stdout, it writes one line with the form `<size> <checksum>`.
+GET_STORE_INFO() {
+	local storeHost="$1"
+	local filePath="$2"
 
 	#shellcheck disable=SC2087
-	ssh -q -t "$rs" <<EOSSH
-if [[ "\$USER" = irods ]]
+	ssh -q -t "$storeHost" <<EOSSH
+if ! size="\$(stat --format '%s' '$filePath' 2> /dev/null)"
+	|| ! chksum="\$(md5sum '$filePath' 2> /dev/null)"
 then
-	$cmd
-else
-	sudo -i -u irods <<'EOSUDO'
-$cmd
-EOSUDO
+	exit 1
 fi
+
+printf '%s %s\n' "\$size" "$\{chksum%% *}"
 EOSSH
 }
-export -f EXEC_ON_RS
-
-
-# build the ifsck call to check a replica
-# Arguments:
-#  filePath: The path to the replica on the resource server
-# Output:
-#  The output of the ifsck call
-# Returns:
-#  The exit status of the ifsck call
-CHECK_CMD() {
-	local filePath="$1"
-
-	local dirPath fileName escFName escFPath
-	dirPath="$(dirname "$filePath")"
-	fileName="$(basename "$filePath")"
-	escFName="$(echo "$fileName" | sed 's/[]\/$*.^[]/\\&/g')"
-	escFPath="$(echo "$filePath" | sed 's/[\/&]/\\&/g')"
-
-  cat <<EOCMD
-name_to_path() { sed 's/$escFName/$escFPath/g' }
-
-if ! cd '$dirPath' 2> /dev/null
-then
-	printf 'ERROR: fsckObj: %s does not exist\n' '$filePath' >&2
-	exit 184
-fi
-
-ifsck -K '$fileName' > >(name_to_path) 2> >(name_to_path >&2)
-EOCMD
-}
-export -f CHECK_CMD
+export -f GET_STORE_INFO
 
 
 CHECK_OBJ() {
 	local resc="$1"
 	local objPath="$2"
 
-	while read -r rescHier storeHost filePath
+	local catInfo
+	readarray -t catInfo < <(GET_CAT_INFO "$objPath" "$resc")
+
+	for replInfo in "${catInfo[@]}"
 	do
-		if [[ "$rescHier" =~ ^${resc}(;.*)?$ ]]
+		local replSize replChksum rescHier filePath
+		read -r rescHier replSize replChksum filePath <<< "$replInfo"
+
+		local storeHost
+		storeHost="$(iquest '%s' "select RESC_LOC where RESC_NAME = '${rescHier##*;}'")"
+
+		local fileSize fileChksum
+		read -r fileSize fileChksum < <(GET_STORE_INFO "$storeHost" "$filePath")
+
+		local reason
+		if [[ "$replSize" != "$fileSize" ]]
 		then
-			local resp
-			resp="$(EXEC_ON_RS "$storeHost" "$(CHECK_CMD "$filePath")" 2>> "$ERR_LOG")"
-
-			local reason
-			if [[ "$resp" =~ size\.$ ]]
-			then
-				reason=size
-			elif [[ "$resp" =~ checksum\.$ ]]
-			then
-				reason=checksum
-			fi
-
-			if [[ -n "$reason" ]]
-			then
-				printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
-			fi
+			reason=size
+		elif [[ "$replChksum" != "$fileChksum" ]]
+		then
+			reason=checksum
 		fi
-	done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
+
+		printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
+	done
 }
 export -f CHECK_OBJ
 
@@ -224,4 +223,6 @@ then
 	readonly JobsOpt="-j$Jobs"
 fi
 
-parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" CHECK_OBJ "${Resc-}" | log
+parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" CHECK_OBJ "${Resc-}" \
+		2> "$ERR_LOG" \
+	| log
