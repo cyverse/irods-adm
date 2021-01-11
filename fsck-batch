@@ -39,8 +39,9 @@ EOF
 }
 
 
-readonly ExecName=$(basename "$0")
 readonly Version=4
+
+readonly ExecName=$(basename "$0")
 
 
 # formats the command line arguments for getopt style
