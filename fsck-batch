@@ -30,10 +30,11 @@ file \`CLASS-BASE.bad_chksum\`. If an error occurs while checking a replica, the
 error is written to \`CLASS-BASE\`.errors. In any case, at most one log entry
 will be logged per line.
 
-\`CLASS-BASE.bad_chksum\` and \`CLASS-BASE.bad_size\` file entries have the
-following form.
+\`CLASS-BASE.bad_chksum\` and \`CLASS-BASE.bad_size\` file entries have the form
+'<rescource hierarchy> <data object path>'.
 
-<rescource hierarchy> <data object path>
+© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+license information, see https://cyverse.org/license.
 EOF
 }
 
