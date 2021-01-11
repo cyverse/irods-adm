@@ -204,16 +204,16 @@ export -f CHECK_OBJ
 
 
 log() {
-	while read -r reason rescHier objPath
+	while read -r reason entry
 	do
-		printf -v entry '%s %s\n' "$rescHier" "$objPath"
-
 		if [ "$reason" = size ]
 		then
 			printf '%s' "$entry" >> "$ClassBase".bad_size
 		elif [ "$reason" = checksum ]
 		then
 			printf '%s' "$entry" >> "$ClassBase".bad_chksum
+		else
+			printf '%s %s\n' "$reason" "$entry" >> "$ERR_LOG"
 		fi
 	done
 }
@@ -224,6 +224,4 @@ then
 	readonly JobsOpt="-j$Jobs"
 fi
 
-parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" CHECK_OBJ "${Resc-}" \
-		2> "$ERR_LOG" \
-	| log
+parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" CHECK_OBJ "${Resc-}" | log
