@@ -41,6 +41,8 @@ EOF
 
 readonly Version=4
 
+set -e
+
 readonly ExecName=$(basename "$0")
 
 
@@ -65,8 +67,6 @@ exit_with_help() {
 	exit 1
 }
 
-
-set -e
 
 if ! opts="$(format_opts "$@")"
 then
