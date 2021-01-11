@@ -66,49 +66,9 @@ main() {
 		[version]=''
 		[zone]='' )
 
-	local opts
-	if ! opts="$(format_opts "$@")"; then
+	if ! map_args argMap "$@"; then
 		show_help >&2
 		return 1
- 	fi
-
-	eval set -- "$opts"
-
-	while true; do
-		case "$1" in
-			-h|--help)
-				argMap[help]=help
-				shift
-				;;
-			-P|--port)
-				argMap[port]="$2"
-				shift 2
-				;;
-			-S|--service)
-				argMap[service]="$2"
-				shift 2
-				;;
-			-V|--verbose)
-				argMap[verbose]=verbose
-				shift
-				;;
-			-v|--version)
-				argMap[version]=version
-				shift
-				;;
-			-Z|--zone)
-				argMap[zone]="$2"
-				shift 2
-				;;
-			--)
-				shift
-				break
-				;;
-		esac
-	done
-
-  if [[ "$#" -ge 1 ]]; then
-		argMap[ies]="$1"
 	fi
 
 	if [[ -n "${argMap[help]}" ]]; then
@@ -121,13 +81,69 @@ main() {
 		return 0
 	fi
 
-	if [[ -z "${argMap[ies]}" ]]; then
-		printf 'IES required\n' >&2
-		show_help >&2
+	ping "${argMap[verbose]}" "${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}"
+}
+
+
+# resolves the command line arguments
+# Arguments:
+#   The first argument is the name of the associative array where the resolved
+#   arguments will be store. The remaining arguments hold the raw command line
+#   arguments to resolve.
+# Output:
+#   Any issues with the command line arguments will be written to stderr.
+# Return:
+#   It returns 0 on success and 1 on failure.
+map_args() {
+	local mapVar="$1"
+	shift
+
+	local opts
+	if ! opts="$(format_opts "$@")"; then
 		return 1
 	fi
 
-	ping "${argMap[verbose]}" "${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}"
+	eval set -- "$opts"
+
+	while true; do
+		case "$1" in
+			-h|--help)
+				eval "$mapVar""[help]=help"
+				shift
+				;;
+			-P|--port)
+				eval "$mapVar""[port]='$2'"
+				shift 2
+				;;
+			-S|--service)
+				eval "$mapVar""[service]='$2'"
+				shift 2
+				;;
+			-V|--verbose)
+				eval "$mapVar""[verbose]=verbose"
+				shift
+				;;
+			-v|--version)
+				eval "$mapVar""[version]=version"
+				shift
+				;;
+			-Z|--zone)
+				eval "$mapVar""[zone]='$2'"
+				shift 2
+				;;
+			--)
+				shift
+				break
+				;;
+		esac
+	done
+
+	if [[ "$#" -lt 1 ]]; then
+		printf 'IES required\n' >&2
+		return 1
+	fi
+
+	eval "$mapVar""[ies]='$1'"
 }
 
 
