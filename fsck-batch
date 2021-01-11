@@ -41,7 +41,7 @@ EOF
 
 readonly Version=4
 
-set -e
+set -o errexit
 
 readonly ExecName=$(basename "$0")
 
