@@ -181,7 +181,7 @@ CHECK_OBJ() {
 	for replInfo in "${catInfo[@]}"
 	do
 		local replSize replChksum rescHier filePath
-		read -r rescHier replSize replChksum filePath <<< "$replInfo"
+		read -r replSize replChksum rescHier filePath <<< "$replInfo"
 
 		local storeHost
 		storeHost="$(iquest '%s' "select RESC_LOC where RESC_NAME = '${rescHier##*;}'")"
