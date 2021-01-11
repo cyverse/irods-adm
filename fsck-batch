@@ -198,7 +198,10 @@ CHECK_OBJ() {
 			reason=checksum
 		fi
 
-		printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
+		if [[ -n "$reason" ]]
+		then
+			printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
+		fi
 	done
 }
 export -f CHECK_OBJ
