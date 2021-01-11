@@ -165,7 +165,7 @@ then
 	exit 1
 fi
 
-printf '%s %s\n' "\$size" "$\{chksum%% *}"
+printf '%s %s\n' "\$size" "\${chksum%% *}"
 EOSSH
 }
 export -f GET_STORE_INFO
