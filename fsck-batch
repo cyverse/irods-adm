@@ -159,7 +159,7 @@ GET_STORE_INFO() {
 
 	#shellcheck disable=SC2087
 	ssh -q -t "$storeHost" <<EOSSH
-if ! size="\$(stat --format '%s' '$filePath' 2> /dev/null)"
+if ! size="\$(stat --format '%s' '$filePath' 2> /dev/null)" \\
 	|| ! chksum="\$(md5sum '$filePath' 2> /dev/null)"
 then
 	exit 1
