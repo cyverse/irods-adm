@@ -81,7 +81,8 @@ main() {
 		return 0
 	fi
 
-	ping "${argMap[verbose]}" "${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}"
+	ping \
+		"${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}" "${argMap[verbose]}"
 }
 
 
@@ -264,11 +265,11 @@ parse_resp() {
 
 
 ping() {
-	local verbose="$1"
-	local ies="$2"
-	local port="$3"
-	local service="$4"
-	local zone="$5"
+	local ies="$1"
+	local port="$2"
+	local service="$3"
+	local zone="$4"
+	local verbose="$5"
 
 	local startTime
 	startTime="$(date +'%s.%N')"
