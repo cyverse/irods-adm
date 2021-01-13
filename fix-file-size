@@ -1,7 +1,6 @@
 #!/bin/bash
 
-show_help()
-{
+show_help() {
   cat <<EOF
 
 $ExecName version $Version
@@ -36,15 +35,12 @@ readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecPath")
 
 
-show_version()
-{
+show_version() {
   printf '%s\n' "$Version"
 }
 
 
-
-EXEC_ON_RS()
-{
+EXEC_ON_RS() {
   local rs="$1"
   local cmd="$2"
 
@@ -63,8 +59,7 @@ EOSSH
 export -f EXEC_ON_RS
 
 
-FIX_CMD()
-{
+FIX_CMD() {
   local obj="$1"
   local resc="$2"
   local file="$3"
@@ -80,8 +75,7 @@ EOCMD
 export -f FIX_CMD
 
 
-FIX()
-{
+FIX() {
   local objPath="$1"
 
   local fixed
