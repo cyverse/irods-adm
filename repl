@@ -44,6 +44,9 @@ Prerequisites:
  1) The user must be initialized with iRODS as an admin user.
  2) The user must be able to connect to the ICAT DB without providing a
     password.
+
+© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+license information, see https://cyverse.org/license.
 EOF
 }
 
