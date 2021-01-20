@@ -3,10 +3,10 @@
 show_help() {
 	cat <<EOF
 
-$ExecName version $Version
+$EXEC_NAME version $VERSION
 
 Usage:
- $ExecName [options] HOST
+ $EXEC_NAME [options] HOST
 
 Checks to see is if an iRODS service is online. If connects to iRODS is it
 prints 'up|time=<resp-time>s' to standard output where '<resp-time>' is the time
@@ -16,12 +16,12 @@ code 1. If it connects to something that isn't iRODS, it prints 'not iRODS' and
 exits with status code 2.
 
 The rodsLog will show a connection from the host where this is run with the proxy
-user set to $ExecName. If SERVICE is specified, the client user will be set to
-SERVICE instead of $ExecName. If ZONE is specificed, the zone for both users
+user set to $EXEC_NAME. If SERVICE is specified, the client user will be set to
+SERVICE instead of $EXEC_NAME. If ZONE is specificed, the zone for both users
 will be ZONE.
 
 If ips happens to be called while this is program is connected to iRODS, ips
-will show this program's connection as comming from $ExecName.
+will show this program's connection as comming from $EXEC_NAME.
 
 Parameters:
  HOST  the FQDN or IP address of the server hosting the service
@@ -44,21 +44,21 @@ EOF
 }
 
 
-readonly Version=3
+readonly VERSION=3
 
 set -o errexit -o nounset -o pipefail
 
-readonly DefaultPort=1247
+readonly DEFAULT_PORT=1247
 
-readonly ExecName="$(basename "$(realpath --canonicalize-missing "$0")")"
+readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 
 
 main() {
 	declare -A argMap=(
 		[help]=''
 		[ies]=''
-		[port]="$DefaultPort"
-		[service]="$ExecName"
+		[port]="$DEFAULT_PORT"
+		[service]="$EXEC_NAME"
 		[verbose]=''
 		[version]=''
 		[zone]='' )
@@ -74,7 +74,7 @@ main() {
 	fi
 
   if [[ -n "${argMap[version]}" ]]; then
-		printf '%s\n' "$Version"
+		printf '%s\n' "$VERSION"
 		return 0
 	fi
 
@@ -184,7 +184,7 @@ encode_header_len() {
 format_opts() {
 	getopt \
 		--longoptions help,port:,service:,verbose,version,zone: \
-		--name "$ExecName" \
+		--name "$EXEC_NAME" \
 		--options hP:S:VvZ: \
 		-- "$@"
 }
@@ -228,13 +228,13 @@ mk_startup_pack() {
 	cat <<EOX
 <StartupPack_PI>
 	<connectCnt>0</connectCnt>
-	<proxyUser>$ExecName</proxyUser>
+	<proxyUser>$EXEC_NAME</proxyUser>
 	<proxyRcatZone>$rcatZone</proxyRcatZone>
 	<clientUser>$clientUser</clientUser>
 	<clientRcatZone>$rcatZone</clientRcatZone>
 	<relVersion></relVersion>
 	<apiVersion></apiVersion>
-	<option>$ExecName</option>
+	<option>$EXEC_NAME</option>
 </StartupPack_PI>
 EOX
 }
