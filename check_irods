@@ -44,7 +44,7 @@ EOF
 }
 
 
-readonly VERSION=3
+readonly VERSION=4
 
 set -o errexit -o nounset -o pipefail
 
@@ -180,7 +180,7 @@ ping() {
 			mk_req RODS_DISCONNECT >&3
 			close_conn
 
-			if [[ -n "$verbose" ]]; then
+			if [[ -z "$verbose" ]]; then
 				local dt
 				dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
 					'BEGIN { print (STOP - START) }')"
