@@ -9,19 +9,19 @@ Usage:
  $EXEC_NAME [options] HOST
 
 Checks to see is if an iRODS service is online. If connects to iRODS is it
-prints 'up|time=<resp-time>s' to standard output where '<resp-time>' is the time
+prints "up|time=<resp-time>s" to standard output where <resp-time> is the time
 it took for iRODS to respond, and it exits with status code 0. If it doesn't
-connect to anything, it prints 'down' to standard output and exits with status
-code 1. If it connects to something that isn't iRODS, it prints 'not iRODS' and
+connect to anything, it prints "down" to standard output and exits with status
+code 1. If it connects to something that isn't iRODS, it prints "not iRODS" and
 exits with status code 2.
 
-The rodsLog will show a connection from the host where this is run with the proxy
-user set to $EXEC_NAME. If SERVICE is specified, the client user will be set to
-SERVICE instead of $EXEC_NAME. If ZONE is specificed, the zone for both users
-will be ZONE.
+The rodsLog will show a connection from the host where this is run with the
+proxy user set to "$EXEC_NAME". If SERVICE is specified, the client user will
+be set to SERVICE instead. If ZONE is specificed, the zone for both users will
+be ZONE.
 
-If ips happens to be called while this is program is connected to iRODS, ips
-will show this program's connection as comming from $EXEC_NAME.
+If \`ips\` happens to be called while this is program is connected to iRODS, \`ips\`
+will show this program's connection as comming from "$EXEC_NAME".
 
 Parameters:
  HOST  the FQDN or IP address of the server hosting the service
