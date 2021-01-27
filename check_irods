@@ -156,20 +156,18 @@ map_args() {
 #   2  if an internal error occured
 format_opts() {
 	set +o errexit
-
 	getopt \
-		--longoptions help,port:,service:,verbose,version,zone: \
 		--name "$EXEC_NAME" \
+		--longoptions help,port:,service:,verbose,version,zone: \
 		--options hP:S:VvZ: \
 		-- "$@"
 	local rc=$?
-
 	set -o errexit
 
-	if (( rc == 1 )); then
-		return 1
-	else
+	if (( rc > 1 )); then
 		return 2
+	else
+		return $rc
 	fi
 }
 
