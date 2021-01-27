@@ -99,11 +99,7 @@ map_args() {
 	local mapVar="$1"
 	shift
 
-	# TODO inline opts
-	local opts
-	opts="$(format_opts "$@")"
-
-	eval set -- "$opts"
+	eval set -- "$(format_opts "$@")"
 
 	while true; do
 		case "$1" in
