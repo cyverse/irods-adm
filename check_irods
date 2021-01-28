@@ -1,6 +1,7 @@
 #!/bin/bash
 
-show_help() {
+# TODO complete documentation
+help() {
 	cat <<EOF
 
 $EXEC_NAME version $VERSION
@@ -64,12 +65,12 @@ main() {
 
 	# TODO handle return code 2
 	if ! map_args argMap "$@"; then
-		show_help >&2
+		help >&2
 		return 1
 	fi
 
 	if [[ -n "${argMap[help]}" ]]; then
-		show_help
+		help
 		return 0
 	fi
 
@@ -83,6 +84,7 @@ main() {
 }
 
 
+# TODO describe mapVar
 # resolves the command line arguments
 # Arguments:
 #  The first argument is the name of the associative array where the resolved
@@ -143,6 +145,7 @@ map_args() {
 }
 
 
+# TODO inline this function
 # formats the command line options using `getopt`
 # Arguments:
 #  the raw command line arguments
