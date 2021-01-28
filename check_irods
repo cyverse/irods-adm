@@ -9,7 +9,7 @@ $EXEC_NAME version $VERSION
 Usage:
  $EXEC_NAME [options] HOST
 
-Checks to see is if an iRODS service is online. If connects to iRODS is it
+Checks to see is if an iRODS service is online. If it connects to iRODS, it
 prints "up|time=<resp-time>s" to standard output where <resp-time> is the time
 it took for iRODS to respond, and it exits with status code 0. If it doesn't
 connect to anything, it prints "down" to standard output and exits with status
