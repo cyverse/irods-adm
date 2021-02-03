@@ -1,7 +1,8 @@
 #!/bin/bash
+# TODO review nagios script requirements
 
-# TODO learn about multi-year copyrights
 help() {
+	# TODO review possible error codes
 	cat <<EOF
 
 $EXEC_NAME version $VERSION
@@ -44,19 +45,31 @@ Exit Status:
  0  connected to iRODS
  1  failed to connect to anything
  2  connected to something other than iRODS
+ 3  $EXEC_NAME was incorrectly invoked
+ 4  internal error, this could be a bug in $EXEC_NAME or a system issue, like
+    running out of memory
 
-© 2019, The Arizona Board of Regents on behalf of The University of Arizona. For
-license information, see https://cyverse.org/license.
+© 2019, 2021 The Arizona Board of Regents on behalf of The University of
+Arizona. For license information, see https://cyverse.org/license.
 EOF
 }
 
+# TODO review error codes
+readonly VERSION=5
 
-readonly VERSION=4
-
+# TODO review possible error codes
 set -o errexit -o nounset -o pipefail
 
 readonly DEFAULT_PORT=1247
+# TODO review possible error codes
 readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
+
+# exit and return statuses
+readonly SUCCESS=0
+readonly NO_CONNECT=1
+readonly NOT_IRODS=2
+readonly USAGE_ERROR=3
+readonly INTERNAL_ERROR=4
 
 
 main() {
@@ -69,20 +82,21 @@ main() {
 		[version]=''
 		[zone]='' )
 
-	# TODO handle return code 2
+	# TODO handle return code 4
 	if ! map_args argMap "$@"; then
 		help >&2
-		return 1
+		return $USAGE_ERROR
 	fi
 
 	if [[ -n "${argMap[help]}" ]]; then
 		help
-		return 0
+		return $SUCCESS
 	fi
 
   if [[ -n "${argMap[version]}" ]]; then
+		# TODO review possible errors
 		printf '%s\n' "$VERSION"
-		return 0
+		return $SUCCESS
 	fi
 
 	ping \
@@ -91,6 +105,7 @@ main() {
 
 
 # TODO describe mapVar
+# TODO verify return codes are correct
 # resolves the command line arguments
 # Arguments:
 #  The first argument is the name of the associative array where the resolved
@@ -100,13 +115,14 @@ main() {
 #  Any issues with the command line arguments will be written to stderr.
 # Return:
 #  It returns the following codes.
-#   0 on success
-#   1 if the command line arguments don't make sense
-#   2 if an internal error occured
+#   0  on success
+#   3  if the command line arguments don't make sense
+#   4  if an internal error occured
 map_args() {
 	local mapVar="$1"
 	shift
 
+	# TODO review possible errors
 	eval set -- "$(format_opts "$@")"
 
 	while true; do
@@ -144,7 +160,7 @@ map_args() {
 
 	if [[ "$#" -lt 1 ]]; then
 		printf 'IES required\n' >&2
-		return 1
+		return $USAGE_ERROR
 	fi
 
 	eval "$mapVar""[ies]='$1'"
@@ -161,8 +177,8 @@ map_args() {
 # Return:
 #  It returns the following codes.
 #   0  on success
-#   1  if the command line options don't make sense
-#   2  if an internal error occured
+#   3  if the command line options don't make sense
+#   4  if an internal error occured
 format_opts() {
 	set +o errexit
 	getopt \
@@ -173,10 +189,12 @@ format_opts() {
 	local rc=$?
 	set -o errexit
 
-	if (( rc > 1 )); then
-		return 2
+	if (( rc == 0 )); then
+		return $SUCCESS
+	elif (( rc == 1 )); then
+		return $USAGE_ERROR
 	else
-		return $rc
+		return $INTERNAL_ERROR
 	fi
 }
 
@@ -191,9 +209,10 @@ ping() {
 	local startTime
 	startTime="$(date +'%s.%N')"
 
+	# TODO review possible return codes for exec
 	if ! exec 3<>/dev/tcp/"$ies"/"$port"; then
 		printf 'down\n'
-		return 1
+		return $NO_CONNECT
 	fi
 
 	local connMsgBody
@@ -203,6 +222,7 @@ ping() {
 		local respMsg
 		if respMsg="$(parse_resp <&3)"; then
 			local stopTime
+			# TODO review possible errors
 			stopTime="$(date +'%s.%N')"
 
 			mk_req RODS_DISCONNECT >&3
@@ -210,6 +230,7 @@ ping() {
 
 			if [[ -z "$verbose" ]]; then
 				local dt
+				# TODO review possible errors
 				dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
 					'BEGIN { print (STOP - START) }')"
 
@@ -218,16 +239,16 @@ ping() {
 				printf '%s\n' "$respMsg"
 			fi
 
-			return 0
+			return $SUCCESS
 		fi
 	fi
 
 	close_conn
 	printf 'not iRODS\n'
-	return 2
+	return $NOT_IRODS
 }
 
-
+# TODO swallow errors
 close_conn() {
 	exec 3<&-
 	exec 3>&-
@@ -255,10 +276,11 @@ parse_resp() {
 	headerLen="$(decode_header_len)"
 
 	local header
+	# TODO learn about errors
 	read -r -d '' -n "$headerLen" header
 
 	if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]; then
-		return 1
+		return $NOT_IRODS
 	fi
 
 	local msgLen="${header#*<msgLen>}"
@@ -307,6 +329,7 @@ EOX
 encode_header_len() {
 	local len="$1"
 
+	# TODO learn about possible errors
 	printf '0: %.8x' "$len" | xxd -revert -g 0
 }
 
@@ -318,6 +341,7 @@ encode_header_len() {
 #   the decimal value to stdout.
 decode_header_len() {
 	local lenHex
+	# TODO learn about possible errors
 	lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"
 
 	printf '%d' $((16#$lenHex))
