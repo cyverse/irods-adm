@@ -1,6 +1,7 @@
 #!/bin/bash
-# TODO review nagios script requirements
 
+# TODO document output
+# TODO document nagios version supported
 help() {
 	# TODO review possible error codes
 	cat <<EOF
@@ -43,19 +44,15 @@ Side Effects:
 
 Exit Status:
  0  connected to iRODS
- 1  failed to connect to anything
- 2  connected to something other than iRODS
- 3  $EXEC_NAME was incorrectly invoked
- 4  internal error, this could be a bug in $EXEC_NAME or a system issue, like
-    running out of memory
+ 2  failed to connect to iRODS
+ 3  an error occurred or connected to something other than iRODS
 
 © 2019, 2021 The Arizona Board of Regents on behalf of The University of
 Arizona. For license information, see https://cyverse.org/license.
 EOF
 }
 
-# TODO review error codes
-readonly VERSION=5
+readonly VERSION=6
 
 # TODO review possible error codes
 set -o errexit -o nounset -o pipefail
@@ -65,11 +62,9 @@ readonly DEFAULT_PORT=1247
 readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 
 # exit and return statuses
-readonly SUCCESS=0
-readonly NO_CONNECT=1
-readonly NOT_IRODS=2
-readonly USAGE_ERROR=3
-readonly INTERNAL_ERROR=4
+readonly OK=0
+readonly NO_CONNECT=2
+readonly ERROR=3
 
 
 main() {
@@ -82,23 +77,23 @@ main() {
 		[version]=''
 		[zone]='' )
 
-	# TODO handle return code 4
 	if ! map_args argMap "$@"; then
 		help >&2
-		return $USAGE_ERROR
+		return $ERROR
 	fi
 
 	if [[ -n "${argMap[help]}" ]]; then
 		help
-		return $SUCCESS
+		return $OK
 	fi
 
   if [[ -n "${argMap[version]}" ]]; then
 		# TODO review possible errors
 		printf '%s\n' "$VERSION"
-		return $SUCCESS
+		return $OK
 	fi
 
+	# TODO ensure only 0, 2, and 3 are returned
 	ping \
 		"${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}" "${argMap[verbose]}"
 }
@@ -122,7 +117,6 @@ map_args() {
 	local mapVar="$1"
 	shift
 
-	# TODO review possible errors
 	eval set -- "$(format_opts "$@")"
 
 	while true; do
@@ -160,7 +154,7 @@ map_args() {
 
 	if [[ "$#" -lt 1 ]]; then
 		printf 'IES required\n' >&2
-		return $USAGE_ERROR
+		return $ERROR
 	fi
 
 	eval "$mapVar""[ies]='$1'"
@@ -190,11 +184,11 @@ format_opts() {
 	set -o errexit
 
 	if (( rc == 0 )); then
-		return $SUCCESS
+		return $OK
 	elif (( rc == 1 )); then
-		return $USAGE_ERROR
+		return $ERROR
 	else
-		return $INTERNAL_ERROR
+		return $ERROR
 	fi
 }
 
@@ -239,13 +233,13 @@ ping() {
 				printf '%s\n' "$respMsg"
 			fi
 
-			return $SUCCESS
+			return $OK
 		fi
 	fi
 
 	close_conn
 	printf 'not iRODS\n'
-	return $NOT_IRODS
+	return $ERROR
 }
 
 # TODO swallow errors
@@ -280,7 +274,7 @@ parse_resp() {
 	read -r -d '' -n "$headerLen" header
 
 	if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]; then
-		return $NOT_IRODS
+		return $ERROR
 	fi
 
 	local msgLen="${header#*<msgLen>}"
