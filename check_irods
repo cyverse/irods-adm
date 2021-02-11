@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# TODO document output
-# TODO document nagios version supported
+# TODO bring options in line with guidelines. See https://nagios-plugins.org/doc/guidelines.html#PLUGOPTIONS
+# TODO bring output in line with guidelines. See https://nagios-plugins.org/doc/guidelines.html#PLUGOUTPUT
 help() {
 	# TODO review possible error codes
 	cat <<EOF
@@ -11,8 +11,8 @@ $EXEC_NAME version $VERSION
 Usage:
  $EXEC_NAME [options] HOST
 
-Checks to see is if an iRODS service is online. It is intended to for use by
-nagios.
+Nagios plugin that checks to see is if an iRODS server is online. It supports
+Nagios version 3 or later and iRODS version 4 or later.
 
 Parameters:
  HOST  the FQDN or IP address of the server hosting the service
