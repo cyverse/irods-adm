@@ -111,7 +111,7 @@ list_logs() {
   #shellcheck disable=SC2087
   mk_list_logs_script "$password" "$namePattern" \
     | ssh -q -t "$host" 2> /dev/null \
-    | sed --quiet '/^\/p'
+    | sed --quiet '/^\//p'
 }
 
 
