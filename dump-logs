@@ -33,7 +33,7 @@
 # © 2021, The Arizona Board of Regents on behalf of The University of Arizona.
 # For license information, see https://cyverse.org/license.
 
-set -o nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecDir=$(dirname "$ExecPath")
