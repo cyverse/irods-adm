@@ -83,7 +83,7 @@ count_sessions()
     if [[ -n "$session" ]]
     then
       printf '§%s' "$session"
-      cnt=$(( cnt++ ))
+      cnt=$(( cnt + 1 ))
       printf '  %d\r' "$cnt" >&2
     fi
   done
