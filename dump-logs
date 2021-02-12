@@ -35,9 +35,9 @@
 
 set -o errexit -o nounset -o pipefail
 
-readonly ExecPath=$(readlink --canonicalize "$0")
-readonly ExecDir=$(dirname "$ExecPath")
-readonly LogBase=rodsLog
+readonly EXEC_PATH=$(readlink --canonicalize "$0")
+readonly EXEC_DIR=$(dirname "$EXEC_PATH")
+readonly LOG_BASE=rodsLog
 
 
 fmt_number()
@@ -66,7 +66,7 @@ filter_day()
     local startTime="$year-$month-$dayRangeBegin 00:00:00"
     local endTime="$year-$month-$dayRangeEnd 23:59:59"
 
-    "$ExecDir"/filter-sessions-by-time "$startTime" "$endTime"
+    "$EXEC_DIR"/filter-sessions-by-time "$startTime" "$endTime"
   fi
 }
 
@@ -105,11 +105,11 @@ dump_log()
   local svr="$1"
   local logExt="$2"
 
-  "$ExecDir"/gather-logs --extension-pattern "$logExt" "$svr" \
-    | "$ExecDir"/group-log-by-pid \
+  "$EXEC_DIR"/gather-logs --extension-pattern "$logExt" "$svr" \
+    | "$EXEC_DIR"/group-log-by-pid \
     | filter_day \
     | count_sessions \
-    | "$ExecDir"/order-sessions
+    | "$EXEC_DIR"/order-sessions
 }
 
 
@@ -145,21 +145,21 @@ else
   logEndDay=
 fi
 
-readonly LogExt="$year"."$month"
+readonly LOG_EXT="$year"."$month"
 
 declare -i cnt
 
 mkdir --parents logs
 
-readonly Ies=$(ienv | sed --quiet 's/NOTICE: irods_host - //p')
+readonly IES=$(ienv | sed --quiet 's/NOTICE: irods_host - //p')
 readonly RS=$(get_servers)
 
-for svr in "$Ies" $RS
+for svr in "$IES" $RS
 do
   printf '\rdumping logs from %s\n' "$svr" >&2
   out=logs/"$svr".sessions
 
-  for log in $("$ExecDir"/list-rods-logs --name-pattern "$LogBase.$LogExt.*" "$svr")
+  for log in $("$EXEC_DIR"/list-rods-logs --name-pattern "$LOG_BASE.$LOG_EXT.*" "$svr")
   do
     logName=$(basename "$log")
 
