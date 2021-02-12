@@ -37,7 +37,6 @@ set -o nounset -o pipefail
 
 readonly ExecPath=$(readlink --canonicalize "$0")
 readonly ExecDir=$(dirname "$ExecPath")
-readonly LogDir=/var/lib/irods/iRODS/server/log
 readonly LogBase=rodsLog
 
 
