@@ -8,18 +8,20 @@ $ExecName version $Version
 Usage:
 $ExecName [options] HOST
 
-Lists the absolute paths to a set of iRODS log files that are on a given server.
+lists the absolute paths to a set of iRODS log files that are on a given server
 
 Parameters:
  HOST  The name of the iRODS server to dump the logs from
 
 Options:
- -N, --name-pattern  A wildcard expression describing the name of the log files to list, default is
-                     "*".
- -P, --password      A password needed to connect to the server
+ -h, --help          show help and exit
+ -N, --name-pattern  a wildcard expression describing the name of the log files
+                     to list, default is "*"
+ -P, --password      a password needed to connect to the server
+ -v, --version       show version and exit
 
- -h, --help     show help and exit
- -v, --version  show version and exit
+© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+license information, see https://cyverse.org/license.
 EOF
 }
 
