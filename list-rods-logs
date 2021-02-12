@@ -34,8 +34,7 @@ readonly Version=1
 readonly LogDir=/var/lib/irods/iRODS/server/log
 
 
-main()
-{
+main() {
   local opts
   if ! opts=$(format_opts "$@")
   then
@@ -90,8 +89,7 @@ main()
 }
 
 
-format_opts()
-{
+format_opts() {
   getopt \
     --longoptions help,name-pattern:,password:,version \
     --options hN:P:v \
@@ -100,14 +98,12 @@ format_opts()
 }
 
 
-show_version()
-{
+show_version() {
   printf '%s\n' "$Version"
 }
 
 
-list_logs()
-{
+list_logs() {
   local host="$1"
   local password="$2"
   local namePattern="$3"
@@ -119,8 +115,7 @@ list_logs()
 }
 
 
-mk_list_logs_script()
-{
+mk_list_logs_script() {
   local password="$1"
   local namePattern="$2"
 
