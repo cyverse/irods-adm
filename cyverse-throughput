@@ -359,25 +359,32 @@ setup_download() {
    return 1
   fi
 
+  local fail
+
   printf 'Creating %s test file\n' "$size" >> "$StatusLog"
   if ! truncate --size "$size" "$srcFile"
   then
     printf 'Failed to create %s test file\n' "$size" >&2
-    return 1
+    fail=fail
   fi
 
   local srcObj="$srcColl/test_file.$size"
 
   printf 'Staging %s test file\n' "$size" >> "$StatusLog"
-  if ! iput "$srcFile" "$srcObj"
+  if [[ -z "${fail-}" ]] && ! iput "$srcFile" "$srcObj"
   then
     printf 'Failed to stage %s test file\n' "$size" >&2
-    return 1
+    fail=fail
   fi
 
   rm --force "$srcFile"
 
-  echo "$srcObj"
+  if [[ -z "${fail-}" ]]
+  then
+    echo "$srcObj"
+  else
+    return 1
+  fi
 }
 
 
