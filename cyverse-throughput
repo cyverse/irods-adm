@@ -170,31 +170,31 @@ map_opts()
   do
     case "$1" in
       -h|--help)
-        eval "$mapVar[help]=help"
+        eval "$mapVar"'[help]=help'
         shift
         ;;
       -V|--version)
-        eval "$mapVar[version]=version"
+        eval "$mapVar"'[version]=version'
         shift
         ;;
       -v|--verbose)
-        eval "$mapVar[verbose]=verbose"
+        eval "$mapVar"'[verbose]=verbose'
         shift
         ;;
       -D|--client-dir)
-        eval "$mapVar[client-dir]='$2'"
+        eval "$mapVar""[client-dir]='$2'"
         shift 2
         ;;
       -L|--log)
-        eval "$mapVar[log]='$2'"
+        eval "$mapVar""[log]='$2'"
         shift 2
         ;;
       -C|--server-coll)
-        eval "$mapVar[server-coll]='$2'"
+        eval "$mapVar""[server-coll]='$2'"
         shift 2
         ;;
       -S|--sizes)
-        eval "$mapVar[sizes]='$2'"
+        eval "$mapVar""[sizes]='$2'"
         shift 2
         ;;
       --)
@@ -508,9 +508,9 @@ gen_report()
 
     if [[ "$curDir" = download ]]
     then
-      downDurs=(${downDurs[@]-} $duration)
+      downDurs=("${downDurs[@]-}" "$duration")
     else
-      upDurs=(${upDurs[@]-} $duration)
+      upDurs=("${upDurs[@]-}" "$duration")
     fi
 
     printf -v runsReport \
