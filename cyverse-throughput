@@ -1,7 +1,6 @@
 #!/bin/bash
 
-help()
-{
+help() {
   cat <<EOF
 
 $ExecName version $Version
@@ -114,8 +113,7 @@ declare ReportLog
 declare StatusLog
 
 
-main()
-{
+main() {
   declare -A optMap=(
     [help]=''
     [version]=''
@@ -163,8 +161,7 @@ main()
 }
 
 
-map_opts()
-{
+map_opts() {
   local mapVar="$1"
   shift
 
@@ -223,8 +220,7 @@ map_opts()
 }
 
 
-fmt_opts()
-{
+fmt_opts() {
   getopt \
     --name "$ExecName" \
     --longoptions help,verbose,version,client-dir:,log:,num-runs:,server-coll:,sizes: \
@@ -234,8 +230,7 @@ fmt_opts()
 }
 
 
-do_test()
-{
+do_test() {
   local numRuns="$1"
   local sizes="$2"
   local clientDir="$3"
@@ -282,8 +277,7 @@ do_test()
 }
 
 
-clean_up()
-{
+clean_up() {
   local clientDir="$1"
   local svrColl="$2"
 
@@ -301,8 +295,7 @@ clean_up()
 }
 
 
-ensure_irods_sess()
-{
+ensure_irods_sess() {
   local authFile
   authFile="$(ienv | sed --quiet 's/.*irods_authentication_file - //p')"
 
@@ -322,13 +315,11 @@ ensure_irods_sess()
 }
 
 
-measure_downloads()
-{
+measure_downloads() {
   local numRuns="$1"
   local reqSize="$2"
   local srcColl="$3"
   local destDir="$4"
-
 
   local srcObj
   srcObj=$(setup_download "$reqSize" "$srcColl" "$destDir")
@@ -356,8 +347,7 @@ measure_downloads()
 }
 
 
-setup_download()
-{
+setup_download() {
   local size="$1"
   local srcColl="$2"
   local destDir="$3"
@@ -391,8 +381,7 @@ setup_download()
 }
 
 
-measure_uploads()
-{
+measure_uploads() {
   local numRuns="$1"
   local reqSize="$2"
   local srcDir="$3"
@@ -423,8 +412,7 @@ measure_uploads()
 }
 
 
-setup_uploads()
-{
+setup_uploads() {
   local size="$1"
   local srcDir="$2"
 
@@ -446,8 +434,7 @@ setup_uploads()
 }
 
 
-perform_download()
-{
+perform_download() {
   local reqSize="$1"
   local actSize="$2"
   local run="$3"
@@ -465,8 +452,7 @@ perform_download()
 }
 
 
-perform_upload()
-{
+perform_upload() {
   local reqSize="$1"
   local actSize="$2"
   local run="$3"
@@ -483,8 +469,7 @@ perform_upload()
 }
 
 
-gen_report()
-{
+gen_report() {
   local clientReport
   clientReport=$(gen_client_report)
 
@@ -547,8 +532,7 @@ gen_report()
 }
 
 
-gen_client_report()
-{
+gen_client_report() {
   local irodsVer numCores totMem
   numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
   totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
@@ -563,8 +547,7 @@ gen_client_report()
   printf '%s\n' "$report"
 }
 
-get_irods_version()
-{
+get_irods_version() {
   local version
   version=$(ienv | sed --quiet 's/.*irods_version - \([0-9.]*\).*/\1/p')
 
@@ -577,8 +560,7 @@ get_irods_version()
 }
 
 
-append_size_summary()
-{
+append_size_summary() {
   local report="$1"
   local repSize="$2"
   local size="$3"
@@ -616,8 +598,7 @@ append_size_summary()
 }
 
 
-gen_stat()
-{
+gen_stat() {
   local geoMean="$1"
   local geoDev="$2"
 
@@ -630,8 +611,7 @@ gen_stat()
 }
 
 
-compute_geomean()
-{
+compute_geomean() {
   awk --file - <(printf '%s\n' "$@") <<'EOF'
     BEGIN { totLn = 0.0; }
     { totLn += log($0); }
@@ -640,8 +620,7 @@ EOF
 }
 
 
-compute_geodev()
-{
+compute_geodev() {
   local geoMean="$1"
   shift
 
@@ -654,8 +633,7 @@ EOF
 }
 
 
-compute_high_bound()
-{
+compute_high_bound() {
   local geoMean="$1"
   local geoDev="$2"
 
@@ -665,8 +643,7 @@ EOF
 }
 
 
-compute_low_bound()
-{
+compute_low_bound() {
   local geoMean="$1"
   local geoDev="$2"
 
@@ -676,8 +653,7 @@ EOF
 }
 
 
-compute_rate()
-{
+compute_rate() {
   local sizeB="$1"
   local durationS="$2"
 
