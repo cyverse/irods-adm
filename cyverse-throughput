@@ -10,11 +10,12 @@ Usage:
  $ExecName [options]
 
 This script measures transfer throughput of the client running this script to
-and from the CyVerse Data Store. It downloads a data object thirty times in a
-row, with each download being to a new file. Afterwards, it uploads a file
-thirty times, with each upload being to a new data object. If multiple
-sizes are requested, this process is repeated for each size. A report is written
-to stdout, while errors and status messages are written to stderr.
+and from the CyVerse Data Store. It downloads a data object one or more times in
+a row, with each download being to a new file. Afterwards, it uploads a file of
+the same size the same number of times, with each upload being creating a new
+data object. If multiple sizes are requested, this process is repeated for each
+size. A report is written to stdout, while errors and status messages are
+written to stderr.
 
 For each set of downloads or uploads of a given size, the geometric mean is
 computed to estimate the throughput and the 67% geometric deviation is computed
@@ -29,6 +30,8 @@ Options:
                                 \`\$TMPDIR\`/throughput-\`date -u -Iseconds\`.
  -h, --help                     show help and exit
  -L, --log REPORT-FILE          write report to REPORT-FILE instead of stdout.
+ -N, --num-runs                 the number of times to try each transfer. Defaults
+                                to 30.
  -S, --sizes SIZE-1,SIZE-2,...  the sizes of the files with units in a form
                                 accepted by \`truncate\`, e.g., 2MiB gives a two
                                 mebibyte file. The default is 1GiB.
@@ -102,10 +105,10 @@ EOF
 set -o nounset -o pipefail
 
 readonly Version=1
+readonly DefaultNumRuns=30
 readonly ExecAbsPath=$(readlink --canonicalize "$0")
 readonly ExecName=$(basename "$ExecAbsPath")
 readonly TestTime="$(date --utc --iso-8601=seconds)"
-readonly NumRuns=30
 
 declare ReportLog
 declare StatusLog
@@ -118,6 +121,7 @@ main()
     [version]=''
     [verbose]=''
     [client-dir]="${TMPDIR:-$PWD}/throughput-$TestTime"
+    [num-runs]="$DefaultNumRuns"
     [server-coll]=''
     [sizes]=1GiB
     [log]=/dev/stdout )
@@ -140,6 +144,12 @@ main()
     return 0
   fi
 
+  if (( optMap[num-runs] < 1 ))
+  then
+    printf 'There must be at least 1 run.\n' >&2
+    return 1
+  fi
+
   if [[ -z "${optMap[verbose]}" ]]
   then
     StatusLog=/dev/null
@@ -149,7 +159,7 @@ main()
 
   ReportLog="${optMap[log]}"
 
-  do_test "${optMap[sizes]}" "${optMap[client-dir]}" "${optMap[server-coll]}"
+  do_test "${optMap[num-runs]}" "${optMap[sizes]}" "${optMap[client-dir]}" "${optMap[server-coll]}"
 }
 
 
@@ -189,6 +199,10 @@ map_opts()
         eval "$mapVar""[log]='$2'"
         shift 2
         ;;
+      -N|--num-runs)
+        eval "$mapVar""[num-runs]='$2'"
+        shift 2
+        ;;
       -C|--server-coll)
         eval "$mapVar""[server-coll]='$2'"
         shift 2
@@ -213,8 +227,8 @@ fmt_opts()
 {
   getopt \
     --name "$ExecName" \
-    --longoptions help,verbose,version,client-dir:,log:,server-coll:,sizes: \
-    --options hVvD:L:S:C: \
+    --longoptions help,verbose,version,client-dir:,log:,num-runs:,server-coll:,sizes: \
+    --options hVvD:L:N:S:C: \
     -- \
     "$@"
 }
@@ -222,9 +236,10 @@ fmt_opts()
 
 do_test()
 {
-  local sizes="$1"
-  local clientDir="$2"
-  local svrColl="$3"
+  local numRuns="$1"
+  local sizes="$2"
+  local clientDir="$3"
+  local svrColl="$4"
 
   if ! ensure_irods_sess
   then
@@ -259,8 +274,8 @@ do_test()
   local size
   for size in ${sizes//,/ }
   do
-    measure_downloads "$size" "$svrColl" "$clientDir"
-    measure_uploads "$size" "$clientDir" "$svrColl"
+    measure_downloads "$numRuns" "$size" "$svrColl" "$clientDir"
+    measure_uploads "$numRuns" "$size" "$clientDir" "$svrColl"
   done | gen_report > "$ReportLog"
 
   printf 'Finished test\n' >> "$StatusLog"
@@ -309,9 +324,10 @@ ensure_irods_sess()
 
 measure_downloads()
 {
-  local reqSize="$1"
-  local srcColl="$2"
-  local destDir="$3"
+  local numRuns="$1"
+  local reqSize="$2"
+  local srcColl="$3"
+  local destDir="$4"
 
 
   local srcObj
@@ -326,7 +342,7 @@ measure_downloads()
   printf 'Beginning %s download measurements\n' "$reqSize" >> "$StatusLog"
 
   local attempt
-  for attempt in $(seq "$NumRuns")
+  for attempt in $(seq "$numRuns")
   do
     printf 'Downloading %s\n' "$attempt" >> "$StatusLog"
 
@@ -377,9 +393,10 @@ setup_download()
 
 measure_uploads()
 {
-  local reqSize="$1"
-  local srcDir="$2"
-  local destColl="$3"
+  local numRuns="$1"
+  local reqSize="$2"
+  local srcDir="$3"
+  local destColl="$4"
 
   local srcFile
   srcFile=$(setup_uploads "$reqSize" "$srcDir")
@@ -390,7 +407,7 @@ measure_uploads()
   printf 'Beginning %s upload measurements\n' "$reqSize" >> "$StatusLog"
 
   local attempt
-  for attempt in $(seq "$NumRuns")
+  for attempt in $(seq "$numRuns")
   do
     printf 'Uploading %s\n' "$attempt" >> "$StatusLog"
 
@@ -508,9 +525,11 @@ gen_report()
 
     if [[ "$curDir" = download ]]
     then
-      downDurs=("${downDurs[@]-}" "$duration")
+      #shellcheck disable=SC2206
+      downDurs=(${downDurs[@]-} "$duration")
     else
-      upDurs=("${upDurs[@]-}" "$duration")
+      #shellcheck disable=SC2206
+      upDurs=(${upDurs[@]-} "$duration")
     fi
 
     printf -v runsReport \
