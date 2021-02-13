@@ -1,6 +1,6 @@
 #!/bin/bash
 
-show_help()
+help()
 {
   cat <<EOF
 
@@ -124,13 +124,13 @@ main()
 
   if ! map_opts optMap "$@"
   then
-    show_help >&2
+    help >&2
     return 1
   fi
 
   if [[ -n "${optMap[help]}" ]]
   then
-    show_help
+    help
     return 0
   fi
 
