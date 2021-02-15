@@ -2,7 +2,6 @@
 
 # TODO bring options in line with Nagios guidelines. See
 #  https://nagios-plugins.org/doc/guidelines.html#PLUGOPTIONS
-#    1. Swap verbose and version short options
 #    2. Bring --version in line
 #    3. -? and any unparsable options should print a short usage statement
 #    4. Bring --help in line
@@ -30,9 +29,9 @@ Options:
                         (default 1247)
  -S, --service SERVICE  the name of the service checking iRODS, identified as
                         client user to iRODS
- -V, --verbose          show the XML message returned from HOST instead of
+ -v, --verbose          show the XML message returned from HOST instead of
                         default response
- -v, --version          show version and exit
+ -V, --version          show version and exit
  -Z, --zone ZONE        the name of the zone to tell iRODS this program and
                         SERVICE belong to.
 
@@ -59,7 +58,7 @@ Arizona. For license information, see https://cyverse.org/license.
 EOF
 }
 
-readonly VERSION=6
+readonly VERSION=7
 
 # TODO review possible error codes
 set -o errexit -o nounset -o pipefail
@@ -140,11 +139,11 @@ map_args() {
 				eval "$mapVar""[service]='$2'"
 				shift 2
 				;;
-			-V|--verbose)
+			-v|--verbose)
 				eval "$mapVar""[verbose]=verbose"
 				shift
 				;;
-			-v|--version)
+			-V|--version)
 				eval "$mapVar""[version]=version"
 				shift
 				;;
