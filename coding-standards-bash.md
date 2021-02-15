@@ -15,7 +15,7 @@ This standard is an adaptation of Google's
 ## Table of Contents
 
 [File Extensions](#file-extensions)  
-[SUID/SGID](#suidguid)  
+[SUID/SGID](#suidsgid)  
 [stdout vs. stderr](#stdout-vs-stderr)  
 [Comments](#comments)  
 [Formatting](#formatting)  
