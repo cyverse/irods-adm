@@ -15,7 +15,7 @@ This standard is an adaptation of Google's
 ## Table of Contents
 
 [File Extensions](#file-extensions)  
-[SUID/SGID](#suid-guid)  
+[SUID/SGID](#suidguid)  
 [stdout vs. stderr](#stdout-vs-stderr)  
 [Comments](#comments)  
 [Formatting](#formatting)  
@@ -25,7 +25,7 @@ This standard is an adaptation of Google's
 [ShellCheck](#shellcheck)  
 [Conclusion](#conclusion)
 
-## <a name="file-extensions"></a>File Extensions
+## File Extensions
 
 When a shell file is executable, it should not have an extension. If it is a library to be included
 in Bash scripts, it should have the standard `.sh` extension. This makes it easy to differentiate
