@@ -2,7 +2,6 @@
 
 # TODO bring options in line with Nagios guidelines. See
 #  https://nagios-plugins.org/doc/guidelines.html#PLUGOPTIONS
-#    2. Bring --version in line
 #    3. -? and any unparsable options should print a short usage statement
 #    4. Bring --help in line
 #    5. Bring --verbose in line
@@ -94,9 +93,13 @@ main() {
 	fi
 
   if [[ -n "${argMap[version]}" ]]; then
-		# TODO review possible errors
-		printf '%s\n' "$VERSION"
+		print_version
 		return $OK
+	fi
+
+	if [[ -z "${argMap[ies]}" ]]; then
+		printf 'IES required\n' >&2
+		return $ERROR
 	fi
 
 	# TODO ensure only 0, 2, and 3 are returned
@@ -158,12 +161,9 @@ map_args() {
 		esac
 	done
 
-	if [[ "$#" -lt 1 ]]; then
-		printf 'IES required\n' >&2
-		return $ERROR
+	if [[ "$#" -ge 1 ]]; then
+		eval "$mapVar""[ies]='$1'"
 	fi
-
-	eval "$mapVar""[ies]='$1'"
 }
 
 
@@ -194,6 +194,18 @@ format_opts() {
 	elif (( rc == 1 )); then
 		return $ERROR
 	else
+		return $ERROR
+	fi
+}
+
+
+# displays the program version in the format required of Nagios plugins
+# Output:
+#  the program version
+# Return:
+#  0 on success or 3 if an internal error occurred
+print_version() {
+	if ! printf '%s v%s\n' "$EXEC_NAME" "$VERSION"; then
 		return $ERROR
 	fi
 }
