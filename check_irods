@@ -2,7 +2,7 @@
 
 # TODO bring options in line with Nagios guidelines. See
 #  https://nagios-plugins.org/doc/guidelines.html#PLUGOPTIONS
-#    3. -? and any unparsable options should print a short usage statement
+#    3. Add -? option that doesn't generate error
 #    4. Bring --help in line
 #    5. Bring --verbose in line
 # TODO bring output in line with guidelines. See
@@ -13,8 +13,7 @@ help() {
 
 $EXEC_NAME version $VERSION
 
-Usage:
- $EXEC_NAME [options] HOST
+$(print_usage)
 
 Nagios plugin that checks to see is if an iRODS server is online. It supports
 Nagios version 2 or later and iRODS version 4 or later.
@@ -57,6 +56,19 @@ Arizona. For license information, see https://cyverse.org/license.
 EOF
 }
 
+
+# displays a short usage statement
+print_usage() {
+	cat <<EOF
+Usage:
+ $EXEC_NAME [-v|--vebose][(-P|--port) PORT][(-S|--service) SERVICE]
+  [(-Z|--zone) ZONE] IES
+ $EXEC_NAME (-h|--help)
+ $EXEC_NAME (-V|--version)
+EOF
+}
+
+
 readonly VERSION=7
 
 # TODO review possible error codes
@@ -83,7 +95,7 @@ main() {
 		[zone]='' )
 
 	if ! map_args argMap "$@"; then
-		help >&2
+		print_usage >&2
 		return $ERROR
 	fi
 
@@ -99,6 +111,7 @@ main() {
 
 	if [[ -z "${argMap[ies]}" ]]; then
 		printf 'IES required\n' >&2
+		print_usage >&2
 		return $ERROR
 	fi
 
@@ -126,7 +139,12 @@ map_args() {
 	local mapVar="$1"
 	shift
 
-	eval set -- "$(format_opts "$@")"
+	local opts
+	if ! opts="$(format_opts "$@")"; then
+		return $ERROR
+	fi
+
+	eval set -- "$opts"
 
 	while true; do
 		case "$1" in

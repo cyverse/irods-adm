@@ -1,4 +1,4 @@
-__TODO proof read in a browser and test links.__
+__TODO proof read in a browser.__
 # CyVerse Coding Standards for Bash
 
 This document is intended to guide the development of Bash scripts by providing coding standards.
