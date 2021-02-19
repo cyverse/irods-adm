@@ -11,7 +11,7 @@ help() {
 	# TODO review possible error codes
 	cat <<EOF
 
-$EXEC_NAME version $VERSION
+$(print_version)
 
 $(print_usage)
 
