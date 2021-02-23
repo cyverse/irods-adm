@@ -2,7 +2,6 @@
 
 # TODO bring options in line with Nagios guidelines. See
 #  https://nagios-plugins.org/doc/guidelines.html#PLUGOPTIONS
-#    3. Add -? option that doesn't generate error
 #    4. Bring --help in line
 #    5. Bring --verbose in line
 # TODO bring output in line with guidelines. See
@@ -27,6 +26,7 @@ Options:
                         (default 1247)
  -S, --service SERVICE  the name of the service checking iRODS, identified as
                         client user to iRODS
+ -?, --usage            show a usage message and exit
  -v, --verbose          show the XML message returned from HOST instead of
                         default response
  -V, --version          show version and exit
@@ -64,6 +64,7 @@ Usage:
  $EXEC_NAME [-v|--vebose][(-P|--port) PORT][(-S|--service) SERVICE]
   [(-Z|--zone) ZONE] IES
  $EXEC_NAME (-h|--help)
+ $EXEC_NAME (-?|--usage)
  $EXEC_NAME (-V|--version)
 EOF
 }
@@ -90,6 +91,7 @@ main() {
 		[ies]=''
 		[port]="$DEFAULT_PORT"
 		[service]="$EXEC_NAME"
+		[usage]=''
 		[verbose]=''
 		[version]=''
 		[zone]='' )
@@ -101,6 +103,11 @@ main() {
 
 	if [[ -n "${argMap[help]}" ]]; then
 		help
+		return $OK
+	fi
+
+	if [[ -n "${argMap[usage]}" ]]; then
+		print_usage
 		return $OK
 	fi
 
@@ -160,6 +167,10 @@ map_args() {
 				eval "$mapVar""[service]='$2'"
 				shift 2
 				;;
+			-\?|--usage)
+				eval "$mapVar""[usage]=usage"
+				shift
+				;;
 			-v|--verbose)
 				eval "$mapVar""[verbose]=verbose"
 				shift
@@ -198,11 +209,17 @@ map_args() {
 #   3  if the command line options don't make sense
 #   4  if an internal error occured
 format_opts() {
+	# getopt doesn't support "?" as a short option.
+	if [[ "$*" =~ (^| )-\? ]]; then
+		printf -- '-? --'
+		return $OK
+	fi
+
 	set +o errexit
 	getopt \
 		--name "$EXEC_NAME" \
-		--longoptions help,port:,service:,verbose,version,zone: \
-		--options hP:S:VvZ: \
+		--longoptions help,port:,service:,usage,verbose,version,zone: \
+		--options 'hP:S:?VvZ:' \
 		-- "$@"
 	local rc=$?
 	set -o errexit
