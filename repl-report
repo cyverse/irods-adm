@@ -1,6 +1,6 @@
 #!/bin/bash
 
-show_help() {
+help() {
 	cat <<EOF
 
 $ExecName version $Version
@@ -55,7 +55,7 @@ main() {
 	local opts
 	if ! opts="$(prep_opts "$@")"
 	then
-		show_help >&2
+		help >&2
 		return 1
 	fi
 
@@ -107,7 +107,7 @@ main() {
 				break
 				;;
 			*)
-				show_help >&2
+				help >&2
 				return 1
 				;;
 		esac
@@ -115,7 +115,7 @@ main() {
 
 	if [[ -n "${help-}" ]]
 	then
-		show_help
+		help
 		return 0
 	fi
 

@@ -1,9 +1,12 @@
-__TODO proof read in a browser.__
 # CyVerse Coding Standards for Bash
 
-This document is intended to guide the development of Bash scripts by providing coding standards.
-Having a coding standard means that code changes involving similar numbers of lines will likely take
-similar effort. This enables logical LOC counts to be used when planning.
+This document provides coding standards for developing Bash scripts. Along with allowing maintainers
+to concentrate on the meaning of coding, following a coding standard improves a developer's ability
+to estimate the amount of effort a script will take create. Code changes involving similar numbers
+of lines will likely take similar effort. This enables a developer to use logical LOC (lines of
+code) counts of past scripts to estimate the amount of time it will take to create a new script.
+
+__TODO proof read below in a browser.__
 
 When writing code, besides being logically correct, __the most important standard is clarity.__ The
 code should be as easy to understand as reasonably possible. If following any of the other standards
