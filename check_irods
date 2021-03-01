@@ -2,18 +2,24 @@
 
 # TODO bring options in line with Nagios guidelines. See
 #  https://nagios-plugins.org/doc/guidelines.html#PLUGOPTIONS
-#    4. Bring --help in line
 #    5. Bring --verbose in line
+print_usage() {
+	cat <<EOF
+Usage:
+ $EXEC_NAME [-v|--verbose][(-P|--port) PORT][(-S|--service) SERVICE]
+  [(-Z|--zone) ZONE] IES
+ $EXEC_NAME (-h|--help)
+ $EXEC_NAME (-?|--usage)
+ $EXEC_NAME (-V|--version)
+EOF
+}
+
+
 # TODO bring output in line with guidelines. See
 #  https://nagios-plugins.org/doc/guidelines.html#PLUGOUTPUT
-help() {
+print_description() {
 	# TODO review possible error codes
 	cat <<EOF
-
-$(print_version)
-
-$(print_usage)
-
 Nagios plugin that checks to see is if an iRODS server is online. It supports
 Nagios version 2 or later and iRODS version 4 or later.
 
@@ -57,19 +63,6 @@ EOF
 }
 
 
-# displays a short usage statement
-print_usage() {
-	cat <<EOF
-Usage:
- $EXEC_NAME [-v|--vebose][(-P|--port) PORT][(-S|--service) SERVICE]
-  [(-Z|--zone) ZONE] IES
- $EXEC_NAME (-h|--help)
- $EXEC_NAME (-?|--usage)
- $EXEC_NAME (-V|--version)
-EOF
-}
-
-
 readonly VERSION=7
 
 # TODO review possible error codes
@@ -97,26 +90,31 @@ main() {
 		[zone]='' )
 
 	if ! map_args argMap "$@"; then
+		# TODO return correct error code
 		print_usage >&2
 		return $ERROR
 	fi
 
 	if [[ -n "${argMap[help]}" ]]; then
-		help
+		# TODO return correct error code
+		print_help
 		return $OK
 	fi
 
 	if [[ -n "${argMap[usage]}" ]]; then
+		# TODO return correct error code
 		print_usage
 		return $OK
 	fi
 
   if [[ -n "${argMap[version]}" ]]; then
+		# TODO return correct error code
 		print_version
 		return $OK
 	fi
 
 	if [[ -z "${argMap[ies]}" ]]; then
+		# TODO return correct error code
 		printf 'IES required\n' >&2
 		print_usage >&2
 		return $ERROR
@@ -234,6 +232,7 @@ format_opts() {
 }
 
 
+# TODO revert error handling
 # displays the program version in the format required of Nagios plugins
 # Output:
 #  the program version
@@ -243,6 +242,18 @@ print_version() {
 	if ! printf '%s v%s\n' "$EXEC_NAME" "$VERSION"; then
 		return $ERROR
 	fi
+}
+
+
+# displays detailed help
+# Output:
+#  the help texted formatted to fit on an 80 character wide terminal
+print_help() {
+	print_version
+	printf '\n'
+	print_usage
+	printf '\n'
+	print_description
 }
 
 
