@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# TODO bring options in line with Nagios guidelines. See
-#  https://nagios-plugins.org/doc/guidelines.html#PLUGOPTIONS
-#    5. Bring --verbose in line
 print_usage() {
 	cat <<EOF
 Usage:
@@ -33,8 +30,8 @@ Options:
  -S, --service SERVICE  the name of the service checking iRODS, identified as
                         client user to iRODS
  -?, --usage            show a usage message and exit
- -v, --verbose          show the XML message returned from HOST instead of
-                        default response
+ -v, --verbose          show additional information, a repeat of this flag will
+                        show the response from the server
  -V, --version          show version and exit
  -Z, --zone ZONE        the name of the zone to tell iRODS this program and
                         SERVICE belong to.
@@ -63,7 +60,7 @@ EOF
 }
 
 
-readonly VERSION=7
+readonly VERSION=8
 
 # TODO review possible error codes
 set -o errexit -o nounset -o pipefail
@@ -77,6 +74,9 @@ readonly OK=0
 readonly NO_CONNECT=2
 readonly ERROR=3
 
+readonly TERSE=0
+readonly VERBOSE=1
+readonly CFG_DEBUG_INFO=2
 
 main() {
 	declare -A argMap=(
@@ -85,7 +85,7 @@ main() {
 		[port]="$DEFAULT_PORT"
 		[service]="$EXEC_NAME"
 		[usage]=''
-		[verbose]=''
+		[verbose]="$TERSE"
 		[version]=''
 		[zone]='' )
 
@@ -170,7 +170,7 @@ map_args() {
 				shift
 				;;
 			-v|--verbose)
-				eval "$mapVar""[verbose]=verbose"
+				eval "$mapVar"'[verbose]=$(( ${'"$mapVar"'[verbose]} + 1 ))'
 				shift
 				;;
 			-V|--version)
@@ -257,12 +257,14 @@ print_help() {
 }
 
 
+# TODO add support for verbosity=1 See
+#  https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
 ping() {
 	local ies="$1"
 	local port="$2"
 	local service="$3"
 	local zone="$4"
-	local verbose="$5"
+	local verbosity="$5"
 
 	local startTime
 	startTime="$(date +'%s.%N')"
@@ -286,14 +288,14 @@ ping() {
 			mk_req RODS_DISCONNECT >&3
 			close_conn
 
-			if [[ -z "$verbose" ]]; then
-				local dt
-				# TODO review possible errors
-				dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
-					'BEGIN { print (STOP - START) }')"
+			local dt
+			# TODO review possible errors
+			dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
+				'BEGIN { print (STOP - START) }')"
 
-				printf 'up|time=%ss\n' "$dt"
-			else
+			printf 'up|time=%ss\n' "$dt"
+
+			if (( verbosity >= CFG_DEBUG_INFO )); then
 				printf '%s\n' "$respMsg"
 			fi
 
@@ -305,6 +307,7 @@ ping() {
 	printf 'not iRODS\n'
 	return $ERROR
 }
+
 
 # TODO swallow errors
 close_conn() {
