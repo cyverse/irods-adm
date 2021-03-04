@@ -12,10 +12,7 @@ EOF
 }
 
 
-# TODO bring output in line with guidelines. See
-#  https://nagios-plugins.org/doc/guidelines.html#PLUGOUTPUT
 print_description() {
-	# TODO review possible error codes
 	cat <<EOF
 Nagios plugin that checks to see is if an iRODS server is online. It supports
 Nagios version 2 or later and iRODS version 4 or later.
@@ -38,7 +35,10 @@ Options:
 
 Output:
  Unless otherwise indicated, it writes the status of the iRODS service on HOST
- to stdout in a form interpretable by nagios.
+ to stdout in a form interpretable by nagios. When the plugin successfully
+ connects to iRODS, it provides the amount of time it took to connect as a
+ performance datum in the form "time=<duration>s" where <duration> is the amount
+ of time in seconds.
 
 Side Effects:
  The rodsLog will show a connection from the host where this is run with the
@@ -71,12 +71,15 @@ readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 
 # exit and return statuses
 readonly OK=0
-readonly NO_CONNECT=2
-readonly ERROR=3
+#readonly WARNING=1  # Not used yet
+readonly CRITICAL=2
+readonly UNKNOWN=3
 
+# verbosity
 readonly TERSE=0
-readonly VERBOSE=1
-readonly CFG_DEBUG_INFO=2
+#readonly VERBOSE=1  # Not used yet
+readonly CFG_DEBUG=2
+
 
 main() {
 	declare -A argMap=(
@@ -92,7 +95,7 @@ main() {
 	if ! map_args argMap "$@"; then
 		# TODO return correct error code
 		print_usage >&2
-		return $ERROR
+		return $UNKNOWN
 	fi
 
 	if [[ -n "${argMap[help]}" ]]; then
@@ -117,7 +120,7 @@ main() {
 		# TODO return correct error code
 		printf 'IES required\n' >&2
 		print_usage >&2
-		return $ERROR
+		return $UNKNOWN
 	fi
 
 	# TODO ensure only 0, 2, and 3 are returned
@@ -146,7 +149,7 @@ map_args() {
 
 	local opts
 	if ! opts="$(format_opts "$@")"; then
-		return $ERROR
+		return $UNKNOWN
 	fi
 
 	eval set -- "$opts"
@@ -225,9 +228,9 @@ format_opts() {
 	if (( rc == 0 )); then
 		return $OK
 	elif (( rc == 1 )); then
-		return $ERROR
+		return $UNKNOWN
 	else
-		return $ERROR
+		return $UNKNOWN
 	fi
 }
 
@@ -240,7 +243,7 @@ format_opts() {
 #  0 on success or 3 if an internal error occurred
 print_version() {
 	if ! printf '%s v%s\n' "$EXEC_NAME" "$VERSION"; then
-		return $ERROR
+		return $UNKNOWN
 	fi
 }
 
@@ -259,6 +262,7 @@ print_help() {
 
 # TODO add support for verbosity=1 See
 #  https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
+# TODO review possible internal return statuses and ensure correct return status and message
 ping() {
 	local ies="$1"
 	local port="$2"
@@ -271,8 +275,8 @@ ping() {
 
 	# TODO review possible return codes for exec
 	if ! exec 3<>/dev/tcp/"$ies"/"$port"; then
-		printf 'down\n'
-		return $NO_CONNECT
+		printf 'CRITICAL: down\n'
+		return $CRITICAL
 	fi
 
 	local connMsgBody
@@ -293,9 +297,9 @@ ping() {
 			dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
 				'BEGIN { print (STOP - START) }')"
 
-			printf 'up|time=%ss\n' "$dt"
+			printf 'OK: up | time=%ss\n' "$dt"
 
-			if (( verbosity >= CFG_DEBUG_INFO )); then
+			if (( verbosity >= CFG_DEBUG )); then
 				printf '%s\n' "$respMsg"
 			fi
 
@@ -304,8 +308,8 @@ ping() {
 	fi
 
 	close_conn
-	printf 'not iRODS\n'
-	return $ERROR
+	printf 'CRITICAL: not iRODS\n'
+	return $CRITICAL
 }
 
 
@@ -341,7 +345,7 @@ parse_resp() {
 	read -r -d '' -n "$headerLen" header
 
 	if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]; then
-		return $ERROR
+		return $UNKNOWN
 	fi
 
 	local msgLen="${header#*<msgLen>}"
