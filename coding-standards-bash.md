@@ -1,22 +1,13 @@
 # CyVerse Coding Standards for Bash
 
-This document provides coding standards for developing Bash scripts. Along with allowing maintainers
-to concentrate on the meaning of coding, following a coding standard improves a developer's ability
-to estimate the amount of effort a script will take create. Code changes involving similar numbers
-of lines will likely take similar effort. This enables a developer to use logical LOC (lines of
-code) counts of past scripts to estimate the amount of time it will take to create a new script.
-
-__TODO proof read below in a browser.__
-
-When writing code, besides being logically correct, __the most important standard is clarity.__ The
-code should be as easy to understand as reasonably possible. If following any of the other standards
-obfuscates the logic, the obfuscating standard should not be followed.
-
-This standard is an adaptation of Google's
-[Shell Style Guide](https://google.github.io/styleguide/shellguide.html).
+This document provides coding standards for developing Bash scripts.
 
 ## Table of Contents
 
+__TODO review the internal links work__
+
+[Introduction](#introduction)
+[Clarity](#clarity)
 [File Extensions](#file-extensions)  
 [SUID/SGID](#suidsgid)  
 [stdout vs. stderr](#stdout-vs-stderr)  
@@ -27,12 +18,29 @@ This standard is an adaptation of Google's
 [Builtin vs. External Commands](#builtin-vs-external-commands)  
 [ShellCheck](#shellcheck)  
 [Conclusion](#conclusion)
+[Acknowledgement](#acknowledgement)
+
+## Introduction
+
+Along with allowing maintainers to concentrate on the meaning of coding, following a coding standard
+improves a developer's ability to estimate the amount of effort a script will take create. Code
+changes involving similar numbers of lines will likely take similar effort. This enables a developer
+to use logical LOC (lines of code) counts of past scripts to estimate the amount of time it will
+take to create a new script.
+
+## Clarity
+
+Besides correctness, __the most important standard is clarity__ when writing code. The code should
+be as easy to understand as reasonably possible. If following any of the other standards obfuscates
+the logic, the obfuscating standard should not be followed.
 
 ## File Extensions
 
-When a shell file is executable, it should not have an extension. If it is a library to be included
-in Bash scripts, it should have the standard `.sh` extension. This makes it easy to differentiate
-between libraries and scripts.
+An executable Bash script should not have an extension. A Bash file acting as a library for other
+Bash files should have the standard `.sh` extension. This makes it easy to differentiate between
+libraries and scripts.
+
+__TODO review the following in a browser__
 
 ## SUID/SGID
 
@@ -786,5 +794,10 @@ boxes of stars around them, any added comments should too.
 Other than focusing on clarity, these standards are merely recommendations, not requirements. It is
 best to use common sense when chosing to violate a standard in a script, though inconsistently
 following a standard can itself obfuscate the code.
+
+## Acknowledgement
+
+This standard is an adaptation of Google's
+[Shell Style Guide](https://google.github.io/styleguide/shellguide.html).
 
 <!-- vim: set tabstop=2: -->
