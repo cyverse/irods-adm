@@ -7,7 +7,7 @@ This document provides coding standards for developing Bash scripts.
 __TODO review the internal links work__
 
 [Introduction](#introduction)  
-[Clarity](#clarity)  
+[Clarity, the Most Important Standard](#clarity)  
 [File Extensions](#file-extensions)  
 [SUID/SGID](#suidsgid)  
 [stdout vs. stderr](#stdout-vs-stderr)  
@@ -28,7 +28,9 @@ changes involving similar numbers of lines will likely take similar effort. This
 to use logical LOC (lines of code) counts of past scripts to estimate the amount of time it will
 take to create a new script.
 
-## Clarity
+__TODO review the following in a browser__
+
+## Clarity, the Most Important Standard
 
 Besides correctness, __the most important standard is clarity__ when writing code. The code should
 be as easy to understand as reasonably possible. If following any of the other standards obfuscates
@@ -39,8 +41,6 @@ the logic, the obfuscating standard should not be followed.
 An executable Bash script should not have an extension. A Bash file acting as a library for other
 Bash files should have the standard `.sh` extension. This makes it easy to differentiate between
 libraries and scripts.
-
-__TODO review the following in a browser__
 
 ## SUID/SGID
 
