@@ -6,8 +6,8 @@ This document provides coding standards for developing Bash scripts.
 
 __TODO review the internal links work__
 
-[Introduction](#introduction)
-[Clarity](#clarity)
+[Introduction](#introduction)  
+[Clarity](#clarity)  
 [File Extensions](#file-extensions)  
 [SUID/SGID](#suidsgid)  
 [stdout vs. stderr](#stdout-vs-stderr)  
@@ -17,7 +17,7 @@ __TODO review the internal links work__
 [Naming Conventions](#naming-conventions)  
 [Builtin vs. External Commands](#builtin-vs-external-commands)  
 [ShellCheck](#shellcheck)  
-[Conclusion](#conclusion)
+[Conclusion](#conclusion)  
 [Acknowledgement](#acknowledgement)
 
 ## Introduction
