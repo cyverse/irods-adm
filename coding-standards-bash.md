@@ -7,7 +7,7 @@ This document provides coding standards for developing Bash scripts.
 __TODO review the internal links work__
 
 [Introduction](#introduction)  
-[Clarity, the Most Important Standard](#clarity)  
+[Clarity, the Most Important Standard](#clarity-the-most-important-standard)  
 [File Extensions](#file-extensions)  
 [SUID/SGID](#suidsgid)  
 [stdout vs. stderr](#stdout-vs-stderr)  
@@ -32,9 +32,9 @@ __TODO review the following in a browser__
 
 ## Clarity, the Most Important Standard
 
-Besides correctness, __the most important standard is clarity__ when writing code. The code should
-be as easy to understand as reasonably possible. If following any of the other standards obfuscates
-the logic, the obfuscating standard should not be followed.
+Besides correctness, the most important standard is clarity when writing code. The code should be as
+easy to understand as reasonably possible. _If following any of the other standards obfuscates the
+logic, the obfuscating standard should not be followed._
 
 ## File Extensions
 
