@@ -4,8 +4,6 @@ This document provides coding standards for developing Bash scripts.
 
 ## Table of Contents
 
-__TODO review the internal links work__
-
 [Introduction](#introduction)  
 [Clarity, the Most Important Standard](#clarity-the-most-important-standard)  
 [File Extensions](#file-extensions)  
@@ -28,8 +26,6 @@ changes involving similar numbers of lines will likely take similar effort. This
 to use logical LOC (lines of code) counts of past scripts to estimate the amount of time it will
 take to create a new script.
 
-__TODO review the following in a browser__
-
 ## Clarity, the Most Important Standard
 
 Besides correctness, the most important standard is clarity when writing code. The code should be as
@@ -39,7 +35,7 @@ logic, the obfuscating standard should not be followed._
 ## File Extensions
 
 An executable Bash script should not have an extension. A Bash file acting as a library for other
-Bash files should have the standard `.sh` extension. This makes it easy to differentiate between
+Bash files should have the customary `.sh` extension. This makes it easy to differentiate between
 libraries and scripts.
 
 ## SUID/SGID
@@ -47,17 +43,21 @@ libraries and scripts.
 SUID and SGID are not allowed in Bash scripts for security reasons. `sudo` or `gosu` should be used
 instead.
 
+__TODO review the following in a browser__
+
 ## stdout vs. stderr
 
-For scripts meant to be part of a data processing pipeline, i.e., scripts that write data to stdout
-so that other scripts can read the data from stdin typically through a pipe, `|`, informational
-messages, like progress messages, and error messages should be written to stderr. For scripts that
-don't write data to stdout, informational messages should be written to stdout.
+Error and warning messages should always be written to stderr. Typically, informational messages,
+like ones about progress, should be written to stdout. Informational messages should be written to
+stderr by scripts meant to be part of a data processing pipeline, i.e., scripts that write data to
+stdout so that other scripts can read the data from their stdin, typically through a pipe, `|`.
 
 ## Comments
 
-All comments should be sufficient enough so that the someone can learn how to use what is being
-described without having to read the code.
+All comments should have enough detail so that the someone can learn how to use what is being
+described without having to study the code in the detail. Since an incorrect comment is usually
+worse than no comment, comments should be kept to a minimum. If a quick glace of the code being
+documented is enough to understand an aspect, that aspect should not be documented.
 
 ### File Header
 
