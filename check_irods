@@ -66,17 +66,16 @@ readonly VERSION=8
 
 readonly DEFAULT_PORT=1247
 
-# TODO declare as integers
 # exit and return statuses
-readonly OK=0
-#readonly WARNING=1  # Not used yet
-readonly CRITICAL=2
-readonly UNKNOWN=3
+declare -i -r OK=0
+#declare -i -r WARNING=1  # Not used yet
+declare -i -r CRITICAL=2
+declare -r -r UNKNOWN=3
 
 # verbosity
-readonly TERSE=0
-#readonly VERBOSE=1   # Not used yet
-readonly CFG_DEBUG=2
+declare -i -r TERSE=0
+#declare -i -r VERBOSE=1   # Not used yet
+declare -i -r CFG_DEBUG=2
 
 declare EXEC_NAME
 
