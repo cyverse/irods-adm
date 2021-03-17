@@ -47,26 +47,28 @@ __TODO review the following in a browser__
 
 ## stdout vs. stderr
 
-Error and warning messages should always be written to stderr. Typically, informational messages,
-like ones about progress, should be written to stdout. Informational messages should be written to
-stderr by scripts meant to be part of a data processing pipeline, i.e., scripts that write data to
-stdout so that other scripts can read the data from their stdin, typically through a pipe, `|`.
+Scripts should always write error and warning messages to stderr. Typically, they should write
+informational messages, like ones about progress,to stdout. The exception is scripts meant to be
+part of a data processing pipeline, i.e., scripts that write data to stdout so that other scripts
+can read the data from their stdin through a pipe, `|`. These scripts should write informational
+messages to stderr.
 
 ## Comments
 
 All comments should have enough detail so that the someone can learn how to use what is being
-described without having to study the code in the detail. Since an incorrect comment is usually
-worse than no comment, comments should be kept to a minimum. If a quick glace of the code being
-documented is enough to understand an aspect, that aspect should not be documented.
+described without having to study the code in detail. Since an incorrect comment is usually worse
+than no comment, comments should be minimal. If a quick glace at the code being documented is enough
+to understand an aspect of the code, that aspect should not be documented.
 
 ### File Header
 
-Every file must start with an overview of its contents. Author and/or maintainer information is
-unneeded. For files that are published for use outside of CyVerse, the header must include a
-copyright notice and a link to the CyVerse license, https://cyverse.org/license. Ordinarily, this
-should be in the form of a comment block. For executables that can display help information, a
-function that generates the help text may be placed at the top of the script instead. For
-consistency's sake, this function should be named `help`.
+Every file must start with an overview of its contents. Ordinarily, this should be in the form of a
+comment block. For executables that can display help information, a function that generates the help
+text may be placed at the top of the script instead. For consistency's sake, this function should be
+named `help`.  The header doesn't need author and maintainer information.
+
+For publicly available files, the header must include a copyright notice and  a link to the CyVerse
+license, https://cyverse.org/license. __TODO not applicable if part of repo with license file.__
 
 For executables, the possible command line arguments should be described as well as any environment
 variables used. If stdin is read, a description of what it expects to read from stdin should be
