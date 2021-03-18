@@ -43,22 +43,21 @@ libraries and scripts.
 SUID and SGID are not allowed in Bash scripts for security reasons. `sudo` or `gosu` should be used
 instead.
 
-__TODO review the following in a browser__
-
 ## stdout vs. stderr
 
 Scripts should always write error and warning messages to stderr. Typically, they should write
-informational messages, like ones about progress,to stdout. The exception is scripts meant to be
-part of a data processing pipeline, i.e., scripts that write data to stdout so that other scripts
+informational messages, like ones about progress, to stdout. The exception is scripts meant to be
+part of a data processing pipeline, i.e., those that write data to stdout so that other scripts
 can read the data from their stdin through a pipe, `|`. These scripts should write informational
 messages to stderr.
 
 ## Comments
 
 All comments should have enough detail so that the someone can learn how to use what is being
-described without having to study the code in detail. Since an incorrect comment is usually worse
-than no comment, comments should be minimal. If a quick glace at the code being documented is enough
-to understand an aspect of the code, that aspect should not be documented.
+described without having to study the code in detail. However, since an incorrect comment is usually
+worse than no comment, comments should be minimal to reduce the risk of them growing out of date. If
+a quick glace at the code being documented is enough to understand an aspect of the code, that aspect
+should not be documented.
 
 ### File Header
 
@@ -67,19 +66,23 @@ comment block. For executables that can display help information, a function tha
 text may be placed at the top of the script instead. For consistency's sake, this function should be
 named `help`.  The header doesn't need author and maintainer information.
 
-For publicly available files, the header must include a copyright notice and  a link to the CyVerse
-license, https://cyverse.org/license. __TODO not applicable if part of repo with license file.__
+__TODO review the following in a browser__
+
+For a publicly available file, the header must include a copyright notice and a link to the CyVerse
+license, https://cyverse.org/license. This isn't necessary if the file is in a repository that
+includes a license file.
 
 For executables, the possible command line arguments should be described as well as any environment
 variables used. If stdin is read, a description of what it expects to read from stdin should be
-included. If it writes to stdout, a description of the output should be included. If it writes
-anything to stderr other than error messages, a description of this output should be included as
-well. If there are any non-obvious side effects, these should be documented too. Finally, if the
-script uses different non-zero exit statuses to indicate different errors, these should be
-described. The standard zero for success and non-zero for failure need not be documented.
+included. If it writes anything other than informational messages to stdout, a description of the
+output should be included. If it writes anything to stderr other than informational, warningm and
+error messages, a description of this output should be included as well. If there are any side
+effects that aren't obvious, these should be documented too. Finally, if the script uses different
+exit statuses to indicate different failures, these should be described. The standard zero for
+success and non-zero for failure need not be documented.
 
-The formatting used in the following header documenttion examples is not required. The content is
-the important part.
+The formatting used in the following header examples is not required. Only the content is the
+important.
 
 Here's an example header comment for a published file.
 
@@ -112,7 +115,7 @@ Here's an example header comment for a published file.
 #
 # Output:
 #  Unless otherwise indicated, it writes the status of the iRODS
-#  service on HOST to stdout in form interpretable by nagios.
+#  service on HOST to stdout in a form understood by nagios.
 #
 #  It writes progress messages to stderr.
 #
