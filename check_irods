@@ -83,7 +83,7 @@ declare EXEC_NAME
 
 main() {
 	if ! EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"; then
-		printf 'cannot determine executable name, using %s\n' "$DEFAULT_EXEC_NAME" >&2
+		printf 'cannot determine executable name, using %s\n' "$DEFAULT_EXEC_NAME" >&2 || true
 		EXEC_NAME="$DEFAULT_EXEC_NAME"
 	fi
 	readonly EXEC_NAME
@@ -99,44 +99,43 @@ main() {
 		[zone]='' )
 
 	if ! map_args argMap "$@"; then
-		# TODO return correct error code
-		print_usage >&2
+		print_usage >&2 || true
 		return $UNKNOWN
 	fi
 
 	if [[ -n "${argMap[help]}" ]]; then
-		# TODO return correct error code
-		print_help
+		if ! print_help; then
+			return $UNKNOWN
+		fi
+
 		return $OK
-	fi
+	elif [[ -n "${argMap[usage]}" ]]; then
+		if ! print_usage; then
+			return $UNKNOWN
+		fi
 
-	if [[ -n "${argMap[usage]}" ]]; then
-		# TODO return correct error code
-		print_usage
 		return $OK
-	fi
+	elif [[ -n "${argMap[version]}" ]]; then
+		if ! print_version; then
+			return $UNKNOWN
+		fi
 
-  if [[ -n "${argMap[version]}" ]]; then
-		# TODO return correct error code
-		print_version
 		return $OK
-	fi
+	else
+		if [[ -z "${argMap[ies]}" ]]; then
+			printf 'IES required\n' >&2 || true
+			print_usage >&2 || true
+			return $UNKNOWN
+		fi
 
-	if [[ -z "${argMap[ies]}" ]]; then
-		# TODO return correct error code
-		printf 'IES required\n' >&2
-		print_usage >&2
-		return $UNKNOWN
+		ping \
+			"${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}" "${argMap[verbose]}"
 	fi
-
-	# TODO ensure only 0, 2, and 3 are returned
-	ping \
-		"${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}" "${argMap[verbose]}"
 }
 
 
+# TODO revert error handling
 # TODO describe mapVar
-# TODO verify return codes are correct
 # resolves the command line arguments
 # Arguments:
 #  The first argument is the name of the associative array where the resolved

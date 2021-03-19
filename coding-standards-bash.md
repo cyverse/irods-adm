@@ -162,7 +162,7 @@ Environment Variables:
          DB
 
 Input:
- It expects to read the output of `repl` from stdin.
+ It expects to read the output of \`repl\` from stdin.
 
 Output:
  Unless otherwise indicated, it writes the status of the
