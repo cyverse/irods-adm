@@ -1,0 +1,266 @@
+#! /bin/bash
+#
+# This describes the current state of the rule queue. It reports the total
+# number of executions in the queue. It also reports the number of executions
+# scheduled to run during given hours, the number of executions for each rule,
+# and the number of executions scheduled for each user. Finally, it reports the
+# number or executions be performed currently and information about them. For
+# each execution being performed, it reports the hour the execution was 
+# scheduled to be performed, the user who triggered the execution, and the 
+# execution's rule ID, REI ID, and rule. The output is similar to the following.
+#
+# 202 Rules in Queue
+#
+# Total Rules by Scheduled Hour
+#       1 2021/01/26T02
+#     131 2021/01/26T08
+#      70 2021/01/26T09
+#
+# Total of Each Rule
+#     200 _syncReplicas
+#       1 _ipc_updateQuotaUsage
+#       1 _ipc_rmTrash
+#
+# Total Rules by User
+#     199 sriram
+#       2 ipc_admin
+#       1 tedgin
+#
+# 2 Running Rules
+# 
+# Sched Hour    User       Rule Id   REI Id     Rule
+# 2021/01/26T02 sriram     698577101 1078121923 _syncReplicas
+# 2021/01/26T08 sriram     699269568 2119481675 _syncReplicas
+
+set -o errexit -o nounset -o pipefail
+
+
+main() {
+	local queueContents
+	queueContents="$(mktemp)"
+
+	# shellcheck disable=SC2064
+	trap "rm --force '$queueContents'" EXIT
+
+	gather_rules > "$queueContents"
+
+	local reportWidth
+	reportWidth="$(tput cols)"
+
+	local numQueued
+	numQueued="$(count_all < "$queueContents")"
+
+	printf '%d Rules in Queue\n' "$numQueued"
+
+	if (( numQueued > 0 )); then
+		printf '\n'
+		report_time_summary < "$queueContents"
+		printf '\n'
+		report_rule_summary "$reportWidth" < "$queueContents"
+		printf '\n'
+		report_user_summary < "$queueContents"
+		printf '\n'
+		report_running_rules "$reportWidth" < "$queueContents"
+	fi
+}
+
+
+report_running_rules() {
+	local reportWidth="$1"
+
+	if (( reportWidth < 50 )); then
+		reportWidth=50
+	fi
+
+	local runningRules
+	readarray -t runningRules < <(filter_running)
+
+	local runningCount=${#runningRules[@]}
+
+	printf '%d Running Rules\n' "$runningCount"
+
+	if (( runningCount > 0 )); then
+		printf '\n'
+		printf '%-13s %-10s %-9s %-10s %s\n' 'Sched Hour' User 'Rule Id' 'REI Id' Rule 
+    
+		local rule
+		for rule in "${runningRules[@]}"; do
+			local id time user rei rule
+			read -r id time user rei rule <<< "$rule"
+
+			printf '%-13s %-10s %-9s %-10s %s\n' "$time" "${user:0:10}" "$id" "$rei" "$rule"
+		done | cut --characters -"$reportWidth" | sort
+	fi
+}
+
+
+report_rule_summary() {
+	local reportWidth="$1"
+
+	printf 'Total of Each Rule\n'
+	summarize_tasks | cut --characters -"$reportWidth" 
+}
+
+
+report_time_summary() {
+	printf 'Total Rules by Scheduled Hour\n'
+	summarize_times 
+}
+
+
+report_user_summary() {
+	printf 'Total Rules by User\n'
+	summarize_users
+}
+
+
+gather_rules() {
+	iquest --no-page \
+			no-distinct \
+			'select 
+				RULE_EXEC_ID, 
+				RULE_EXEC_STATUS, 
+				RULE_EXEC_TIME, 
+				RULE_EXEC_USER_NAME, 
+				RULE_EXEC_REI_FILE_PATH, 
+				RULE_EXEC_NAME' \
+		| clean_rules
+}
+
+
+clean_rules() {
+	awk --file - <(cat) <<'EOAWK'
+function build_rule_line(startIdx, endIdx,  line, i) {
+	line = $startIdx;
+
+	for (i = startIdx + 1; i <= endIdx; i++) { 
+		line = line " " $i; 
+	}
+
+	return gensub(/ *(\||\\)$/, "", "", line);
+}
+
+
+/RULE_EXEC_ID/ {
+	print $0;
+	next;
+}
+
+
+/RULE_EXEC_REI_FILE_PATH/ {
+	print $0;
+	next;
+}
+
+
+/RULE_EXEC_STATUS/ {
+	print $0;
+	next;
+}
+
+
+/RULE_EXEC_TIME/ {
+	printf "RULE_EXEC_TIME = %s\n", strftime("%Y/%m/%dT%H", $3);
+	next;
+}
+
+
+/RULE_EXEC_USER_NAME/ {
+	print $0;
+	next;
+}
+
+
+/RULE_EXEC_NAME/ {
+	rule = build_rule_line(3, NF);
+	next;
+}
+
+
+/------------------------------------------------------------/ {
+	printf "RULE_EXEC_NAME = %s\n", rule;
+	print $0;
+	next;
+} 
+
+
+{
+	if (rule != "") { 
+		rule = rule " "; 
+	}
+
+	rule = rule build_rule_line(1, NF);
+}
+EOAWK
+}
+
+
+filter_running() {
+	awk --file - <(cat) <<'EOAWK'
+/RULE_EXEC_ID/ { 
+	id = $3; 
+}
+
+
+/RULE_EXEC_REI_FILE_PATH/ { 
+	rei = gensub(/^.*\./, "", "", $3); 
+}
+
+
+/RULE_EXEC_STATUS/ { 
+	status = $3; 
+}
+
+
+/RULE_EXEC_TIME/ { 
+	time = $3; 
+}
+
+
+/RULE_EXEC_USER_NAME/ { 
+	user = $3; 
+}
+
+
+/RULE_EXEC_NAME/ { 
+	rule = gensub(/^RULE_EXEC_NAME = /, "", "", $0); 
+}
+
+
+/------------------------------------------------------------/ {
+	if (status == "RE_RUNNING") { 
+		printf "%s\t%s\t%s\t%s\t%s\n", id, time, user, rei, rule; 
+	}
+}
+EOAWK
+}
+
+
+summarize_tasks() {
+	sed --quiet 's/^RULE_EXEC_NAME = //p' | summarize | sort --numeric --reverse --key 1,1 
+}
+
+
+summarize_times() {
+	sed --quiet 's/^RULE_EXEC_TIME = //p' | summarize
+}
+
+
+summarize_users() {
+	sed --quiet 's/^RULE_EXEC_USER_NAME = \(.*\)/\1/p' \
+		| summarize \
+		| sort --numeric --reverse --key 1,1
+}
+
+
+summarize() {
+	sort | uniq --count
+}
+
+
+count_all() {
+	sed --quiet '/^------------------------------------------------------------$/p' | wc --lines
+}
+
+
+main "$@"
