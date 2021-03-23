@@ -66,20 +66,20 @@ comment block. For executables that can display help information, a function tha
 text may be placed at the top of the script instead. For consistency's sake, this function should be
 named `help`.  The header doesn't need author and maintainer information.
 
-__TODO review the following in a browser__
-
 For a publicly available file, the header must include a copyright notice and a link to the CyVerse
 license, https://cyverse.org/license. This isn't necessary if the file is in a repository that
 includes a license file.
 
-For executables, the possible command line arguments should be described as well as any environment
-variables used. If stdin is read, a description of what it expects to read from stdin should be
-included. If it writes anything other than informational messages to stdout, a description of the
-output should be included. If it writes anything to stderr other than informational, warningm and
-error messages, a description of this output should be included as well. If there are any side
-effects that aren't obvious, these should be documented too. Finally, if the script uses different
-exit statuses to indicate different failures, these should be described. The standard zero for
-success and non-zero for failure need not be documented.
+For an executable, the header should describe possible command line arguments as well as any
+environment variables used. If the executable reads stdin, the header should describe what the
+executable expects to read. If it writes anything other than informational messages to stdout, the
+header should describe the output. If the executable writes anything to stderr other than
+informational, warning, and error messages, the header should describe this output as well. If there
+is any side effects that isn't obvious, the header should document this too. Finally, if the script
+uses different exit statuses for different types of failures, the header should describe them. If
+standard zero for success and non-zero for failure, the header need not document this.
+
+__TODO review the following in a browser__
 
 The formatting used in the following header examples is not required. Only the content is the
 important.

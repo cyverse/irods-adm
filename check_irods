@@ -134,7 +134,6 @@ main() {
 }
 
 
-# TODO revert error handling
 # TODO describe mapVar
 # resolves the command line arguments
 # Arguments:
@@ -143,18 +142,13 @@ main() {
 #  arguments to resolve.
 # Output:
 #  Any issues with the command line arguments will be written to stderr.
-# Return:
-#  It returns the following codes.
-#   0  on success
-#   3  if the command line arguments don't make sense
-#   4  if an internal error occured
 map_args() {
 	local mapVar="$1"
 	shift
 
 	local opts
 	if ! opts="$(format_opts "$@")"; then
-		return $UNKNOWN
+		return 1
 	fi
 
 	eval set -- "$opts"
