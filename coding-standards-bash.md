@@ -81,8 +81,8 @@ standard zero for success and non-zero for failure, the header need not document
 
 __TODO review the following in a browser__
 
-The formatting used in the following header examples is not required. Only the content is the
-important.
+The formatting used in the following header examples is not required. The content is the important
+part.
 
 Here's an example header comment for a published file.
 
@@ -94,33 +94,40 @@ Here's an example header comment for a published file.
 # Usage:
 #  check_irods [options] HOST
 #
-# Checks to see is if an iRODS service is online. It is ...
+# Nagios plugin that checks to see is if an iRODS server is
+# online. It supports Nagios version 2 or later and iRODS
+# version 4 or later.
 #
 # Parameters:
 #  HOST  The FQDN or IP address of the server hosting the
 #        service
 #
 # Options:
-#  -h, --help       show help and exit
-#  -P, --port PORT  the TCP port the iRODS server listens to on
-#                   HOST (default 1247)
+#  -h, --help             show help and exit
+#  -S, --service SERVICE  the name of the service checking
+#                         iRODS, identified as client user
+#                         to iRODS
 #  ...
 #
 # Environment Variables:
-#  PGHOST  the FQDN or IP address of the DBMS hosting the ICAT
-#          DB
+#  PGHOST  the FQDN or IP address of the DBMS hosting the
+#          ICAT DB
 #
 # Input:
 #  It expects to read the output of `repl` from stdin.
 #
 # Output:
-#  Unless otherwise indicated, it writes the status of the iRODS
-#  service on HOST to stdout in a form understood by nagios.
+#  Unless otherwise indicated, it writes the status of the
+#  iRODS service on HOST to stdout in a form understood by
+#  Nagios.
 #
 #  It writes progress messages to stderr.
 #
 # Side Effects:
-#  The rodsLog on HOST will show a connection from the host ...
+#  The rodsLog on HOST will show a connection from the host
+#  where check_irods is run with the client user set to
+#  "check_irods". If SERVICE is specified, the user will be
+#  set to SERVICE instead.
 #
 # Exit Status:
 #  0  connected to iRODS
@@ -134,6 +141,7 @@ Here's an example header comment for a published file.
 
 Here's an alternate example where a help function provides the file header information.
 
+__TODO bring this example in line with the header comment version.__
 ```bash
 #!/bin/bash
 
