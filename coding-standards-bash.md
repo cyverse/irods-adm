@@ -79,8 +79,6 @@ is any side effects that isn't obvious, the header should document this too. Fin
 uses different exit statuses for different types of failures, the header should describe them. If
 standard zero for success and non-zero for failure, the header need not document this.
 
-__TODO review the following in a browser__
-
 The formatting used in the following header examples is not required. The content is the important
 part.
 
@@ -118,16 +116,16 @@ Here's an example header comment for a published file.
 #
 # Output:
 #  Unless otherwise indicated, it writes the status of the
-#  iRODS service on HOST to stdout in a form understood by
-#  Nagios.
+#  iRODS service running on HOST to stdout in a form
+#  understood by Nagios.
 #
 #  It writes progress messages to stderr.
 #
 # Side Effects:
 #  The rodsLog on HOST will show a connection from the host
-#  where check_irods is run with the client user set to
-#  "check_irods". If SERVICE is specified, the user will be
-#  set to SERVICE instead.
+#  where check_irods is run with the proxy user set to
+#  "check_irods". If SERVICE is specified, the client user
+#  will be set to SERVICE instead.
 #
 # Exit Status:
 #  0  connected to iRODS
@@ -141,28 +139,29 @@ Here's an example header comment for a published file.
 
 Here's an alternate example where a help function provides the file header information.
 
-__TODO bring this example in line with the header comment version.__
 ```bash
 #!/bin/bash
 
 help() {
 	cat <<EOF
-
 $EXEC_NAME version $VERSION
 
 Usage:
  $EXEC_NAME [options] HOST
 
-Checks to see is if an iRODS service is online. It is ...
+Nagios plugin that checks to see is if an iRODS server is
+online. It supports Nagios version 2 or later and iRODS
+version 4 or later.
 
 Parameters:
  HOST  the FQDN or IP address of the server hosting the
        service
 
 Options:
- -h, --help       show help and exit
- -P, --port PORT  the TCP port the iRODS server listens to on
-                  HOST (default 1247)
+ -h, --help             show help and exit
+ -S, --service SERVICE  the name of the service checking
+                        iRODS, identified as client user to
+                        iRODS
  ...
 
 Environment Variables:
@@ -174,13 +173,16 @@ Input:
 
 Output:
  Unless otherwise indicated, it writes the status of the
- iRODS service on HOST to stdout in form interpretable by
- nagios.
+ iRODS service running on HOST to stdout in form understood
+ by Nagios.
 
  It writes progress messages to stderr.
 
 Side Effects:
- The rodsLog on HOST will show a connection from the ...
+ The rodsLog on HOST will show a connection from the host
+ where $EXEC_NAME is run with the proxy user set to
+ "$EXEC_NAME". If SERVICE is specified, the client user will
+ be set to SERVICE instead.
 
 Exit Status:
  0  connected to iRODS
@@ -192,17 +194,19 @@ University of Arizona. For license information, see
 https://cyverse.org/license.
 EOF
 }
-
 ```
 
 ### Function Comments
 
-Any function whose purpose isn't obvious or is part of a library should be documented with a
-comment immediately preceeding it's definition. A function comment should describe its function's
-behavior and not its implementation. In addition to its purpose, the following should be described.
+__TODO review the following in a browser__
+
+Any function that is part of a library or whose purpose isn't obvious should have a leading comment
+that describing it. A function comment should describe its function's behavior and not its
+implementation. It should describe the following as well.
 
 * any global or exported variables read or modified
-* usage of stdin, stdout, and stderr
+* usage of stdin and stdout
+* usage of stderr if it is used for something other than warning and error messages
 * any special return statuses other than zero for success and the default non-zero for failure
 
 ```bash
@@ -219,10 +223,11 @@ decode_header_len() {
 ### Implementation Comments
 
 The implementation should be self documenting as much as reasonably possible. Implementation
-comments can reduce the understandability. When reading code, a comment causes a mental context
-switch, interrupting the reader. All comments run the risk of become out of date. A comment that is
-inconsistent with the code is worse than useless. With this said, sometimes the implementation is
-non-obvious, and a short, explanatory comment should be provided immediately before this code.
+comments can reduce understandability. When reading code, a comment causes a mental context
+switch, interrupting the reader. Also, all comments run the risk of become out of date. A comment
+that is inconsistent with the code is worse than useless. With this said, sometimes the
+implementation is not obvious, and a short, explanatory comment should be provided immediately
+before this code.
 
 ## Formatting
 
