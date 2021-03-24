@@ -134,14 +134,11 @@ main() {
 }
 
 
-# TODO describe mapVar
-# resolves the command line arguments
+# It resolves the command line arguments, storing them in an associative array
+# using the long option names as the keys.
 # Arguments:
-#  The first argument is the name of the associative array where the resolved
-#  arguments will be store. The remaining arguments hold the raw command line
-#  arguments to resolve.
-# Output:
-#  Any issues with the command line arguments will be written to stderr.
+#  The first argument is the name of the associative array where the resolved.
+#  The remaining arguments hold the raw command line arguments to resolve.
 map_args() {
 	local mapVar="$1"
 	shift
@@ -196,7 +193,7 @@ map_args() {
 }
 
 
-# TODO inline this function
+# TODO revert to default return codes
 # formats the command line options using `getopt`
 # Arguments:
 #  the raw command line arguments
