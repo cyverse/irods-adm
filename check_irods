@@ -103,14 +103,14 @@ main() {
 		return $UNKNOWN
 	fi
 
-	if [[ -n "${argMap[help]}" ]]; then
-		if ! print_help; then
+	if [[ -n "${argMap[usage]}" ]]; then
+		if ! print_usage; then
 			return $UNKNOWN
 		fi
 
 		return $OK
-	elif [[ -n "${argMap[usage]}" ]]; then
-		if ! print_usage; then
+	elif [[ -n "${argMap[help]}" ]]; then
+		if ! print_help; then
 			return $UNKNOWN
 		fi
 
@@ -206,17 +206,18 @@ map_args() {
 #   3  if the command line options don't make sense
 #   4  if an internal error occured
 format_opts() {
-	# getopt doesn't support "?" as a short option.
+	# getopt doesn't support "?" as a short option. Since usage takes precedent
+	# over all other options, if the command contains a "?" option, return only it.
+	# TODO make this handle all cases
 	if [[ "$*" =~ (^| )-\? ]]; then
 		printf -- '-? --'
 		return $OK
 	fi
 
-	set +o errexit
 	getopt \
 		--name "$EXEC_NAME" \
 		--longoptions help,port:,service:,usage,verbose,version,zone: \
-		--options 'hP:S:?VvZ:' \
+		--options 'hP:S:VvZ:' \
 		-- "$@"
 	local rc=$?
 	set -o errexit
