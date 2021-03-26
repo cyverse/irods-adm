@@ -198,16 +198,14 @@ EOF
 
 ### Function Comments
 
-__TODO review the following in a browser__
-
 Any function that is part of a library or whose purpose isn't obvious should have a leading comment
-that describing it. A function comment should describe its function's behavior and not its
-implementation. It should describe the following as well.
+describing it. A function comment should describe its function's interface and behavior, not its
+implementation. It should include the following.
 
 * any global or exported variables read or modified
 * usage of stdin and stdout
 * usage of stderr if it is used for something other than warning and error messages
-* any special return statuses other than zero for success and the default non-zero for failure
+* any special return statuses other than zero for success and non-zero for failure
 
 ```bash
 # Decodes a serialized iRODS protocol packet header length
@@ -224,32 +222,33 @@ decode_header_len() {
 
 The implementation should be self documenting as much as reasonably possible. Implementation
 comments can reduce understandability. When reading code, a comment causes a mental context
-switch, interrupting the reader. Also, all comments run the risk of become out of date. A comment
-that is inconsistent with the code is worse than useless. With this said, sometimes the
-implementation is not obvious, and a short, explanatory comment should be provided immediately
-before this code.
+switch, interrupting the reader. Also, comments run the risk of become out of date. A comment that
+is inconsistent with the code is worse than useless. With this said, sometimes the implementation is
+not obvious, and a short, explanatory comment should lead the difficult section of code.
 
 ## Formatting
 
-New files should use the following style guidelines. When modifying existing files, the existing
-style should be used. As a separate, refactoring task, an existing file's style can be adapted to
-meet the following guidelines.
+__TODO review the following in a browser__
+
+A developer should use the following style guidelines when creating new source files. When
+modifying existing an existing one, the developer should follow the file's existing style. If the
+file has poor style, the developer could adapt the style as a separate, refactoring task.
 
 ### Indentation
 
-The primary purpose of indentation is readability. To make it easier for the visually impaired who
-use code readers to understand the layout of the file, use tabs for indentation. A study has shown
-that a tab length of 2-4 characters provides optimal readability. See ["Program Indentation and
-Comprehensibility" by Miaria et. al, Communications of the ACM 26, (Nov. 1983)
-p.861-867](https://www.cs.umd.edu/~ben/papers/Miara1983Program.pdf).
+The primary purpose of indentation is readability. To make it easier for the visually impaired, who
+often use code readers, to understand the layout of the file, a developer should use tabs for
+indentation. A study has shown that a tab length of 2 - 4 characters provides optimal readability.
+See ["Program Indentation and Comprehensibility" by Miaria et. al, Communications of the ACM 26,
+(Nov. 1983) p.861-867](https://www.cs.umd.edu/~ben/papers/Miara1983Program.pdf).
 
-Separate blocks with blank lines to improve readability.
+A developer should use blank lines to separate code blocks. This will also improve readability.
 
 ### Line Length
 
-There is no mandated maximum line length. The length of each line should be governed by readability.
-The optimal line length is considered to be 50-60 characters. See "Typographie" by E. Ruder. This is
-not an absolute length, but a relative length measured from the first character after indentation.
+There is no mandated maximum line length. Reability should govern the length of each line. One study
+shows that the optimal line length is  50 - 60 characters. This is not an absolute length, but a
+relative length measured from the first character after indentation. See "Typographie" by E. Ruder.
 
 ```bash
 # This is a 60 character line. This is a 60 character line.
