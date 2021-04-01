@@ -103,14 +103,14 @@ main() {
 		return $UNKNOWN
 	fi
 
-	if [[ -n "${argMap[usage]}" ]]; then
-		if ! print_usage; then
+	if [[ -n "${argMap[help]}" ]]; then
+		if ! print_help; then
 			return $UNKNOWN
 		fi
 
 		return $OK
-	elif [[ -n "${argMap[help]}" ]]; then
-		if ! print_help; then
+	elif [[ -n "${argMap[usage]}" ]]; then
+		if ! print_usage; then
 			return $UNKNOWN
 		fi
 
@@ -242,6 +242,18 @@ format_opts() {
 }
 
 
+# displays detailed help
+# Output:
+#  the help text formatted to fit on an 80 character wide terminal
+print_help() {
+	print_version
+	printf '\n'
+	print_usage
+	printf '\n'
+	print_description
+}
+
+
 # TODO revert error handling
 # displays the program version in the format required of Nagios plugins
 # Output:
@@ -252,18 +264,6 @@ print_version() {
 	if ! printf '%s v%s\n' "$EXEC_NAME" "$VERSION"; then
 		return $UNKNOWN
 	fi
-}
-
-
-# displays detailed help
-# Output:
-#  the help texted formatted to fit on an 80 character wide terminal
-print_help() {
-	print_version
-	printf '\n'
-	print_usage
-	printf '\n'
-	print_description
 }
 
 
