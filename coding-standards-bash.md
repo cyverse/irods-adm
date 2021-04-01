@@ -253,16 +253,15 @@ Ruder.
 
 ```bash
 # This is a 60 character line. This is a 60 character line.
-			# This is a 60 character line. This is a 60 character line.
+		# This is a 60 character line. This is a 60 character line.
 ```
 
 ### Pipelines and Other Chained Expressions
 
-If a pipeline fits on a single line, it should be on one. Otherwise, it should be split with each
-pipe segment being on its own line with all but the first line being indented and beginning with
-the `|` operator.
+If a pipeline fits on a single line, it should be on one. Otherwise, it should be split before each
+`|` operator with segment being on its own line. All but the first line should be indented.
 
-The same policy applies to outher chained expressions like logical compounds using `||` and `&&`.
+The same policy applies to other chained expressions like logical compounds using `||` and `&&`.
 
 ```bash
 od --address-radix n --read-bytes 4 | tr --delete ' '
