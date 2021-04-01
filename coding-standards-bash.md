@@ -228,27 +228,28 @@ not obvious, and a short, explanatory comment should lead the difficult section 
 
 ## Formatting
 
-__TODO review the following in a browser__
-
 A developer should use the following style guidelines when creating new source files. When
-modifying existing an existing one, the developer should follow the file's existing style. If the
-file has poor style, the developer could adapt the style as a separate, refactoring task.
+modifying an existing one, the developer should follow the file's current style. If the file has
+poor style, the developer could adapt its style as a separate, refactoring task.
 
 ### Indentation
 
 The primary purpose of indentation is readability. To make it easier for the visually impaired, who
-often use code readers, to understand the layout of the file, a developer should use tabs for
-indentation. A study has shown that a tab length of 2 - 4 characters provides optimal readability.
-See ["Program Indentation and Comprehensibility" by Miaria et. al, Communications of the ACM 26,
-(Nov. 1983) p.861-867](https://www.cs.umd.edu/~ben/papers/Miara1983Program.pdf).
+often use code readers, to understand the logic, a developer should use tabs for indentation. A
+study has shown that a tab length of 2 - 4 characters provides optimal readability. See ["Program
+Indentation and Comprehensibility" by Miaria et. al, Communications of the ACM 26, (Nov. 1983)
+p.861-867](https://www.cs.umd.edu/~ben/papers/Miara1983Program.pdf).
 
 A developer should use blank lines to separate code blocks. This will also improve readability.
 
 ### Line Length
 
-There is no mandated maximum line length. Reability should govern the length of each line. One study
-shows that the optimal line length is  50 - 60 characters. This is not an absolute length, but a
-relative length measured from the first character after indentation. See "Typographie" by E. Ruder.
+__TODO review the following in a browser__
+
+There is no mandated maximum line length. Readability should govern the length of each line. One
+study shows that the optimal line length is 50 - 60 characters. This is not an absolute length, but
+a relative length measured from the first character after indentation. See "Typographie" by E.
+Ruder.
 
 ```bash
 # This is a 60 character line. This is a 60 character line.
@@ -258,7 +259,7 @@ relative length measured from the first character after indentation. See "Typogr
 ### Pipelines and Other Chained Expressions
 
 If a pipeline fits on a single line, it should be on one. Otherwise, it should be split with each
-pipe segement being on its own line with all but the first line being indented and beginning with
+pipe segment being on its own line with all but the first line being indented and beginning with
 the `|` operator.
 
 The same policy applies to outher chained expressions like logical compounds using `||` and `&&`.
