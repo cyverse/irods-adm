@@ -254,16 +254,9 @@ print_help() {
 }
 
 
-# TODO revert error handling
 # displays the program version in the format required of Nagios plugins
-# Output:
-#  the program version
-# Return:
-#  0 on success or 3 if an internal error occurred
 print_version() {
-	if ! printf '%s v%s\n' "$EXEC_NAME" "$VERSION"; then
-		return $UNKNOWN
-	fi
+	printf '%s v%s\n' "$EXEC_NAME" "$VERSION"
 }
 
 
