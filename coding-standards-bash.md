@@ -244,8 +244,6 @@ A developer should use blank lines to separate code blocks. This will also impro
 
 ### Line Length
 
-__TODO review the following in a browser__
-
 There is no mandated maximum line length. Readability should govern the length of each line. One
 study shows that the optimal line length is 50 - 60 characters. This is not an absolute length, but
 a relative length measured from the first character after indentation. See "Typographie" by E.
@@ -259,25 +257,30 @@ Ruder.
 ### Pipelines and Other Chained Expressions
 
 If a pipeline fits on a single line, it should be on one. Otherwise, it should be split before each
-`|` operator with segment being on its own line. All but the first line should be indented.
+`|` operator with each segment being on its own line. All but the first line should be indented.
 
 The same policy applies to other chained expressions like logical compounds using `||` and `&&`.
 
 ```bash
 od --address-radix n --read-bytes 4 | tr --delete ' '
 
-"$ExecDir"/gather-logs --password "$password" "$ies" \
+"$EXEC_DIR"/gather-logs --password "$password" "$ies" \
 	| filter_msgs \
 	| tee >(mk_downloads > downloads) >(mk_uploads > uploads)
 
+mv --no-clobber "$file" "$TmpFile" \
+	&& touch "$file" \
+	&& irsync -K -s -v -R "$resc" "$TmpFile" i:"$obj"
 ```
 
 ### Conditionals and Loops
 
-For conditionals and loops, put the `; then` and `; do` on the same line as the corresponding `if`,
-`elif`, `for`, `until`, or `while`. The ending `fi` and `done` should be on their own line with the
-same level of indentation as the corresponding `then` or `done`. This makes them conditionals and
-loops consistent with `case` statements.
+__TODO review the following in a browser__
+
+For conditionals and loops, put the `then` and `do` on the same line as the corresponding `if`,
+`elif`, `for`, `until`, or `while`. The ending `fi` and `done` should be on their own line with
+the same level of indentation as the corresponding `then` or `done`. This makes them conditionals
+and loops consistent with `case` statements.
 
 ```bash
 if [[ "$resp" =~ size\.$ ]]; then
@@ -296,14 +299,17 @@ for size in ${sizes//,/ }; do
 	...
 done | gen_report > "$ReportLog"
 
+case "$1" in
+	...
+esac
 ```
 
 ### Case Statement
 
 For case statements, `esac` should have the same level of indentation as `case`. Each alternative
-should be indented one additional level. The pattern should be on its own line, and the action logic
-should be indented one more level. The action terminator, `;;`, `;&`, or `;;&` should be placed on
-its own line.
+should have one more level of indentation. Within each alternative, the pattern should be on its own
+line, and the action logic should have an additional level of indentation. The action terminator,
+`;;`, `;&`, or `;;&` should on its own line.
 
 ```bash
 case "$1" in
@@ -324,8 +330,7 @@ esac
 
 ### Variable Expansion
 
-All variables storing non-integer values should be quoted when expanded. Also during expansion, the
-variable name shouldn't be brace-delimited unless necessary or to avoid confusion.
+All variables storing non-integer values should be quoted when expanded.
 
 ```bash
 # Preferred style for ordinary variables
