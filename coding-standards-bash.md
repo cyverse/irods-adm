@@ -273,36 +273,7 @@ mv --no-clobber "$file" "$TmpFile" \
 	&& irsync -K -s -v -R "$resc" "$TmpFile" i:"$obj"
 ```
 
-### Conditionals and Loops
-
 __TODO review the following in a browser__
-
-For conditionals and loops, put the `then` and `do` on the same line as the corresponding `if`,
-`elif`, `for`, `until`, or `while`. The ending `fi` and `done` should be on their own line with
-the same level of indentation as the corresponding `then` or `done`. This makes them conditionals
-and loops consistent with `case` statements.
-
-```bash
-if [[ "$resp" =~ size\.$ ]]; then
-	reason=size
-elif [[ "$resp" =~ checksum\.$ ]]; then
-	reason=checksum
-else
-	...
-fi
-
-while true; do
-	...
-done
-
-for size in ${sizes//,/ }; do
-	...
-done | gen_report > "$ReportLog"
-
-case "$1" in
-	...
-esac
-```
 
 ### Case Statement
 
@@ -326,6 +297,31 @@ case "$1" in
 		exit 1
 		;;
 esac
+```
+
+### Conditionals and Loops
+
+For conditionals and loops, put the `then` and `do` on the same line as the corresponding `if`,
+`elif`, `for`, `until`, or `while`. The ending `fi` and `done` should be on their own line with
+the same level of indentation as the corresponding `then` or `done`. This makes conditionals and
+loops consistent with `case` statements.
+
+```bash
+if [[ "$resp" =~ size\.$ ]]; then
+	reason=size
+elif [[ "$resp" =~ checksum\.$ ]]; then
+	reason=checksum
+else
+	...
+fi
+
+while true; do
+	...
+done
+
+for size in ${sizes//,/ }; do
+	...
+done | gen_report > "$ReportLog"
 ```
 
 ### Variable Expansion
