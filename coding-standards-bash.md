@@ -273,14 +273,12 @@ mv --no-clobber "$file" "$TmpFile" \
 	&& irsync -K -s -v -R "$resc" "$TmpFile" i:"$obj"
 ```
 
-__TODO review the following in a browser__
-
 ### Case Statement
 
-For case statements, `esac` should have the same level of indentation as `case`. Each alternative
+For case statements, `esac` should have the same level of indentation as `case`. The alternatives
 should have one more level of indentation. Within each alternative, the pattern should be on its own
 line, and the action logic should have an additional level of indentation. The action terminator,
-`;;`, `;&`, or `;;&` should on its own line.
+`;;`, `;&`, or `;;&` should also be on its own line.
 
 ```bash
 case "$1" in
@@ -299,12 +297,14 @@ case "$1" in
 esac
 ```
 
+__TODO review the following in a browser__
+
 ### Conditionals and Loops
 
-For conditionals and loops, put the `then` and `do` on the same line as the corresponding `if`,
-`elif`, `for`, `until`, or `while`. The ending `fi` and `done` should be on their own line with
-the same level of indentation as the corresponding `then` or `done`. This makes conditionals and
-loops consistent with `case` statements.
+For conditionals and loops, put `then` and `do` on the same line as the corresponding `if`, `elif`,
+`for`, `until`, or `while`. The ending `fi` and `done` should be on its own line with the same
+level of indentation as the corresponding `then` or `done`. This makes conditionals and loops
+consistent with `case` statements.
 
 ```bash
 if [[ "$resp" =~ size\.$ ]]; then
@@ -326,11 +326,12 @@ done | gen_report > "$ReportLog"
 
 ### Variable Expansion
 
-All variables storing non-integer values should be quoted when expanded.
+All variables storing non-integer values should be quoted when expanded. This prevents accidental
+word splitting. Also brace-delimiting should be used to avoid confusion.
 
 ```bash
 # Preferred style for ordinary variables
-readonly ExecName="$(basename "$ExecAbsPath")"
+readonly EXEC_NAME="$(basename "$EXEC_ABS_PATH")"
 
 # Preferred style for special variables
 echo Positional: "$1" ... "${10}" ...
@@ -345,30 +346,13 @@ echo "${1}0${2}"
 # Outputs "a0b"
 ```
 
-### Quoting
-
-Variables that haven't been declared as integer type and command substitutions should be quoted
-unless unquoted expansion is required.
-
-Literal integers should not be quoted.
-
-```bash
-readonly ExecAbsPath="$(readlink --canonicalize "$0")"
-readonly Version=2
-
-if [[ $# -lt 1 ]]; then
-	exit_with_help
-fi
-```
-
 ### Functions
 
-For any non-trivial script, it is preferred to decompose the logic into functions. This allows
-for variables to be localized to the body of a function, making debugging easier.
+For any non-trivial script, the logic should be decomposed into functions. This allows variables to
+be localized to the body of a function, making debugging easier.
 
-To be consistent with `case` statements, the `{` should be placed on the same line as the
-declaration, while the `}` should be placed on its own line with the same level of indentation as
-the declaration.
+To be consistent with `case` statements, the `{` should be placed on the declaration line, while the
+`}` should be placed on its own line with the same level of indentation as the declaration.
 
 ```bash
 display_resp() {
