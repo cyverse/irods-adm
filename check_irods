@@ -273,7 +273,6 @@ ping() {
 	local startTime
 	startTime="$(date +'%s.%N')"
 
-	# TODO review possible return codes for exec
 	if ! exec 3<>/dev/tcp/"$ies"/"$port"; then
 		printf 'CRITICAL: down\n'
 		return $CRITICAL
@@ -286,14 +285,12 @@ ping() {
 		local respMsg
 		if respMsg="$(parse_resp <&3)"; then
 			local stopTime
-			# TODO review possible errors
 			stopTime="$(date +'%s.%N')"
 
 			mk_req RODS_DISCONNECT >&3
 			close_conn
 
 			local dt
-			# TODO review possible errors
 			dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
 				'BEGIN { print (STOP - START) }')"
 
@@ -313,13 +310,14 @@ ping() {
 }
 
 
-# TODO swallow errors
+# TODO document
 close_conn() {
-	exec 3<&-
-	exec 3>&-
+	exec 3<&- || true
+	exec 3>&- || true
 }
 
 
+# TODO document
 mk_req() {
 	local msgType="$1"
 
@@ -336,6 +334,7 @@ mk_req() {
 }
 
 
+# TODO document
 parse_resp() {
 	local headerLen
 	headerLen="$(decode_header_len)"
@@ -357,6 +356,7 @@ parse_resp() {
 }
 
 
+# TODO document
 mk_header() {
 	local type="$1"
 	local msgLen="$2"
@@ -372,6 +372,7 @@ EOX
 }
 
 
+# TODO document
 mk_startup_pack() {
 	local clientUser="$1"
 	local rcatZone="$2"
@@ -391,6 +392,7 @@ EOX
 }
 
 
+# TODO document
 encode_header_len() {
 	local len="$1"
 
