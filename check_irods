@@ -288,7 +288,8 @@ ping() {
 			stopTime="$(date +'%s.%N')"
 
 			mk_req RODS_DISCONNECT >&3
-			close_conn
+			exec 3<&- || true
+			exec 3>&- || true
 
 			local dt
 			dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
@@ -304,16 +305,10 @@ ping() {
 		fi
 	fi
 
-	close_conn
-	printf 'CRITICAL: not iRODS\n'
-	return $CRITICAL
-}
-
-
-# TODO document
-close_conn() {
 	exec 3<&- || true
 	exec 3>&- || true
+	printf 'CRITICAL: not iRODS\n'
+	return $CRITICAL
 }
 
 
