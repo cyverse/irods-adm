@@ -28,11 +28,9 @@ take to create a new script.
 
 ## Clarity, the Most Important Standard
 
-__TODO review below for voice__
-
 Besides correctness, the most important standard is clarity when writing code. The code should be as
 easy to understand as reasonably possible. _If following any of the other standards obfuscates the
-logic, the obfuscating standard should not be followed._
+logic, don't follow the obfuscating standard._
 
 ## File Extensions
 
@@ -42,8 +40,7 @@ libraries and scripts.
 
 ## SUID/SGID
 
-SUID and SGID are not allowed in Bash scripts for security reasons. `sudo` or `gosu` should be used
-instead.
+SUID and SGID are not allowed in Bash scripts for security reasons. Use `sudo` or `gosu` instead.
 
 ## stdout vs. stderr
 
@@ -55,18 +52,20 @@ messages to stderr.
 
 ## Comments
 
-All comments should have enough detail so that the someone can learn how to use what is being
-described without having to study the code in detail. However, since an incorrect comment is usually
-worse than no comment, comments should be minimal to reduce the risk of them growing out of date. If
-a quick glace at the code being documented is enough to understand an aspect of the code, that aspect
-should not be documented.
+__TODO review the following in a browser__
+
+All comments should have enough detail so that the someone can learn how to use the described logic
+without having to study the code in detail. Since an incorrect comment is usually worse than no
+comment, comments should be minimal to reduce the risk of them growing out of date. If a quick
+glace at the commented logic is enough to understand an aspect of the code, don't comment on that
+aspect.
 
 ### File Header
 
 Every file must start with an overview of its contents. Ordinarily, this should be in the form of a
-comment block. For executables that can display help information, a function that generates the help
-text may be placed at the top of the script instead. For consistency's sake, this function should be
-named `help`.  The header doesn't need author and maintainer information.
+comment block. For an executable that can display help information, you may place a function that
+generates the help text at the top of the script instead. For consistency's sake, name this function
+`help`. The header doesn't need author and maintainer information.
 
 For a publicly available file, the header must include a copyright notice and a link to the CyVerse
 license, https://cyverse.org/license. This isn't necessary if the file is in a repository that
@@ -125,9 +124,9 @@ Here's an example header comment for a published file.
 #
 # Side Effects:
 #  The rodsLog on HOST will show a connection from the host
-#  where check_irods is run with the proxy user set to
-#  "check_irods". If SERVICE is specified, the client user
-#  will be set to SERVICE instead.
+#  that runs check_irods with the proxy user set to
+#  "check_irods". If the call specifies SERVICE, check_irods
+#  will set the client to SERVICE.
 #
 # Exit Status:
 #  0  connected to iRODS
@@ -182,9 +181,9 @@ Output:
 
 Side Effects:
  The rodsLog on HOST will show a connection from the host
- where $EXEC_NAME is run with the proxy user set to
- "$EXEC_NAME". If SERVICE is specified, the client user will
- be set to SERVICE instead.
+ that runs $EXEC_NAME with the proxy user set to
+ "$EXEC_NAME". If the call specifies SERVICE, $EXEC_NAME
+ will set the client user to SERVICE.
 
 Exit Status:
  0  connected to iRODS
@@ -298,8 +297,6 @@ case "$1" in
 		;;
 esac
 ```
-
-__TODO review the following in a browser__
 
 ### Conditionals and Loops
 
