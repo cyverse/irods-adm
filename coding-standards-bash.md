@@ -28,6 +28,8 @@ take to create a new script.
 
 ## Clarity, the Most Important Standard
 
+__TODO review below for voice__
+
 Besides correctness, the most important standard is clarity when writing code. The code should be as
 easy to understand as reasonably possible. _If following any of the other standards obfuscates the
 logic, the obfuscating standard should not be followed._
@@ -301,9 +303,9 @@ __TODO review the following in a browser__
 
 ### Conditionals and Loops
 
-For conditionals and loops, put `then` and `do` on the same line as the corresponding `if`, `elif`,
-`for`, `until`, or `while`. The ending `fi` and `done` should be on its own line with the same
-level of indentation as the corresponding `then` or `done`. This makes conditionals and loops
+For conditionals and loops, `then` and `do` should be on the same line as the corresponding `if`,
+`elif`,`for`, `until`, or `while`. The ending `fi` and `done` should be on its own line with the
+same level of indentation as the corresponding `then` or `done`. This makes conditionals and loops
 consistent with `case` statements.
 
 ```bash
@@ -327,7 +329,9 @@ done | gen_report > "$ReportLog"
 ### Variable Expansion
 
 All variables storing non-integer values should be quoted when expanded. This prevents accidental
-word splitting. Also brace-delimiting should be used to avoid confusion.
+word splitting.
+
+Brace-delimiting can clarify what is being expanded in some cases.
 
 ```bash
 # Preferred style for ordinary variables

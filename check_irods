@@ -403,10 +403,9 @@ encode_header_len() {
 #   the decimal value to stdout.
 decode_header_len() {
 	local lenHex
-	# TODO learn about possible errors
 	lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"
 
-	printf '%d' $((16#$lenHex))
+	printf '%d' $(( 16#$lenHex ))
 }
 
 
