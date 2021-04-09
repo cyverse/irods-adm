@@ -5,8 +5,8 @@
 # scheduled to run during given hours, the number of executions for each rule,
 # and the number of executions scheduled for each user. Finally, it reports the
 # number or executions be performed currently and information about them. For
-# each execution being performed, it reports the hour the execution was 
-# scheduled to be performed, the user who triggered the execution, and the 
+# each execution being performed, it reports the hour the execution was
+# scheduled to be performed, the user who triggered the execution, and the
 # execution's rule ID, REI ID, and rule. The output is similar to the following.
 #
 # 202 Rules in Queue
@@ -27,7 +27,7 @@
 #       1 tedgin
 #
 # 2 Running Rules
-# 
+#
 # Sched Hour    User       Rule Id   REI Id     Rule
 # 2021/01/26T02 sriram     698577101 1078121923 _syncReplicas
 # 2021/01/26T08 sriram     699269568 2119481675 _syncReplicas
@@ -81,8 +81,8 @@ report_running_rules() {
 
 	if (( runningCount > 0 )); then
 		printf '\n'
-		printf '%-13s %-10s %-9s %-10s %s\n' 'Sched Hour' User 'Rule Id' 'REI Id' Rule 
-    
+		printf '%-13s %-10s %-9s %-10s %s\n' 'Sched Hour' User 'Rule Id' 'REI Id' Rule
+
 		local rule
 		for rule in "${runningRules[@]}"; do
 			local id time user rei rule
@@ -98,13 +98,13 @@ report_rule_summary() {
 	local reportWidth="$1"
 
 	printf 'Total of Each Rule\n'
-	summarize_tasks | cut --characters -"$reportWidth" 
+	summarize_tasks | cut --characters -"$reportWidth"
 }
 
 
 report_time_summary() {
 	printf 'Total Rules by Scheduled Hour\n'
-	summarize_times 
+	summarize_times
 }
 
 
@@ -117,12 +117,12 @@ report_user_summary() {
 gather_rules() {
 	iquest --no-page \
 			no-distinct \
-			'select 
-				RULE_EXEC_ID, 
-				RULE_EXEC_STATUS, 
-				RULE_EXEC_TIME, 
-				RULE_EXEC_USER_NAME, 
-				RULE_EXEC_REI_FILE_PATH, 
+			'select
+				RULE_EXEC_ID,
+				RULE_EXEC_STATUS,
+				RULE_EXEC_TIME,
+				RULE_EXEC_USER_NAME,
+				RULE_EXEC_REI_FILE_PATH,
 				RULE_EXEC_NAME' \
 		| clean_rules
 }
@@ -133,8 +133,8 @@ clean_rules() {
 function build_rule_line(startIdx, endIdx,  line, i) {
 	line = $startIdx;
 
-	for (i = startIdx + 1; i <= endIdx; i++) { 
-		line = line " " $i; 
+	for (i = startIdx + 1; i <= endIdx; i++) {
+		line = line " " $i;
 	}
 
 	return gensub(/ *(\||\\)$/, "", "", line);
@@ -181,12 +181,12 @@ function build_rule_line(startIdx, endIdx,  line, i) {
 	printf "RULE_EXEC_NAME = %s\n", rule;
 	print $0;
 	next;
-} 
+}
 
 
 {
-	if (rule != "") { 
-		rule = rule " "; 
+	if (rule != "") {
+		rule = rule " ";
 	}
 
 	rule = rule build_rule_line(1, NF);
@@ -197,39 +197,39 @@ EOAWK
 
 filter_running() {
 	awk --file - <(cat) <<'EOAWK'
-/RULE_EXEC_ID/ { 
-	id = $3; 
+/RULE_EXEC_ID/ {
+	id = $3;
 }
 
 
-/RULE_EXEC_REI_FILE_PATH/ { 
-	rei = gensub(/^.*\./, "", "", $3); 
+/RULE_EXEC_REI_FILE_PATH/ {
+	rei = gensub(/^.*\./, "", "", $3);
 }
 
 
-/RULE_EXEC_STATUS/ { 
-	status = $3; 
+/RULE_EXEC_STATUS/ {
+	status = $3;
 }
 
 
-/RULE_EXEC_TIME/ { 
-	time = $3; 
+/RULE_EXEC_TIME/ {
+	time = $3;
 }
 
 
-/RULE_EXEC_USER_NAME/ { 
-	user = $3; 
+/RULE_EXEC_USER_NAME/ {
+	user = $3;
 }
 
 
-/RULE_EXEC_NAME/ { 
-	rule = gensub(/^RULE_EXEC_NAME = /, "", "", $0); 
+/RULE_EXEC_NAME/ {
+	rule = gensub(/^RULE_EXEC_NAME = /, "", "", $0);
 }
 
 
 /------------------------------------------------------------/ {
-	if (status == "RE_RUNNING") { 
-		printf "%s\t%s\t%s\t%s\t%s\n", id, time, user, rei, rule; 
+	if (status == "RE_RUNNING") {
+		printf "%s\t%s\t%s\t%s\t%s\n", id, time, user, rei, rule;
 	}
 }
 EOAWK
@@ -237,7 +237,7 @@ EOAWK
 
 
 summarize_tasks() {
-	sed --quiet 's/^RULE_EXEC_NAME = //p' | summarize | sort --numeric --reverse --key 1,1 
+	sed --quiet 's/^RULE_EXEC_NAME = //p' | summarize | sort --numeric --reverse --key 1,1
 }
 
 
@@ -258,6 +258,12 @@ summarize() {
 }
 
 
+# counts all of the rules
+# INPUT:
+#  It expects a list of information about rules separated by a line consisting
+#  of only 60 hyphens.
+# OUTPUT:
+#  the total number rules
 count_all() {
 	sed --quiet '/^------------------------------------------------------------$/p' | wc --lines
 }
