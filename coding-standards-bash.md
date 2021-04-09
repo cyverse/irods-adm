@@ -52,33 +52,34 @@ messages to stderr.
 
 ## Comments
 
-__TODO review the following in a browser__
-
 All comments should have enough detail so that the someone can learn how to use the described logic
-without having to study the code in detail. Since an incorrect comment is usually worse than no
-comment, comments should be minimal to reduce the risk of them growing out of date. If a quick
-glace at the commented logic is enough to understand an aspect of the code, don't comment on that
-aspect.
+without having to study it in detail. Since an incorrect comment is usually worse than no comment,
+comments should be minimal to reduce the risk of them growing out of date. If a quick glace at the
+code is enough to understand an aspect of it, don't comment on that aspect.
 
 ### File Header
 
 Every file must start with an overview of its contents. Ordinarily, this should be in the form of a
 comment block. For an executable that can display help information, you may place a function that
-generates the help text at the top of the script instead. For consistency's sake, name this function
-`help`. The header doesn't need author and maintainer information.
+generates command line help text at the top of the script instead. For consistency's sake, name this
+function `help`.
+
+__TODO review the following in a browser__
+
+The header doesn't need author and maintainer information.
 
 For a publicly available file, the header must include a copyright notice and a link to the CyVerse
 license, https://cyverse.org/license. This isn't necessary if the file is in a repository that
 includes a license file.
 
 For an executable, the header should describe possible command line arguments as well as any
-environment variables used. If the executable reads stdin, the header should describe what the
+environment variables used. If the executable reads from stdin, the header should describe what the
 executable expects to read. If it writes anything other than informational messages to stdout, the
 header should describe the output. If the executable writes anything to stderr other than
 informational, warning, and error messages, the header should describe this output as well. If there
 is any side effects that isn't obvious, the header should document this too. Finally, if the script
-uses different exit statuses for different types of failures, the header should describe them. If
-standard zero for success and non-zero for failure, the header need not document this.
+uses different exit statuses for different types of failures, the header should describe them. It
+should not document the standard zero for success and non-zero for failure.
 
 The formatting used in the following header examples is not required. The content is the important
 part.
@@ -200,12 +201,13 @@ EOF
 ### Function Comments
 
 Any function that is part of a library or whose purpose isn't obvious should have a leading comment
-describing it. A function comment should describe its function's interface and behavior, not its
+describing it. A function comment should describe its interface and behavior, not its
 implementation. It should include the following.
 
 * any global or exported variables read or modified
-* usage of stdin and stdout
-* usage of stderr if it is used for something other than warning and error messages
+* usage of stdin
+* usage of stdout for something other than informational messages
+* usage of stderr for something other than informational, warning, and error messages
 * any special return statuses other than zero for success and non-zero for failure
 
 ```bash
@@ -235,8 +237,8 @@ poor style, the developer could adapt its style as a separate, refactoring task.
 
 ### Indentation
 
-The primary purpose of indentation is readability. To make it easier for the visually impaired, who
-often use code readers, to understand the logic, a developer should use tabs for indentation. A
+The primary purpose of indentation is readability. To make it easier for the visually impaired (who
+often use code readers) to understand the logic, a developer should use tabs for indentation. A
 study has shown that a tab length of 2 - 4 characters provides optimal readability. See ["Program
 Indentation and Comprehensibility" by Miaria et. al, Communications of the ACM 26, (Nov. 1983)
 p.861-867](https://www.cs.umd.edu/~ben/papers/Miara1983Program.pdf).
@@ -245,10 +247,10 @@ A developer should use blank lines to separate code blocks. This will also impro
 
 ### Line Length
 
-There is no mandated maximum line length. Readability should govern the length of each line. One
-study shows that the optimal line length is 50 - 60 characters. This is not an absolute length, but
-a relative length measured from the first character after indentation. See "Typographie" by E.
-Ruder.
+This standard doe not mandate a maximum line length. Readability should govern the length of each
+line. One study shows that the optimal line length is 50 - 60 characters. This is not an absolute
+length, but a relative length measured from the first character after indentation. See "Typographie"
+by E. Ruder.
 
 ```bash
 # This is a 60 character line. This is a 60 character line.
@@ -257,10 +259,9 @@ Ruder.
 
 ### Pipelines and Other Chained Expressions
 
-If a pipeline fits on a single line, it should be on one. Otherwise, it should be split before each
-`|` operator with each segment being on its own line. All but the first line should be indented.
-
-The same policy applies to other chained expressions like logical compounds using `||` and `&&`.
+If a pipeline fits on a single line, it should be on one. Otherwise, it should split before each `|`
+operator with each segment being on its own line with all but the first line indented. The same
+policy applies to other chained expressions like logical compounds using `||` and `&&`.
 
 ```bash
 od --address-radix n --read-bytes 4 | tr --delete ' '
@@ -276,10 +277,10 @@ mv --no-clobber "$file" "$TmpFile" \
 
 ### Case Statement
 
-For case statements, `esac` should have the same level of indentation as `case`. The alternatives
-should have one more level of indentation. Within each alternative, the pattern should be on its own
-line, and the action logic should have an additional level of indentation. The action terminator,
-`;;`, `;&`, or `;;&` should also be on its own line.
+For case statements, the terminator `esac` should have the same level of indentation as the
+initiator `case`. The alternatives should have one more level of indentation. Within each
+alternative, the pattern should be on its own line with the action logic further indented. The
+action terminator, `;;`, `;&`, or `;;&`, should also be on its own line.
 
 ```bash
 case "$1" in
@@ -300,10 +301,11 @@ esac
 
 ### Conditionals and Loops
 
-For conditionals and loops, `then` and `do` should be on the same line as the corresponding `if`,
-`elif`,`for`, `until`, or `while`. The ending `fi` and `done` should be on its own line with the
-same level of indentation as the corresponding `then` or `done`. This makes conditionals and loops
-consistent with `case` statements.
+For conditionals and loops, the section initiators `then` or `do` should be on the same line as
+the corresponding condition initiator `if`, `elif`,`for`, `until`, or `while`. The condition
+initiator `elif`, section initiator `else`, and the terminator `fi` or `done` should be on its own
+line with the same level of indentation as the corresponding `fi`, `until`, or `while`. This makes
+conditionals and loops consistent with `case` statements.
 
 ```bash
 if [[ "$resp" =~ size\.$ ]]; then
