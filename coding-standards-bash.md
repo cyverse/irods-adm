@@ -64,8 +64,6 @@ comment block. For an executable that can display help information, you may plac
 generates command line help text at the top of the script instead. For consistency's sake, name this
 function `help`.
 
-__TODO review the following in a browser__
-
 The header doesn't need author and maintainer information.
 
 For a publicly available file, the header must include a copyright notice and a link to the CyVerse
@@ -77,7 +75,7 @@ environment variables used. If the executable reads from stdin, the header shoul
 executable expects to read. If it writes anything other than informational messages to stdout, the
 header should describe the output. If the executable writes anything to stderr other than
 informational, warning, and error messages, the header should describe this output as well. If there
-is any side effects that isn't obvious, the header should document this too. Finally, if the script
+is any side effects that aren't obvious, the header should document this too. Finally, if the script
 uses different exit statuses for different types of failures, the header should describe them. It
 should not document the standard zero for success and non-zero for failure.
 
@@ -125,7 +123,7 @@ Here's an example header comment for a published file.
 #
 # Side Effects:
 #  The rodsLog on HOST will show a connection from the host
-#  that runs check_irods with the proxy user set to
+#  running check_irods with the proxy user set to
 #  "check_irods". If the call specifies SERVICE, check_irods
 #  will set the client to SERVICE.
 #
@@ -182,9 +180,9 @@ Output:
 
 Side Effects:
  The rodsLog on HOST will show a connection from the host
- that runs $EXEC_NAME with the proxy user set to
- "$EXEC_NAME". If the call specifies SERVICE, $EXEC_NAME
- will set the client user to SERVICE.
+ running $EXEC_NAME with the proxy user set to "$EXEC_NAME".
+ If the call specifies SERVICE, $EXEC_NAME will set the
+ client user to SERVICE.
 
 Exit Status:
  0  connected to iRODS
@@ -225,22 +223,24 @@ decode_header_len() {
 
 The implementation should be self documenting as much as reasonably possible. Implementation
 comments can reduce understandability. When reading code, a comment causes a mental context
-switch, interrupting the reader. Also, comments run the risk of become out of date. A comment that
-is inconsistent with the code is worse than useless. With this said, sometimes the implementation is
-not obvious, and a short, explanatory comment should lead the difficult section of code.
+switch, interrupting the reader. Comments run the risk of become out of date as the code evolves. A
+comment that is inconsistent with the code is worse than useless. With this said, sometimes the
+implementation is not obvious, and a short, explanatory comment should lead the difficult section of
+code.
 
 ## Formatting
 
-A developer should use the following style guidelines when creating new source files. When
+A developer should use the following formatting guidelines when creating a new source file. When
 modifying an existing one, the developer should follow the file's current style. If the file has
 poor style, the developer could adapt its style as a separate, refactoring task.
 
-### Indentation
+### Whitespace Usage
 
 The primary purpose of indentation is readability. To make it easier for the visually impaired (who
-often use code readers) to understand the logic, a developer should use tabs for indentation. A
-study has shown that a tab length of 2 - 4 characters provides optimal readability. See ["Program
-Indentation and Comprehensibility" by Miaria et. al, Communications of the ACM 26, (Nov. 1983)
+often use code readers) to understand the logic, a developer should use tabs for indentation. This
+standard does not specify the length of tab. A study has shown that a tab length of 2 - 4 characters
+provides optimal readability. See ["Program Indentation and Comprehensibility" by Miaria et. al,
+Communications of the ACM 26, (Nov. 1983)
 p.861-867](https://www.cs.umd.edu/~ben/papers/Miara1983Program.pdf).
 
 A developer should use blank lines to separate code blocks. This will also improve readability.
@@ -260,8 +260,8 @@ by E. Ruder.
 ### Pipelines and Other Chained Expressions
 
 If a pipeline fits on a single line, it should be on one. Otherwise, it should split before each `|`
-operator with each segment being on its own line with all but the first line indented. The same
-policy applies to other chained expressions like logical compounds using `||` and `&&`.
+operator with each segment being on its own line and with all but the first line indented. The same
+policy applies to other chained expressions like logical compounds using `||` and `&&` operators.
 
 ```bash
 od --address-radix n --read-bytes 4 | tr --delete ' '
@@ -298,6 +298,8 @@ case "$1" in
 		;;
 esac
 ```
+
+__TODO review the following in a browser__
 
 ### Conditionals and Loops
 
