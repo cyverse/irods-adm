@@ -391,7 +391,6 @@ EOX
 encode_header_len() {
 	local len="$1"
 
-	# TODO learn about possible errors
 	printf '0: %.8x' "$len" | xxd -revert -g 0
 }
 
