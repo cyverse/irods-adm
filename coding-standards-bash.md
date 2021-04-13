@@ -219,6 +219,8 @@ decode_header_len() {
 }
 ```
 
+__TODO review the following in a browser__
+
 ### Implementation Comments
 
 The implementation should be self documenting as much as reasonably possible. Implementation
@@ -228,132 +230,13 @@ comment that is inconsistent with the code is worse than useless. With this said
 implementation is not obvious, and a short, explanatory comment should lead the difficult section of
 code.
 
-## Formatting
+## Feature Usage
 
-A developer should use the following formatting guidelines when creating a new source file. When
-modifying an existing one, the developer should follow the file's current style. If the file has
-poor style, the developer could adapt its style as a separate, refactoring task.
-
-### Whitespace Usage
-
-The primary purpose of indentation is readability. To make it easier for the visually impaired (who
-often use code readers) to understand the logic, a developer should use tabs for indentation. This
-standard does not specify the length of tab. A study has shown that a tab length of 2 - 4 characters
-provides optimal readability. See ["Program Indentation and Comprehensibility" by Miaria et. al,
-Communications of the ACM 26, (Nov. 1983)
-p.861-867](https://www.cs.umd.edu/~ben/papers/Miara1983Program.pdf).
-
-A developer should use blank lines to separate code blocks. This will also improve readability.
-
-### Line Length
-
-This standard doe not mandate a maximum line length. Readability should govern the length of each
-line. One study shows that the optimal line length is 50 - 60 characters. This is not an absolute
-length, but a relative length measured from the first character after indentation. See "Typographie"
-by E. Ruder.
-
-```bash
-# This is a 60 character line. This is a 60 character line.
-		# This is a 60 character line. This is a 60 character line.
-```
-
-### Pipelines and Other Chained Expressions
-
-If a pipeline fits on a single line, it should be on one. Otherwise, it should split before each `|`
-operator with each segment being on its own line and with all but the first line indented. The same
-policy applies to other chained expressions like logical compounds using `||` and `&&` operators.
-
-```bash
-od --address-radix n --read-bytes 4 | tr --delete ' '
-
-"$EXEC_DIR"/gather-logs --password "$password" "$ies" \
-	| filter_msgs \
-	| tee >(mk_downloads > downloads) >(mk_uploads > uploads)
-
-mv --no-clobber "$file" "$TmpFile" \
-	&& touch "$file" \
-	&& irsync -K -s -v -R "$resc" "$TmpFile" i:"$obj"
-```
-
-### Case Statement
-
-For case statements, the terminator `esac` should have the same level of indentation as the
-initiator `case`. The alternatives should have one more level of indentation. Within each
-alternative, the pattern should be on its own line with the action logic further indented. The
-action terminator, `;;`, `;&`, or `;;&`, should also be on its own line.
-
-```bash
-case "$1" in
-	-h|--help)
-		help
-		exit 0
-		;;
-	-P|--port)
-		...
-		;;
-	...
-	*)
-		help >&2
-		exit 1
-		;;
-esac
-```
-
-__TODO review the following in a browser__
-
-### Conditionals and Loops
-
-For conditionals and loops, the section initiators `then` or `do` should be on the same line as
-the corresponding condition initiator `if`, `elif`,`for`, `until`, or `while`. The condition
-initiator `elif`, section initiator `else`, and the terminator `fi` or `done` should be on its own
-line with the same level of indentation as the corresponding `fi`, `until`, or `while`. This makes
-conditionals and loops consistent with `case` statements.
-
-```bash
-if [[ "$resp" =~ size\.$ ]]; then
-	reason=size
-elif [[ "$resp" =~ checksum\.$ ]]; then
-	reason=checksum
-else
-	...
-fi
-
-while true; do
-	...
-done
-
-for size in ${sizes//,/ }; do
-	...
-done | gen_report > "$ReportLog"
-```
-
-### Variable Expansion
-
-All variables storing non-integer values should be quoted when expanded. This prevents accidental
-word splitting.
-
-Brace-delimiting can clarify what is being expanded in some cases.
-
-```bash
-# Preferred style for ordinary variables
-readonly EXEC_NAME="$(basename "$EXEC_ABS_PATH")"
-
-# Preferred style for special variables
-echo Positional: "$1" ... "${10}" ...
-echo Special: "$0" $# "$*" "$@" "$_" "$-" $? $$ $!
-
-# Brace-delimiting required
-header="$(mk_header "$msgType" ${#msg})"
-
-# Brace-delimited to avoid confusion
-set -- a b
-echo "${1}0${2}"
-# Outputs "a0b"
-```
+This section makes recommendations on bash feature usage.
 
 ### Functions
 
-For any non-trivial script, the logic should be decomposed into functions. This allows variables to
+For any non-trivial script, decompose the logic into functions. This allows variables to
 be localized to the body of a function, making debugging easier.
 
 To be consistent with `case` statements, the `{` should be placed on the declaration line, while the
@@ -368,23 +251,6 @@ display_resp() {
 		printf '\n'
 	fi
 }
-```
-
-### `main` function
-
-If an executable has at least one other function, an entry point function that encapsulates the
-remaining logic excluding includes, `set` statements, and environment variable and constant
-declarations is required. This makes the start of the program easy to find allows more variables to
-be made local.
-
-This function should be named `main` and should take the command line arguments as its own. Since
-the executable's header or `help` function describes the script, `main` should not have its own
-comment.
-
-The last non-comment line in the file should be a call to `main`.
-
-``bash
-main "$@"
 ```
 
 ### Use Local Variables
@@ -419,54 +285,6 @@ constant using `readonly` or `declare -r`. This will catch important errors when
 ```bash
 readonly EXEC_NAME="$(realpath --canonicalize-missing "$0")"
 ```
-
-### Executable File Organization
-
-If there is a `help` function, it should go at the top of the file just below the shebang line.
-Below this should come any includes, `set` statements, and environmentvariable and constant
-declarations. If the logic has been decomposed into functions, the functions other than `help`
-should be come next, followed by the invocation of `main`.
-
-```bash
-#!/bin/bash
-
-help() {
-	...
-}
-
-
-set -o errexit -o nounset -o pipefail
-
-source library.sh
-
-declare -r -x IRODS_SVC_ACNT=irods
-
-export PGUSER
-
-readonly DEFAULT_PORT=1247
-
-
-main() {
-	...
-}
-
-
-
-# ...
-map_args() {
-	local mapVar="$1"
-
-	...
-}
-
-
-main "$@"
-
-```
-
-## Feature Usage
-
-This section makes recommendations on bash feature usage.
 
 ### Command Substitution
 
@@ -662,6 +480,186 @@ done
 
 The `$((...))` and `((...))` automatically expand variables, so the the `$` operator isn't required.
 It is recommended to omit the `$` operator to improve readability.
+
+## Formatting
+
+A developer should use the following formatting guidelines when creating a new source file. When
+modifying an existing one, the developer should follow the file's current style. If the file has
+poor style, the developer could adapt its style as a separate, refactoring task.
+
+### Whitespace Usage
+
+The primary purpose of indentation is readability. To make it easier for the visually impaired (who
+often use code readers) to understand the logic, a developer should use tabs for indentation. This
+standard does not specify the length of tab. A study has shown that a tab length of 2 - 4 characters
+provides optimal readability. See ["Program Indentation and Comprehensibility" by Miaria et. al,
+Communications of the ACM 26, (Nov. 1983)
+p.861-867](https://www.cs.umd.edu/~ben/papers/Miara1983Program.pdf).
+
+A developer should use blank lines to separate code blocks. This will also improve readability.
+
+### Line Length
+
+This standard doe not mandate a maximum line length. Readability should govern the length of each
+line. One study shows that the optimal line length is 50 - 60 characters. This is not an absolute
+length, but a relative length measured from the first character after indentation. See "Typographie"
+by E. Ruder.
+
+```bash
+# This is a 60 character line. This is a 60 character line.
+		# This is a 60 character line. This is a 60 character line.
+```
+
+### Pipelines and Other Chained Expressions
+
+If a pipeline fits on a single line, it should be on one. Otherwise, it should split before each `|`
+operator with each segment being on its own line and with all but the first line indented. The same
+policy applies to other chained expressions like logical compounds using `||` and `&&` operators.
+
+```bash
+od --address-radix n --read-bytes 4 | tr --delete ' '
+
+"$EXEC_DIR"/gather-logs --password "$password" "$ies" \
+	| filter_msgs \
+	| tee >(mk_downloads > downloads) >(mk_uploads > uploads)
+
+mv --no-clobber "$file" "$TmpFile" \
+	&& touch "$file" \
+	&& irsync -K -s -v -R "$resc" "$TmpFile" i:"$obj"
+```
+
+### Case Statement
+
+For case statements, the terminator `esac` should have the same level of indentation as the
+initiator `case`. The alternatives should have one more level of indentation. Within each
+alternative, the pattern should be on its own line with the action logic further indented. The
+action terminator, `;;`, `;&`, or `;;&`, should also be on its own line.
+
+```bash
+case "$1" in
+	-h|--help)
+		help
+		exit 0
+		;;
+	-P|--port)
+		...
+		;;
+	...
+	*)
+		help >&2
+		exit 1
+		;;
+esac
+```
+
+### Conditionals and Loops
+
+For a conditional or loop, the block initiator `then` or `do` should be on the same line as the
+corresponding condition initiator `if`, `elif`,`for`, `until`, or `while`. The condition initiator
+`elif`, block initiator `else`, and the terminator `fi` or `done` should be on its own line with the
+same level of indentation as the corresponding `fi`, `until`, or `while`. This makes conditionals
+and loops consistent with `case` statements.
+
+```bash
+if [[ "$resp" =~ size\.$ ]]; then
+	reason=size
+elif [[ "$resp" =~ checksum\.$ ]]; then
+	reason=checksum
+else
+	...
+fi
+
+while true; do
+	...
+done
+
+for size in ${sizes//,/ }; do
+	...
+done | gen_report > "$ReportLog"
+```
+
+### Variable Expansion
+
+Quote all non-integer variables when expanding. This prevents accidental word splitting. When the
+variable name isn't obvious in an expression, delimit the variable in braces.
+
+```bash
+# Preferred style for ordinary variables
+readonly EXEC_NAME="$(basename "$EXEC_ABS_PATH")"
+
+# Preferred style for special variables
+echo Positional: "$1" ... "${10}" ...
+echo Special: "$0" $# "$*" "$@" "$_" "$-" $? $$ $!
+
+# Brace-delimiting required
+header="$(mk_header "$msgType" ${#msg})"
+
+# Brace-delimited to avoid confusion
+set -- a b
+echo "${1}0${2}"
+# Outputs "a0b"
+```
+
+### `main` function
+
+If an executable has at least one other function, an entry point function that encapsulates the
+remaining logic excluding includes, `set` statements, and environment variable and constant
+declarations is required. This makes the start of the program easy to find allows more variables to
+be made local.
+
+This function should be named `main` and should take the command line arguments as its own. Since
+the executable's header or `help` function describes the script, `main` should not have its own
+comment.
+
+The last non-comment line in the file should be a call to `main`.
+
+``bash
+main "$@"
+```
+
+### Executable File Organization
+
+If there is a `help` function, it should go at the top of the file just below the shebang line.
+Below this should come any includes, `set` statements, and environmentvariable and constant
+declarations. If the logic has been decomposed into functions, the functions other than `help`
+should be come next, followed by the invocation of `main`.
+
+```bash
+#!/bin/bash
+
+help() {
+	...
+}
+
+
+set -o errexit -o nounset -o pipefail
+
+source library.sh
+
+declare -r -x IRODS_SVC_ACNT=irods
+
+export PGUSER
+
+readonly DEFAULT_PORT=1247
+
+
+main() {
+	...
+}
+
+
+
+# ...
+map_args() {
+	local mapVar="$1"
+
+	...
+}
+
+
+main "$@"
+
+```
 
 ## Naming Conventions
 
