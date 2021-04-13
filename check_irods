@@ -387,7 +387,11 @@ EOX
 }
 
 
-# TODO document
+# Encodes the length of a serialized iRODS protocol packet header
+# Parameter:
+#  len  the decimal value of the length to encode
+# Output:
+#  the serialized length
 encode_header_len() {
 	local len="$1"
 
