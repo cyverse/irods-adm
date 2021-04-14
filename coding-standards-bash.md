@@ -229,19 +229,19 @@ comment that is inconsistent with the code is worse than useless. With this said
 implementation is not obvious, and a short, explanatory comment should lead the difficult section of
 code.
 
-__TODO review the following in a browser__
-
 ## Feature Usage
 
 This section makes recommendations on bash feature usage.
 
 ### Functions
 
-For any non-trivial script, decompose the logic into functions. This allows variables to
-be localized to the body of a function, making debugging easier.
+__TODO review the following in a browser__
 
-To be consistent with `case` statements, the `{` should be placed on the declaration line, while the
-`}` should be placed on its own line with the same level of indentation as the declaration.
+For any non-trivial script, decompose the logic into functions. This allows for the localization of
+variables to the body of a function, making debugging easier.
+
+To be consistent with `case` statements, place the function body initiator `{` on the declaration
+line and the terminator `}` on its own line with the same level of indentation as the declaration.
 
 ```bash
 display_resp() {
@@ -254,14 +254,14 @@ display_resp() {
 }
 ```
 
-### Use Local Variables
+### Local Variables
 
-A function-specific variable should be declared using `local` to this restricts the variable to the
-name space fo the function and its children, avoiding inadertently overriding the value of variable
-with the same name used elsewhere.
+Declare a function-specific variable using `local`. This restricts the variable to the namespace of
+the function and the functions it calls, which helps avoid accidentally overriding the value of
+variable with the same name used elsewhere.
 
 Since `local` doesn't propagate the exit code from a command substitution, assignment of the output
-of an command substitution should be in a separate statement from the variable's declaration.  
+of a command substitution should be in a separate statement from the variable's declaration.  
 
 ```bash
 # ...
@@ -280,8 +280,8 @@ map_args() {
 
 ### Read-Only Variables
 
-A global variables that is not intended to be modified after first assignment, should be made into a
-constant using `readonly` or `declare -r`. This will catch important errors when working with them.
+If you will not modify a global variable after first assignment, declare it using `readonly` or
+`declare -r`. This will catch important errors when working with them.
 
 ```bash
 readonly EXEC_NAME="$(realpath --canonicalize-missing "$0")"
