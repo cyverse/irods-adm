@@ -255,6 +255,9 @@ print_help() {
 
 
 # displays the program version in the format required of Nagios plugins
+# Globals:
+#  EXEC_NAME
+#  VERSION
 print_version() {
 	printf '%s v%s\n' "$EXEC_NAME" "$VERSION"
 }
