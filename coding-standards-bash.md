@@ -202,6 +202,7 @@ Any function that is part of a library or whose purpose isn't obvious should hav
 describing it. A function comment should describe its interface and behavior, not its
 implementation. It should include the following.
 
+* any arguments passed in
 * any global or exported variables read or modified
 * usage of stdin
 * usage of stdout for something other than informational messages
@@ -219,8 +220,6 @@ decode_header_len() {
 }
 ```
 
-__TODO review the following in a browser__
-
 ### Implementation Comments
 
 The implementation should be self documenting as much as reasonably possible. Implementation
@@ -229,6 +228,8 @@ switch, interrupting the reader. Comments run the risk of become out of date as 
 comment that is inconsistent with the code is worse than useless. With this said, sometimes the
 implementation is not obvious, and a short, explanatory comment should lead the difficult section of
 code.
+
+__TODO review the following in a browser__
 
 ## Feature Usage
 
