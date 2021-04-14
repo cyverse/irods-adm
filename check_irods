@@ -367,7 +367,13 @@ EOX
 }
 
 
-# TODO document
+# create the iRODS protocol startup pack instruction
+# Arguments:
+#  clientUser  the username of the client to connect as
+#  rcatZone    the zone of the client and proxy to connect as
+# Globals:
+#  EXEC_NAME  used as the username of the proxy and as the option identifying
+#             the client program
 mk_startup_pack() {
 	local clientUser="$1"
 	local rcatZone="$2"
@@ -388,10 +394,6 @@ EOX
 
 
 # Encodes the length of a serialized iRODS protocol packet header
-# Parameter:
-#  len  the decimal value of the length to encode
-# Output:
-#  the serialized length
 encode_header_len() {
 	local len="$1"
 
