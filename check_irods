@@ -354,7 +354,10 @@ parse_resp() {
 }
 
 
-# TODO document
+# create an iRODS protocol message header
+# Arguments:
+#  type    the message type
+#  msgLen  the message body length in bytes
 mk_header() {
 	local type="$1"
 	local msgLen="$2"
@@ -370,7 +373,7 @@ EOX
 }
 
 
-# create the iRODS protocol startup pack instruction
+# create an iRODS protocol startup message body
 # Arguments:
 #  clientUser  the username of the client to connect as
 #  rcatZone    the zone of the client and proxy to connect as
