@@ -233,32 +233,11 @@ code.
 
 This section makes recommendations on bash feature usage.
 
-### Functions
-
-__TODO review the following in a browser__
-
-For any non-trivial script, decompose the logic into functions. This allows for the localization of
-variables to the body of a function, making debugging easier.
-
-To be consistent with `case` statements, place the function body initiator `{` on the declaration
-line and the terminator `}` on its own line with the same level of indentation as the declaration.
-
-```bash
-display_resp() {
-	local verbose="$1"
-
-	if [[ -n "$verbose" ]]; then
-		cat
-		printf '\n'
-	fi
-}
-```
-
 ### Local Variables
 
 Declare a function-specific variable using `local`. This restricts the variable to the namespace of
-the function and the functions it calls, which helps avoid accidentally overriding the value of
-variable with the same name used elsewhere.
+the function and the functions it calls. This helps avoid overriding the value of variable with the
+same name used elsewhere.
 
 Since `local` doesn't propagate the exit code from a command substitution, assignment of the output
 of a command substitution should be in a separate statement from the variable's declaration.  
@@ -280,8 +259,10 @@ map_args() {
 
 ### Read-Only Variables
 
-If you will not modify a global variable after first assignment, declare it using `readonly` or
-`declare -r`. This will catch important errors when working with them.
+__TODO review the following in a browser__
+
+If other maintainers should not modify a global variable after first assignment, declare it using
+`readonly` or `declare -r`. This will help prevent certain hard to catch errors.
 
 ```bash
 readonly EXEC_NAME="$(realpath --canonicalize-missing "$0")"
@@ -289,22 +270,22 @@ readonly EXEC_NAME="$(realpath --canonicalize-missing "$0")"
 
 ### Command Substitution
 
-Use `$(...)` instead of `` `...` `` for command substitution. The `$(...)` form can be nested
-without escaping, so it is easier to read.
+Use `$(...)` instead of `` `...` `` for command substitution. You can nest the `$(...)` form without
+escaping it, making the code easier to read.
 
 ```bash
-# This is preferred
+# preferred
 ExecName="$(basename "$(realpath -m "$0")")"
 
-# This is not
+# undesirable
 ExecName="`basename \"\`readpath -m \\\"$0\\\"\`\"`"
 ```
 
 ### `test`, `[ ... ]`, `[[ ... ]]`, and `((...))`
 
-Use `[[ ... ]]` for testing conditions instead of `test` or `[ ... ]`, because it can prevent many
-logic errors. `[[ ... ]]` doesn't perform filename expansion or word splitting, and the `&&`, `||`,
-`<`, and `>` operators can be used without having to be escaped.
+Use `[[ ... ]]` for testing conditions instead of `test` or `[ ... ]`, because it can prevent
+certain types of logic errors. `[[ ... ]]` doesn't perform filename expansion or word splitting, and
+the `&&`, `||`, `<`, and `>` operators can be used without having to be escaped.
 
 ```bash
 # This performs pattern matching of filename versus f*, so it would write "Match" to stdout.
@@ -599,6 +580,25 @@ header="$(mk_header "$msgType" ${#msg})"
 set -- a b
 echo "${1}0${2}"
 # Outputs "a0b"
+```
+
+### Functions
+
+For any non-trivial script, decompose the logic into functions. This allows for the localization of
+a variable to the scope of a function, making debugging easier.
+
+To be consistent with `case` statements, place the function body initiator `{` on the declaration
+line and the terminator `}` on its own line with the same level of indentation as the declaration.
+
+```bash
+display_resp() {
+	local verbose="$1"
+
+	if [[ -n "$verbose" ]]; then
+		cat
+		printf '\n'
+	fi
+}
 ```
 
 ### `main` function
