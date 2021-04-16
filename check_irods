@@ -338,7 +338,6 @@ parse_resp() {
 	headerLen="$(decode_header_len)"
 
 	local header
-	# TODO learn about errors
 	read -r -d '' -n "$headerLen" header
 
 	if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]; then
