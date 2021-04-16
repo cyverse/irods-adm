@@ -259,8 +259,6 @@ map_args() {
 
 ### Read-Only Variables
 
-__TODO review the following in a browser__
-
 If other maintainers should not modify a global variable after first assignment, declare it using
 `readonly` or `declare -r`. This will help prevent certain hard to catch errors.
 
@@ -277,7 +275,7 @@ escaping it, making the code easier to read.
 # preferred
 ExecName="$(basename "$(realpath -m "$0")")"
 
-# undesirable
+# not preferred
 ExecName="`basename \"\`readpath -m \\\"$0\\\"\`\"`"
 ```
 
@@ -285,25 +283,28 @@ ExecName="`basename \"\`readpath -m \\\"$0\\\"\`\"`"
 
 Use `[[ ... ]]` for testing conditions instead of `test` or `[ ... ]`, because it can prevent
 certain types of logic errors. `[[ ... ]]` doesn't perform filename expansion or word splitting, and
-the `&&`, `||`, `<`, and `>` operators can be used without having to be escaped.
+you don't have to escape the `&&`, `||`, `<`, and `>` operators.
+
+__TODO review the following in a browser__
 
 ```bash
-# This performs pattern matching of filename versus f*, so it would write "Match" to stdout.
+# This performs pattern matching of filename versus f*, so
+# it would write "Match" to stdout.
 if [[ filename == f* ]]; then
-  echo Match
+	echo Match
 fi
 
-# This would like generate an error, since f* is expanded within the contents of the current
-# directory.
+# This would likely generate an error, since bash expands f*
+# within the contents of the current directory.
 if [ filename == f* ]; then
 	echo Match
 fi
 ```
 
-It is recommended to use `((...))` to test numerical conditions. The operators `<`, `<=`, `==`,
-`>=`, and `>` are more readable than the operators `-lt`, `-le`, `-eq`, `-ge`, and `-gt` that would
-be used in the other test constructs. Also, the `((...))` handles variable expansion, so the `$`
-operator isn't needed.
+This standard recommends the use of `((...))` to test numerical conditions. The operators `<`, `<=`,
+`==`, `>=`, and `>` are more readable than the operators `-lt`, `-le`, `-eq`, `-ge`, and `-gt` that
+the other test constructs require. Also,  `((...))` handles variable expansion, so the `$` operator
+isn't needed.
 
 ```bash
 if ((a > b)); then
@@ -317,8 +318,8 @@ fi
 
 ### Testing Strings
 
-To make code easier to read by making it explicit what is being tested, use the `-z` test for
-checking if a string is empty, and use the `-n` test for checking if a string is non-empty.
+Use the `-z` operator for checking if a string is empty and `-n` for checking if a string is
+non-empty. This makes it clear what the code is testing.
 
 ```bash
 # Do this
@@ -337,10 +338,10 @@ To avoid accidental assignment, use `==` instead of `=` for testing equality.
 ### Wildcard Expansion of Filenames
 
 Since file names may begin with a `-`, use an explicit path when doing wildcard expansions of them.
-This avoids the risk of having a name being interpretted as a flag. It's safer to expand wildcards
-of the form `./*` than `*`.
+This avoids the risk of bash interpreting a name as a flag. It's safer to expand wildcards of the
+form `./*` than `*`.
 
-In the following examples, assume the contents of the currect directory are as follows.
+In the following examples, assume the contents of the current directory are as follows.
 
 ```bash
 prompt> ls
@@ -369,10 +370,10 @@ prompt> ls
 SomeDirectory
 ```
 
-### Eval
+### `eval`
 
-`eval` is dangerous and should usually be avoided. It obfiscates the code. In some situations, it
-makes it impossible to trap run-time errors.
+`eval` is dangerous, and you should generally avoid using it. It obfuscates the code. In some
+situations, it makes trapping run-time errors impossible.
 
 ```bash
 # What happens if `func` writes a value to stdout with a
@@ -382,9 +383,9 @@ var="$(eval func)"
 
 ### Arrays
 
-An array should be used to store a list of elements to avoid quoting complications like nesting. Do
-not use them to implement more complex data structures. Instead, consider using another scripting
-language such as awk or python.
+Use an array to store a list of elements to avoid quoting complications like nesting. Do not use
+them to implement more complex data structures. Instead, consider using another scripting language
+such as awk or python.
 
 ### Iterating over Command Output
 
