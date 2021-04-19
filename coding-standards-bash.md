@@ -285,8 +285,6 @@ Use `[[ ... ]]` for testing conditions instead of `test` or `[ ... ]`, because i
 certain types of logic errors. `[[ ... ]]` doesn't perform filename expansion or word splitting, and
 you don't have to escape the `&&`, `||`, `<`, and `>` operators.
 
-__TODO review the following in a browser__
-
 ```bash
 # This performs pattern matching of filename versus f*, so
 # it would write "Match" to stdout.
@@ -301,7 +299,7 @@ if [ filename == f* ]; then
 fi
 ```
 
-This standard recommends the use of `((...))` to test numerical conditions. The operators `<`, `<=`,
+This standard recommends the use of `((...))` to test numeric conditions. The operators `<`, `<=`,
 `==`, `>=`, and `>` are more readable than the operators `-lt`, `-le`, `-eq`, `-ge`, and `-gt` that
 the other test constructs require. Also,  `((...))` handles variable expansion, so the `$` operator
 isn't needed.
@@ -319,7 +317,7 @@ fi
 ### Testing Strings
 
 Use the `-z` operator for checking if a string is empty and `-n` for checking if a string is
-non-empty. This makes it clear what the code is testing.
+non-empty. This makes it more clear what the code is testing.
 
 ```bash
 # Do this
@@ -383,9 +381,11 @@ var="$(eval func)"
 
 ### Arrays
 
-Use an array to store a list of elements to avoid quoting complications like nesting. Do not use
-them to implement more complex data structures. Instead, consider using another scripting language
-such as awk or python.
+__TODO review the following in a browser__
+
+Use a bash array to as an array, list, or map of integers or strings, but do not use them to
+implement more complex data structures. Instead, consider using another scripting language such as
+awk or python.
 
 ### Iterating over Command Output
 
