@@ -332,7 +332,11 @@ mk_req() {
 }
 
 
-# TODO document
+# parse a response from iRODS
+# Input:
+#  the response
+# Output:
+#  the body of the response
 parse_resp() {
 	local headerLen
 	headerLen="$(decode_header_len)"
@@ -341,7 +345,7 @@ parse_resp() {
 	read -r -d '' -n "$headerLen" header
 
 	if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]; then
-		return $UNKNOWN
+		return 1
 	fi
 
 	local msgLen="${header#*<msgLen>}"
