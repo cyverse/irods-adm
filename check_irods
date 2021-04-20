@@ -315,7 +315,10 @@ ping() {
 }
 
 
-# TODO document
+# create an iRODS protocol request message
+# Arguments:
+#  type  the message type
+#  msg   optional the message body
 mk_req() {
 	local msgType="$1"
 
@@ -332,7 +335,7 @@ mk_req() {
 }
 
 
-# parse a response from iRODS
+# parse an iRODS protocol response message
 # Input:
 #  the response
 # Output:
