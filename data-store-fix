@@ -348,7 +348,7 @@ process_perm_issue() {
 			printf '%s' "${issue/%  /✓ }"
 		elif [[ "$err" =~ CAT_INVALID_ARGUMENT ]]
 		then
-			return 1
+			printf '%s' "${issue/%  /👻 }"
 		else
 			printf '%s' "${issue/%  /✗ }"
 			echo "$err" >&2
@@ -382,20 +382,28 @@ process_uuid_issue() {
 		local imetaFlag=-d
 	fi
 
-  local success
+  local statusMsg
 	if [[ $cnt -eq 0 ]]
 	then
-		success=$(add_missing_uuid "$entity" "$imetaFlag")
+		statusMsg="$(add_missing_uuid "$entity" "$imetaFlag")"
 	else
-		success=$(rm_extra_uuids "$entity" "$imetaFlag")
+		statusMsg="$(rm_extra_uuids "$entity" "$imetaFlag")"
 	fi
 
-	if [[ -n "${success-}" ]]
-	then
-		printf '%s✓ ' "$uuidCntField"
-	else
-		printf '%s✗ ' "$uuidCntField"
-  fi
+	local statusFmt
+	case "${statusMsg-}" in
+		SUCCESS)
+			statusFmt=✓
+			;;
+		MISSING)
+			statusFmt=👻
+			;;
+		*)
+			statusFmt=✗
+			;;
+	esac
+
+	printf '%s%s ' "$uuidCntField" "$statusFmt"
 }
 
 
@@ -409,10 +417,11 @@ add_missing_uuid() {
 	local err
 	if err=$(imeta set "$imetaFlag" "$entity" ipc_UUID "$uuid" 2>&1)
 	then
-		printf success
+		printf SUCCESS
 	else
 		if [[ "$err" =~ (CAT_UNKNOWN_COLLECTION|CAT_UNKNOWN_FILE) ]]
 		then
+			printf MISSING
 			return 1
 		else
 			echo "$err" >&2
@@ -435,7 +444,7 @@ rm_extra_uuids() {
 
 		if [[ "$uuidMap" = UNKNOWN_ENTITY ]]
 		then
-			return 1
+			printf MISSING
 		else
 			echo "$uuidMap" >&2
 		fi
@@ -458,7 +467,7 @@ rm_extra_uuids() {
 
   if [[ -z "${failed-}" ]]
 	then
-	  printf success
+	  printf SUCCESS
 	else
 		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
   fi
@@ -473,25 +482,16 @@ get_meta_id_uuid_map() {
 	local query
 	if [[ "$imetaFlag" = -c ]]
 	then
-		query="
-			select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
-			where META_COLL_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$entityPath'"
+		query="$(mk_coll_uuid_query "$entityPath")"
 	else
-		local collPath
-		collPath=$(dirname "$entityPath")
-
-		local objName
-		objName=$(basename "$entityPath")
-
-		query="
-			select order(META_DATA_ATTR_ID), META_DATA_ATTR_VALUE
-			where META_DATA_ATTR_NAME = 'ipc_UUID'
-				and COLL_NAME = '$collPath'
-				and DATA_NAME = '$objName'"
+		query="$(mk_data_uuid_query "$(dirname "$entityPath")" "$(basename "$entityPath")")"
 	fi
 
   local results
-	results=$(iquest --no-page '%s %s' "$query")
+	if ! results=$(iquest --no-page '%s %s' "$query")
+	then
+		return 1
+	fi
 
 	if [[ "$results" =~ CAT_NO_ROWS_FOUND ]]
 	then
@@ -500,6 +500,27 @@ get_meta_id_uuid_map() {
 	fi
 
 	echo "$results"
+}
+
+
+mk_coll_uuid_query() {
+	local collPath="$1"
+
+	cat <<EOF
+select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
+where META_COLL_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath'"
+EOF
+}
+
+
+mk_data_uuid_query() {
+	local collPath="$1"
+	local dataName="$2"
+
+	cat <<EOF
+select order(META_DATA_ATTR_ID), META_DATA_ATTR_VALUE
+where META_DATA_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath' and DATA_NAME = '$dataName'"
+EOF
 }
 
 
@@ -518,10 +539,8 @@ process_chksum_issue() {
 
     if [[ "$err" =~ 'does not exist' ]]
 		then
-			return 1
-		fi
-
-		if [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]
+			printf '%s' "${issue/%  /👻 }"
+		elif [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]
 		then
 			printf '%s' "${issue/%  /✓ }"
 		else
