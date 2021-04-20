@@ -3,10 +3,10 @@
 show_help() {
 	cat <<EOF
 
-$ExecName version $Version
+$EXEC_NAME version $VERSION
 
 Usage:
- $ExecName [options] [HOST [PORT [USER [CUTOFF-TIME [DEBUG]]]]]
+ $EXEC_NAME [options] [HOST [PORT [USER [CUTOFF-TIME [DEBUG]]]]]
 
 This script generates two reports, one for collections and one for data objects.
 Each report lists all collections or data objects, respectively, that were
@@ -39,7 +39,7 @@ EOF
 }
 
 
-readonly Version=1
+readonly VERSION=1
 
 set -o errexit -o nounset -o pipefail
 
@@ -47,13 +47,13 @@ export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=irods
 
-readonly ExecAbsPath=$(readlink --canonicalize "$0")
-readonly ExecName=$(basename "$ExecAbsPath")
+readonly EXEC_ABS_PATH=$(readlink --canonicalize "$0")
+readonly EXEC_NAME=$(basename "$EXEC_ABS_PATH")
 
 
 main() {
 	local opts
-	if ! opts=$(getopt --name "$ExecName" --longoptions help,version --options hv -- "$@")
+	if ! opts=$(getopt --name "$EXEC_NAME" --longoptions help,version --options hv -- "$@")
 	then
 		show_help >&2
 		return 1
@@ -69,7 +69,7 @@ main() {
 				return 0
 				;;
 			-v|--version)
-				printf '%s\n' "$Version"
+				printf '%s\n' "$VERSION"
 				return 0
 				;;
 			--)
@@ -135,10 +135,10 @@ check_existing_instance() {
 	fi
 
 	currPid=$$
-	for pid in $("$pidofExec" -x "$ExecName")
+	for pid in $("$pidofExec" -x "$EXEC_NAME")
 	do
 		if [ "$pid" -ne $currPid ]; then
-			printf "\n%s already running at PID %s\n" "$ExecName" "$pid" 1>&2
+			printf "\n%s already running at PID %s\n" "$EXEC_NAME" "$pid" 1>&2
 			printf "exiting\n\n" 1>&2
 			exit 1
 		fi
