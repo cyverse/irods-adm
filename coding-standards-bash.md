@@ -383,18 +383,17 @@ var="$(eval func)"
 
 __TODO review the following in a browser__
 
-Use a bash array to as an array, list, or map of integers or strings, but do not use them to
-implement more complex data structures. Instead, consider using another scripting language such as
-awk or python.
+Use a bash array as an array, list, or map of integers or strings, but do not use them as more
+complex data structures. Instead, consider using another scripting language such as awk or python.
 
 ### Iterating over Command Output
 
 Use `readarray` plus a `for` loop instead of a `while` to iterate over the output of a command. This
 makes the flow of the script text reflect the flow of the execution, improving understandability.
 
-In this example, the flow of the source code has the output of `get_resources` being iterated over
-before the command is called. The reader of the code needs to go to the bottom of the loop to see
-what is being iterated over. For all but the smallest while loops this is disruptive to the reader.
+In this example, the flow of the source code shows an iteration. Only when the reader scans to the
+bottom does they learn the iteration is over the output of `get_resources`. For all but the smallest
+while loops this is disruptive to the reader.
 
 ```bash
 while read -r resc; do
@@ -402,11 +401,12 @@ while read -r resc; do
 done < <(get_resources "$srcColl")
 ```
 
-In this example, the flow of the code has `get_resources` called before its output is iterated over,
-so the reader doesn't need to go to the bottom of the loop to know what is being interated over.
+In this example, the flow of the code has `get_resources` called before the iteration, so the reader
+doesn't need to go to the bottom of the loop to understand the logic.
 
 ```bash
 readarray -t resources < <(get_resources "$srcColl")
+
 for resc in "${resources[@]}"; do
   ...
 done
@@ -414,7 +414,7 @@ done
 
 ### Arithmetic
 
-Use `((...))` or `$((...))` instead of `expr`, `let`, or `$[...]` when doing arthimetic.
+Use `(( ... ))` or `$(( ... ))` instead of `expr`, `let`, or `$[ ... ]` when doing arithmetic.
 
 Since `expr` is a utility program instead of a shell builtin, quoting can be error prone.
 
@@ -429,10 +429,10 @@ prompt> echo $((2 * 3))
 6
 ```
 
-Also, `expr` is takes many times longer to execute than the shell's builtin arithmetic.
+Also, `expr` takes a lot longer to execute than the shell's builtin arithmetic.
 
-`let` isn't a declarative keyword in bash, so assignments must be quoted to avoid globbing and word
-splitting. It is simpler to avoid using `let`.
+`let` isn't a declarative keyword in bash, so you must quote assignments to avoid globbing and word
+splitting.
 
 ```bash
 prompt> let var=2 * 3
@@ -441,28 +441,29 @@ prompt> let var=2*3
 prompt> var=$((2 * 3))
 ```
 
-The form `$[...]` is deprecated and isn't portable.
+The bash standard has deprecated the form `$[ ... ]`, and it isn't portable.
 
-Avoid using standalone `((...))`` statements. In bash, any arithmetic expression that evaluates to
-`0` has an exit status of `1`. If exit on error is enable, e.g., `set -o errexit`, then standalone
-`((...))` statements risk causing a script to abruptly exit.
+Avoid using standalone `(( ... ))` statements. In bash, any arithmetic expression that evaluates to
+`0` has an exit status of `1`. If the script enables exit on error, e.g., `set -o errexit`, then
+standalone `(( ... ))` statements risk causing a script to abruptly exit.
 
 ```bash
 set -o errexit
 
 cnt=0
 
-while ((cnt < 10)); do
+while (( cnt < 10 )); do
 	# Since cnt is 0 on the first pass through the while loop,
-	# the next statement's exit code is 1, causing the shell script to exit.
-	((cnt++))
+	# the next statement's exit code is 1, causing the shell
+	# script to exit.
+	(( cnt++ ))
 
 	echo "$cnt"
 done
 ```
 
-The `$((...))` and `((...))` automatically expand variables, so the the `$` operator isn't required.
-It is recommended to omit the `$` operator to improve readability.
+The `$(( ... ))` and `(( ... ))` automatically expand variables, so the `$` operator isn't required.
+This standard recommends omitting the `$` operator to improve readability.
 
 ## Formatting
 
