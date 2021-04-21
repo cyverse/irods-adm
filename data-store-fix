@@ -454,9 +454,9 @@ rm_extra_uuids() {
 		while read -r _ uuid
 		do
 			# The first UUID created will have the first DB Id
-			if [[ $((++cnt)) -gt 1 ]]
+			if [[ $(( ++cnt )) -gt 1 ]]
 			then
-				if ! imeta rm "$imetaFlag" "$entityPath" ipc_UUID "$uuid"
+				if ! imeta rm "$imetaFlag" "$entity" ipc_UUID "$uuid"
 				then
 					failed=failed
 				fi
