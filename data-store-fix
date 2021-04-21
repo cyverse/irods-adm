@@ -6,7 +6,7 @@ show_help() {
 $EXEC_NAME version $VERSION
 
 Usage:
- $EXEC_NAME [options] [HOST [PORT [USER [CUTOFF-TIME [DEBUG]]]]]
+ $EXEC_NAME [options] [HOST [PORT [USER [CUTOFF-TIME]]]]
 
 This script generates two reports, one for collections and one for data objects.
 Each report lists all collections or data objects, respectively, that were
@@ -29,10 +29,8 @@ Parameters:
               format used by \`date\`. The default value is today at 00:00:00 in
               the local time zone.
 
- DEBUG        any value that, if present, will cause the script to generate
-              describing what it is doing. It is not present by default.
-
 Options:
+ -d, --debug    will cause the script to generate describing what it is doing
  -h, --help     show help and exit
  -v, --version  show version and exit
 EOF
@@ -50,10 +48,12 @@ export PGUSER=irods
 readonly EXEC_ABS_PATH=$(readlink --canonicalize "$0")
 readonly EXEC_NAME=$(basename "$EXEC_ABS_PATH")
 
+declare DEBUG
+
 
 main() {
 	local opts
-	if ! opts=$(getopt --name "$EXEC_NAME" --longoptions help,version --options hv -- "$@")
+	if ! opts=$(getopt --name "$EXEC_NAME" --longoptions debug,help,version --options dhv -- "$@")
 	then
 		show_help >&2
 		return 1
@@ -64,6 +64,10 @@ main() {
 	while true
 	do
 		case "$1" in
+			-d|--debug)
+				DEBUG=debug
+				shift
+				;;
 			-h|--help)
 				show_help
 				return 0
@@ -82,6 +86,8 @@ main() {
 				;;
 		esac
 	done
+
+	readonly DEBUG
 
 	if [ "$#" -ge 1 ]
 	then
@@ -103,13 +109,6 @@ main() {
 		readonly CUTOFF_TIME="$4"
 	else
 		readonly CUTOFF_TIME=$(date -I --date=today)
-	fi
-
-	if [ "$#" -ge 5 ]
-	then
-		readonly DEBUG=1
-	else
-		readonly DEBUG=
 	fi
 
 	check_existing_instance
