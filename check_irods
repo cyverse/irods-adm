@@ -263,9 +263,9 @@ print_version() {
 }
 
 
+# TODO learn how Nagios uses stderr
 # TODO add support for verbosity=1 See
 #  https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
-# TODO review possible internal return statuses and ensure correct return status and message
 ping() {
 	local ies="$1"
 	local port="$2"
@@ -274,43 +274,47 @@ ping() {
 	local verbosity="$5"
 
 	local startTime
-	startTime="$(date +'%s.%N')"
+	startTime="$(date +%s.%N)"
 
 	if ! exec 3<>/dev/tcp/"$ies"/"$port"; then
-		printf 'CRITICAL: down\n'
+		printf 'CRITICAL: down\n' || true
 		return $CRITICAL
 	fi
 
+	trap 'exec 3<&- || true; exec 3>&- || true; trap - RETURN' RETURN
+
 	local connMsgBody
-	connMsgBody="$(mk_startup_pack "$service" "$zone")"
-
-	if mk_req RODS_CONNECT "$connMsgBody" >&3; then
-		local respMsg
-		if respMsg="$(parse_resp <&3)"; then
-			local stopTime
-			stopTime="$(date +'%s.%N')"
-
-			mk_req RODS_DISCONNECT >&3
-			exec 3<&- || true
-			exec 3>&- || true
-
-			local dt
-			dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" \
-				'BEGIN { print (STOP - START) }')"
-
-			printf 'OK: up | time=%ss\n' "$dt"
-
-			if (( verbosity >= CFG_DEBUG )); then
-				printf '%s\n' "$respMsg"
-			fi
-
-			return $OK
-		fi
+	if ! connMsgBody="$(mk_startup_pack "$service" "$zone")"; then
+		return $UNKNOWN
 	fi
 
-	exec 3<&- || true
-	exec 3>&- || true
-	printf 'CRITICAL: not iRODS\n'
+	if ! mk_req RODS_CONNECT "$connMsgBody" >&3; then
+		return $UNKNOWN
+	fi
+
+	local respMsg
+	# TODO distinguish between internal error and bad response
+	if respMsg="$(parse_resp <&3)"; then
+		local stopTime
+		stopTime="$(date +'%s.%N')"
+
+		mk_req RODS_DISCONNECT >&3 || true
+
+		# TODO switch to bc
+		local dt
+		dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN { print (STOP - START) }')"
+
+		# TODO if dt is empty, print time=UNKNOWN
+		printf 'OK: up | time=%ss\n' "$dt" || true
+
+		if (( verbosity >= CFG_DEBUG )); then
+			printf '%s\n' "$respMsg" || true
+		fi
+
+		return $OK
+	fi
+
+	printf 'CRITICAL: not iRODS\n' || true
 	return $CRITICAL
 }
 
