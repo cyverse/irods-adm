@@ -157,7 +157,7 @@ check_existing_instance() {
 inject_debug_stmt() {
 	local stmt="$*"
 
-	if [ -n "$DEBUG" ]
+	if [[ -n "${DEBUG-}" ]]
 	then
 		printf '%s\n' "$stmt"
 	fi
@@ -683,7 +683,7 @@ fix_problems() {
 strip_noise() {
 	while IFS= read -r
 	do
-		if [ -n "$DEBUG" ]
+		if [[ -n "${DEBUG-}" ]]
 		then
 			printf '%s\n' "$REPLY"
 		else
