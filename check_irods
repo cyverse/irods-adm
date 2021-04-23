@@ -293,29 +293,29 @@ ping() {
 	fi
 
 	local respMsg
-	# TODO distinguish between internal error and bad response
-	if respMsg="$(parse_resp <&3)"; then
-		local stopTime
-		stopTime="$(date +'%s.%N')"
-
-		mk_req RODS_DISCONNECT >&3 || true
-
-		# TODO switch to bc
-		local dt
-		dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN { print (STOP - START) }')"
-
-		# TODO if dt is empty, print time=UNKNOWN
-		printf 'OK: up | time=%ss\n' "$dt" || true
-
-		if (( verbosity >= CFG_DEBUG )); then
-			printf '%s\n' "$respMsg" || true
-		fi
-
-		return $OK
+	if ! respMsg="$(parse_resp <&3)"; then
+		printf 'CRITICAL: not iRODS\n' || true
+		return $UNKNOWN
 	fi
 
-	printf 'CRITICAL: not iRODS\n' || true
-	return $CRITICAL
+	local stopTime
+	stopTime="$(date +%s.%N)"
+
+	mk_req RODS_DISCONNECT >&3 || true
+
+	local dt
+	# TODO do this only if startTime and stopTine aren't empty
+	# TODO switch to bc
+	dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN { print (STOP - START) }')"
+
+	# TODO if dt is empty, print time=UNKNOWN
+	printf 'OK: up | time=%ss\n' "$dt" || true
+
+	if (( verbosity >= CFG_DEBUG )); then
+		printf '%s\n' "$respMsg" || true
+	fi
+
+	return $OK
 }
 
 
@@ -332,7 +332,9 @@ mk_req() {
 	fi
 
 	local header
-	header="$(mk_header "$msgType" ${#msg})"
+	if ! header="$(mk_header "$msgType" ${#msg})"; then
+		return 1
+	fi
 
 	encode_header_len ${#header}
 	printf '%s%s' "$header" "$msg"
@@ -346,7 +348,9 @@ mk_req() {
 #  the body of the response
 parse_resp() {
 	local headerLen
-	headerLen="$(decode_header_len)"
+	headerLen="$(decode_header_len)"; then
+		return 1
+	fi
 
 	local header
 	read -r -d '' -n "$headerLen" header
@@ -424,7 +428,9 @@ encode_header_len() {
 #   the decimal value to stdout.
 decode_header_len() {
 	local lenHex
-	lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"
+	if ! lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"; then
+		return 1
+	fi
 
 	printf '%d' $(( 16#$lenHex ))
 }
