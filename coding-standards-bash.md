@@ -383,17 +383,19 @@ var="$(eval func)"
 
 __TODO review the following in a browser__
 
-Use a bash array as an array, list, or map of integers or strings, but do not use them as more
-complex data structures. Instead, consider using another scripting language such as awk or python.
+Use a bash array as an array or list of integers or strings, and use an associative array as map of
+integers or strings, but do not use either of them to mimic more complex data structures. Instead
+consider using another scripting language such as awk or python.
 
 ### Iterating over Command Output
 
-Use `readarray` plus a `for` loop instead of a `while` to iterate over the output of a command. This
-makes the flow of the script text reflect the flow of the execution, improving understandability.
+Use `readarray` plus a `for` loop instead of an `until` or `while` loop to iterate over the output
+of a command. This makes the flow of a script's text reflect the flow of its execution, improving
+its understandability.
 
-In this example, the flow of the source code shows an iteration. Only when the reader scans to the
-bottom does they learn the iteration is over the output of `get_resources`. For all but the smallest
-while loops this is disruptive to the reader.
+In this example, the flow of the text shows an iteration. When the reader scans to the bottom does
+they learn the iteration is over the output of `get_resources`. For all but the smallest `until`
+and `while` loops this is disruptive to the reader.
 
 ```bash
 while read -r resc; do
