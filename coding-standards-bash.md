@@ -231,7 +231,7 @@ code.
 
 ## Feature Usage
 
-This section makes recommendations on bash feature usage.
+This section makes recommendations on Bash feature usage.
 
 ### Local Variables
 
@@ -292,7 +292,7 @@ if [[ filename == f* ]]; then
 	echo Match
 fi
 
-# This would likely generate an error, since bash expands f*
+# This would likely generate an error, since Bash expands f*
 # within the contents of the current directory.
 if [ filename == f* ]; then
 	echo Match
@@ -336,7 +336,7 @@ To avoid accidental assignment, use `==` instead of `=` for testing equality.
 ### Wildcard Expansion of Filenames
 
 Since file names may begin with a `-`, use an explicit path when doing wildcard expansions of them.
-This avoids the risk of bash interpreting a name as a flag. It's safer to expand wildcards of the
+This avoids the risk of Bash interpreting a name as a flag. It's safer to expand wildcards of the
 form `./*` than `*`.
 
 In the following examples, assume the contents of the current directory are as follows.
@@ -382,6 +382,7 @@ var="$(eval func)"
 ### Arrays
 
 __TODO review the following in a browser__
+__TODO capitalize Bash, Awk, and Python__
 
 Use a bash array as an array or list of integers or strings, and use an associative array as map of
 integers or strings, but do not use either of them to mimic more complex data structures. Instead
