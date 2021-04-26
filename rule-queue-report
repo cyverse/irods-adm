@@ -253,6 +253,14 @@ summarize_users() {
 }
 
 
+# generates a report of how many times each entries appears in a list
+# INPUT:
+#  the list of entries deliniated by newlines.
+# OUTPUT:
+#  a two column summary, where the second column is an entry and the first is
+#  the number of time it appeared in the list. The first column is right
+#  justified with a width of at least seven characters. The two columns are
+#  separated by a blank, and the rows by newlines.
 summarize() {
 	sort | uniq --count
 }
