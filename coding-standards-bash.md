@@ -382,11 +382,10 @@ var="$(eval func)"
 ### Arrays
 
 __TODO review the following in a browser__
-__TODO capitalize Bash, Awk, and Python__
 
-Use a bash array as an array or list of integers or strings, and use an associative array as map of
-integers or strings, but do not use either of them to mimic more complex data structures. Instead
-consider using another scripting language such as awk or python.
+Use a Bash array for an array or list of integers or strings, and use an associative array for map
+of integers or strings, but do not use either of them to mimic more complex data structures. Instead
+consider using another scripting language such as Awk or Python.
 
 ### Iterating over Command Output
 
@@ -394,9 +393,9 @@ Use `readarray` plus a `for` loop instead of an `until` or `while` loop to itera
 of a command. This makes the flow of a script's text reflect the flow of its execution, improving
 its understandability.
 
-In this example, the flow of the text shows an iteration. When the reader scans to the bottom does
-they learn the iteration is over the output of `get_resources`. For all but the smallest `until`
-and `while` loops this is disruptive to the reader.
+In this example, the flow of the text shows an iteration. When the reader scans to the bottom they
+learn the iteration is over the output of `get_resources`. For all but the smallest `until` and
+`while` loops this delay is disruptive to the reader.
 
 ```bash
 while read -r resc; do
@@ -434,7 +433,7 @@ prompt> echo $((2 * 3))
 
 Also, `expr` takes a lot longer to execute than the shell's builtin arithmetic.
 
-`let` isn't a declarative keyword in bash, so you must quote assignments to avoid globbing and word
+`let` isn't a declarative keyword in Bash, so you must quote assignments to avoid globbing and word
 splitting.
 
 ```bash
@@ -444,9 +443,9 @@ prompt> let var=2*3
 prompt> var=$((2 * 3))
 ```
 
-The bash standard has deprecated the form `$[ ... ]`, and it isn't portable.
+The Bash standard has deprecated the form `$[ ... ]`, and it isn't portable.
 
-Avoid using standalone `(( ... ))` statements. In bash, any arithmetic expression that evaluates to
+Avoid using standalone `(( ... ))` statements. In Bash, any arithmetic expression that evaluates to
 `0` has an exit status of `1`. If the script enables exit on error, e.g., `set -o errexit`, then
 standalone `(( ... ))` statements risk causing a script to abruptly exit.
 
@@ -787,7 +786,7 @@ msgLen="$(sed 's/^.*<msgLen>\(.*\)<.*$/\1/' <<< "$header")"
 ## ShellCheck
 
 The `shellcheck` program created by the [ShellCheck project](https://www.shellcheck.net) finds
-common bugs and weaknesses in bash scripts. It is recommended to check all scripts with this
+common bugs and weaknesses in Bash scripts. It is recommended to check all scripts with this
 program.
 
 ## Conclusion
