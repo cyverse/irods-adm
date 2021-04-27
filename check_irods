@@ -308,8 +308,12 @@ ping() {
 	# TODO switch to bc
 	dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN { print (STOP - START) }')"
 
-	# TODO if dt is empty, print time=UNKNOWN
-	printf 'OK: up | time=%ss\n' "$dt" || true
+	local dispTime
+	if [[ -n "${dt-}" ]]; then
+		printf -v dispTime '%ss' "$dt" || true
+	fi
+
+	printf 'OK: up | time=%s\n' "${dispTime-UNKNOWN}" || true
 
 	if (( verbosity >= CFG_DEBUG )); then
 		printf '%s\n' "$respMsg" || true
