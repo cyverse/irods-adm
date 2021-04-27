@@ -313,6 +313,7 @@ ping() {
 		printf -v dispTime '%ss' "$dt" || true
 	fi
 
+	# TODO don't return time field if time can't be computed
 	printf 'OK: up | time=%s\n' "${dispTime-UNKNOWN}" || true
 
 	if (( verbosity >= CFG_DEBUG )); then
@@ -352,7 +353,7 @@ mk_req() {
 #  the body of the response
 parse_resp() {
 	local headerLen
-	headerLen="$(decode_header_len)"; then
+	if ! headerLen="$(decode_header_len)"; then
 		return 1
 	fi
 
