@@ -304,9 +304,10 @@ ping() {
 	mk_req RODS_DISCONNECT >&3 || true
 
 	local dt
-	# TODO do this only if startTime and stopTine aren't empty
-	# TODO switch to bc
-	dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN { print (STOP - START) }')"
+	if [[ -n "$startTime" ]] && [[ -n "$stopTime" ]]; then
+		# TODO switch to bc
+		dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN { print (STOP - START) }')"
+	fi
 
 	local dispTime
 	if [[ -n "${dt-}" ]]; then
