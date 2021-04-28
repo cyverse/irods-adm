@@ -381,21 +381,21 @@ var="$(eval func)"
 
 ### Arrays
 
-__TODO review the following in a browser__
-
-Use a Bash array for an array or list of integers or strings, and use an associative array for map
+Use a Bash array for an array or list of integers or strings, and use an associative array for a map
 of integers or strings, but do not use either of them to mimic more complex data structures. Instead
 consider using another scripting language such as Awk or Python.
 
 ### Iterating over Command Output
 
 Use `readarray` plus a `for` loop instead of an `until` or `while` loop to iterate over the output
-of a command. This makes the flow of a script's text reflect the flow of its execution, improving
-its understandability.
+of a command. This makes the flow of the script reflect the flow of its execution, improving its
+understandability.
 
-In this example, the flow of the text shows an iteration. When the reader scans to the bottom they
-learn the iteration is over the output of `get_resources`. For all but the smallest `until` and
-`while` loops this delay is disruptive to the reader.
+__TODO review the following in a browser__
+
+In this example, the flow of the script shows an iteration. When the reader scans to the bottom,
+they learn the iteration is over the output of `get_resources`. For all but the smallest `until` and
+`while` loops, this delay is disruptive to the reader.
 
 ```bash
 while read -r resc; do
@@ -421,17 +421,33 @@ Use `(( ... ))` or `$(( ... ))` instead of `expr`, `let`, or `$[ ... ]` when doi
 Since `expr` is a utility program instead of a shell builtin, quoting can be error prone.
 
 ```bash
-prompt> echo "$(expr 2 * 3)"
+prompt> echo $(expr 2 * 3)
 expr: syntax error: unexpected argument ‘bin’
-prompt> echo "$(expr '2 * 3')"
+prompt> echo $(expr '2 * 3')
 2 * 3
-prompt> echo "$(expr 2 '*' 3)"
+prompt> echo $(expr 2 \* 3)
 6
-prompt> echo $((2 * 3))
+prompt> echo $(( 2 * 3 ))
 6
 ```
 
 Also, `expr` takes a lot longer to execute than the shell's builtin arithmetic.
+
+```bash
+prompt> time echo $(expr 2 \* 3)
+6
+
+real	0m0.004s
+user	0m0.004s
+sys	0m0.000s
+
+prompt> time echo $(( 2 * 3 ))
+6
+
+real	0m0.000s
+user	0m0.000s
+sys	0m0.000s
+```
 
 `let` isn't a declarative keyword in Bash, so you must quote assignments to avoid globbing and word
 splitting.
