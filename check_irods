@@ -305,13 +305,12 @@ ping() {
 
 	local dt
 	if [[ -n "$startTime" ]] && [[ -n "$stopTime" ]]; then
-		# TODO switch to bc
-		dt="$(awk --assign START="$startTime" --assign STOP="$stopTime" 'BEGIN { print (STOP - START) }')"
+		dt="$(printf '%s - %s\n' "$startTime" "$stopTime" | bc)"
 	fi
 
 	local dispTime
 	if [[ -n "${dt-}" ]]; then
-		printf -v dispTime '%ss' "$dt" || true
+		printf -v dispTime '%.3fs' "$dt" || true
 	fi
 
 	# TODO don't return time field if time can't be computed
