@@ -391,8 +391,6 @@ Use `readarray` plus a `for` loop instead of an `until` or `while` loop to itera
 of a command. This makes the flow of the script reflect the flow of its execution, improving its
 understandability.
 
-__TODO review the following in a browser__
-
 In this example, the flow of the script shows an iteration. When the reader scans to the bottom,
 they learn the iteration is over the output of `get_resources`. For all but the smallest `until` and
 `while` loops, this delay is disruptive to the reader.
@@ -449,21 +447,21 @@ user	0m0.000s
 sys	0m0.000s
 ```
 
-`let` isn't a declarative keyword in Bash, so you must quote assignments to avoid globbing and word
+`let` isn't a declarative keyword in Bash, so you must take special care to avoid globbing and word
 splitting.
 
 ```bash
 prompt> let var=2 * 3
 bash: let: examples.desktop: syntax error: invalid arithmetic operator (error token is ".desktop")
 prompt> let var=2*3
-prompt> var=$((2 * 3))
+prompt> var=$(( 2 * 3 ))
 ```
 
 The Bash standard has deprecated the form `$[ ... ]`, and it isn't portable.
 
 Avoid using standalone `(( ... ))` statements. In Bash, any arithmetic expression that evaluates to
 `0` has an exit status of `1`. If the script enables exit on error, e.g., `set -o errexit`, then
-standalone `(( ... ))` statements risk causing a script to abruptly exit.
+standalone `(( ... ))` statements risk causing a script to exit prematurely.
 
 ```bash
 set -o errexit
@@ -473,15 +471,20 @@ cnt=0
 while (( cnt < 10 )); do
 	# Since cnt is 0 on the first pass through the while loop,
 	# the next statement's exit code is 1, causing the shell
-	# script to exit.
+	# script to exit. Using `$(( cnt++ ))` would have prevented
+	# this.
 	(( cnt++ ))
 
 	echo "$cnt"
 done
 ```
 
-The `$(( ... ))` and `(( ... ))` automatically expand variables, so the `$` operator isn't required.
-This standard recommends omitting the `$` operator to improve readability.
+__TODO review the following in a browser__
+
+The forms `$(( ... ))` and `(( ... ))` automatically expand variables, so the `$` operator isn't
+required inside. This standard recommends omitting the `$` operator to improve readability.
+
+__TODO provide example__
 
 ## Formatting
 
