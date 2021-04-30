@@ -459,12 +459,18 @@ prompt> var=$(( 2 * 3 ))
 
 The Bash standard has deprecated the form `$[ ... ]`, and it isn't portable.
 
-__TODO review the following in a browser__
-
 The forms `$(( ... ))` and `(( ... ))` automatically expand variables, so the `$` operator isn't
 required inside. This standard recommends omitting the `$` operator to improve readability.
 
-__TODO provide example__
+__TODO review the following in a browser__
+
+```bash
+echo $(( $shrlCnt + $ssrCnt ))  # not recommended
+# The `$` operator isn't needed to expand `shrlCnt` or
+# `ssrCnt`, so you could write the above statement as the
+# following one.
+echo $(( shrlCnt + ssrCnt ))  # recommended
+```
 
 Avoid using standalone `(( ... ))` statements. In Bash, any arithmetic expression that evaluates to
 `0` has an exit status of `1`. If the script enables exit on error, e.g., `set -o errexit`, then
