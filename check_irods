@@ -305,16 +305,16 @@ ping() {
 
 	local dt
 	if [[ -n "$startTime" ]] && [[ -n "$stopTime" ]]; then
-		dt="$(printf '%s - %s\n' "$startTime" "$stopTime" | bc)"
+		dt="$(printf '%s - %s\n' "$stopTime" "$startTime" | bc)"
 	fi
 
-	local dispTime
+	local status='OK: up'
+
 	if [[ -n "${dt-}" ]]; then
-		printf -v dispTime '%.3fs' "$dt" || true
+		printf -v status '%s | time=%.3fs' "$status" "$dt" || true
 	fi
 
-	# TODO don't return time field if time can't be computed
-	printf 'OK: up | time=%s\n' "${dispTime-UNKNOWN}" || true
+	printf '%s\n' "$status" || true
 
 	if (( verbosity >= CFG_DEBUG )); then
 		printf '%s\n' "$respMsg" || true
