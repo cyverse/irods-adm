@@ -246,6 +246,15 @@ summarize_times() {
 }
 
 
+# generates a report of how many rules each user has in the rule queue
+# sort by rule count in reverse order
+# INPUT:
+#  a list of rule queue report
+# OUTPUT:
+#  a two column summary, where the second column is a username and the first is
+#  the number of rules that user has queued. The first column is right justified
+#  with a width of at least seven characters. The two columns are separated by a
+#  blank, and the rows by newlines.
 summarize_users() {
 	sed --quiet 's/^RULE_EXEC_USER_NAME = \(.*\)/\1/p' \
 		| summarize \
