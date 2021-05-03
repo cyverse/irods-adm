@@ -1,4 +1,6 @@
 #!/bin/bash
+# TODO read all of nagios plugins development guidlines,
+# https://nagios-plugins.org/doc/guidelines.html
 
 print_usage() {
 	cat <<EOF
@@ -81,6 +83,7 @@ declare -i -r CFG_DEBUG=2
 declare EXEC_NAME
 
 
+# TODO ensure a stdout message is written as well when indicating an error
 main() {
 	if ! EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"; then
 		printf 'cannot determine executable name, using %s\n' "$DEFAULT_EXEC_NAME" >&2 || true
@@ -263,7 +266,7 @@ print_version() {
 }
 
 
-# TODO learn how Nagios uses stderr
+# TODO ensure stderr is redirected to stdout
 # TODO add support for verbosity=1 See
 #  https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
 ping() {

@@ -209,6 +209,8 @@ implementation. It should include the following.
 * usage of stderr for something other than informational, warning, and error messages
 * any special return statuses other than zero for success and non-zero for failure
 
+__TODO review the following in a browser__
+
 ```bash
 # Decodes a serialized iRODS protocol packet header length
 # Input:
@@ -216,7 +218,7 @@ implementation. It should include the following.
 # Output:
 #  the decimal value to stdout.
 decode_header_len() {
-	...
+	# ...
 }
 ```
 
@@ -253,7 +255,7 @@ map_args() {
 		return 1
 	fi
 
-	...
+	# ...
 }
 ```
 
@@ -268,7 +270,7 @@ readonly EXEC_NAME="$(realpath --canonicalize-missing "$0")"
 
 ### Command Substitution
 
-Use `$(...)` instead of `` `...` `` for command substitution. You can nest the `$(...)` form without
+Use `$( )` instead of `` ` ` `` for command substitution. You can nest the `$( )` form without
 escaping it, making the code easier to read.
 
 ```bash
@@ -279,11 +281,11 @@ ExecName="$(basename "$(realpath -m "$0")")"
 ExecName="`basename \"\`readpath -m \\\"$0\\\"\`\"`"
 ```
 
-### `test`, `[ ... ]`, `[[ ... ]]`, and `((...))`
+### `test`, `[ ]`, `[[ ]]`, and `(( ))`
 
-Use `[[ ... ]]` for testing conditions instead of `test` or `[ ... ]`, because it can prevent
-certain types of logic errors. `[[ ... ]]` doesn't perform filename expansion or word splitting, and
-you don't have to escape the `&&`, `||`, `<`, and `>` operators.
+Use `[[ ]]` for testing conditions instead of `test` or `[ ]`, because it can prevent certain types
+of logic errors. `[[ ]]` doesn't perform filename expansion or word splitting, and you don't have
+to escape the `&&`, `||`, `<`, and `>` operators.
 
 ```bash
 # This performs pattern matching of filename versus f*, so
@@ -299,13 +301,13 @@ if [ filename == f* ]; then
 fi
 ```
 
-This standard recommends the use of `((...))` to test numeric conditions. The operators `<`, `<=`,
+This standard recommends the use of `(( ))` to test numeric conditions. The operators `<`, `<=`,
 `==`, `>=`, and `>` are more readable than the operators `-lt`, `-le`, `-eq`, `-ge`, and `-gt` that
-the other test constructs require. Also,  `((...))` handles variable expansion, so the `$` operator
+the other test constructs require. Also,  `(( ))` handles variable expansion, so the `$` operator
 isn't needed.
 
 ```bash
-if ((a > b)); then
+if (( a > b )); then
 	echo greater than
 fi
 
@@ -397,7 +399,7 @@ they learn the iteration is over the output of `get_resources`. For all but the 
 
 ```bash
 while read -r resc; do
-	...
+	# ...
 done < <(get_resources "$srcColl")
 ```
 
@@ -408,13 +410,13 @@ doesn't need to go to the bottom of the loop to understand the logic.
 readarray -t resources < <(get_resources "$srcColl")
 
 for resc in "${resources[@]}"; do
-  ...
+  # ...
 done
 ```
 
 ### Arithmetic
 
-Use `(( ... ))` or `$(( ... ))` instead of `expr`, `let`, or `$[ ... ]` when doing arithmetic.
+Use `(( ))` or `$(( ))` instead of `expr`, `let`, or `$[ ]` when doing arithmetic.
 
 Since `expr` is a utility program instead of a shell builtin, quoting can be error prone.
 
@@ -457,12 +459,10 @@ prompt> let var=2*3
 prompt> var=$(( 2 * 3 ))
 ```
 
-The Bash standard has deprecated the form `$[ ... ]`, and it isn't portable.
+The Bash standard has deprecated the form `$[ ]`, and it isn't portable.
 
-The forms `$(( ... ))` and `(( ... ))` automatically expand variables, so the `$` operator isn't
-required inside. This standard recommends omitting the `$` operator to improve readability.
-
-__TODO review the following in a browser__
+The forms `$(( ))` and `(( ))` automatically expand variables, so the `$` operator isn't required
+inside. This standard recommends omitting the `$` operator to improve readability.
 
 ```bash
 echo $(( $shrlCnt + $ssrCnt ))  # not recommended
@@ -472,9 +472,9 @@ echo $(( $shrlCnt + $ssrCnt ))  # not recommended
 echo $(( shrlCnt + ssrCnt ))  # recommended
 ```
 
-Avoid using standalone `(( ... ))` statements. In Bash, any arithmetic expression that evaluates to
-`0` has an exit status of `1`. If the script enables exit on error, e.g., `set -o errexit`, then
-standalone `(( ... ))` statements risk causing a script to exit prematurely.
+Avoid using standalone `(( ))` statements. In Bash, any arithmetic expression that evaluates to `0`
+has an exit status of `1`. If the script enables exit on error, e.g., `set -o errexit`, then
+standalone `(( ))` statements risk causing a script to exit prematurely.
 
 ```bash
 set -o errexit
@@ -553,9 +553,9 @@ case "$1" in
 		exit 0
 		;;
 	-P|--port)
-		...
+		# ...
 		;;
-	...
+	# ...
 	*)
 		help >&2
 		exit 1
@@ -577,15 +577,15 @@ if [[ "$resp" =~ size\.$ ]]; then
 elif [[ "$resp" =~ checksum\.$ ]]; then
 	reason=checksum
 else
-	...
+	# ...
 fi
 
 while true; do
-	...
+	# ...
 done
 
 for size in ${sizes//,/ }; do
-	...
+	# ...
 done | gen_report > "$ReportLog"
 ```
 
@@ -599,7 +599,7 @@ variable name isn't obvious in an expression, delimit the variable in braces.
 readonly EXEC_NAME="$(basename "$EXEC_ABS_PATH")"
 
 # Preferred style for special variables
-echo Positional: "$1" ... "${10}" ...
+echo Positional: "$1" "$2" ... "$9" "${10}" "${11}" ...
 echo Special: "$0" $# "$*" "$@" "$_" "$-" $? $$ $!
 
 # Brace-delimiting required
@@ -650,7 +650,7 @@ main "$@"
 ### Executable File Organization
 
 If there is a `help` function, it should go at the top of the file just below the shebang line.
-Below this should come any includes, `set` statements, and environmentvariable and constant
+Below this should come any includes, `set` statements, and environment variable and constant
 declarations. If the logic has been decomposed into functions, the functions other than `help`
 should be come next, followed by the invocation of `main`.
 
@@ -658,7 +658,7 @@ should be come next, followed by the invocation of `main`.
 #!/bin/bash
 
 help() {
-	...
+	# ...
 }
 
 
@@ -674,7 +674,7 @@ readonly DEFAULT_PORT=1247
 
 
 main() {
-	...
+	# ...
 }
 
 
@@ -683,7 +683,7 @@ main() {
 map_args() {
 	local mapVar="$1"
 
-	...
+	# ...
 }
 
 
@@ -733,16 +733,16 @@ words separated by an underscore (`_`).
 #
 # a program that demonstrates how to name a local function
 
-...
+# ...
 
 
 # ...
 map_args() {
-	...
+	# ...
 }
 
 
-...
+# ...
 ```
 
 For a function that is part of library, its name should begin the library name followed by a `::`
@@ -757,7 +757,7 @@ descriptive names should be lower case with each pair of adjacent words separate
 
 # ...
 chunk_transfer::chunk::get_resources() {
-	...
+	# ...
 }
 ```
 
@@ -768,7 +768,7 @@ For a function that is exported, its name should be all upper case.
 
 # ...
 FIX_FILE_SIZE() {
-	...
+	# ...
 }
 export -f FIX_FILE_SIZE
 
@@ -789,7 +789,7 @@ prompt> cat project_storage.sh
 
 # ...
 project_storage::report() {
-	...
+	# ...
 }
 ```
 
