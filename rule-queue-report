@@ -256,9 +256,7 @@ summarize_times() {
 #  with a width of at least seven characters. The two columns are separated by a
 #  blank, and the rows by newlines.
 summarize_users() {
-	sed --quiet 's/^RULE_EXEC_USER_NAME = \(.*\)/\1/p' \
-		| summarize \
-		| sort --numeric --reverse --key 1,1
+	sed --quiet 's/^RULE_EXEC_USER_NAME = //p' | summarize | sort --numeric --reverse --key 1,1
 }
 
 
