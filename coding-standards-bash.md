@@ -209,8 +209,6 @@ implementation. It should include the following.
 * usage of stderr for something other than informational, warning, and error messages
 * any special return statuses other than zero for success and non-zero for failure
 
-__TODO review the following in a browser__
-
 ```bash
 # Decodes a serialized iRODS protocol packet header length
 # Input:
@@ -226,10 +224,10 @@ decode_header_len() {
 
 The implementation should be self documenting as much as reasonably possible. Implementation
 comments can reduce understandability. When reading code, a comment causes a mental context
-switch, interrupting the reader. Comments run the risk of become out of date as the code evolves. A
-comment that is inconsistent with the code is worse than useless. With this said, sometimes the
-implementation is not obvious, and a short, explanatory comment should lead the difficult section of
-code.
+switch, interrupting the reader. Also, comments run the risk of become out of date as the code
+evolves. A comment that is inconsistent with the code is worse than useless. With this said,
+sometimes the implementation is not obvious, and a short, explanatory comment should precede the
+difficult section of code.
 
 ## Feature Usage
 
@@ -238,8 +236,8 @@ This section makes recommendations on Bash feature usage.
 ### Local Variables
 
 Declare a function-specific variable using `local`. This restricts the variable to the namespace of
-the function and the functions it calls. This helps avoid overriding the value of variable with the
-same name used elsewhere.
+the function and the functions it calls. This helps avoid overriding the value of a variable with
+the same name used elsewhere.
 
 Since `local` doesn't propagate the exit code from a command substitution, assignment of the output
 of a command substitution should be in a separate statement from the variable's declaration.  
@@ -261,8 +259,10 @@ map_args() {
 
 ### Read-Only Variables
 
-If other maintainers should not modify a global variable after first assignment, declare it using
-`readonly` or `declare -r`. This will help prevent certain hard to catch errors.
+__TODO review the following in a browser__
+
+If a global variable should not modified after first assignment, declare it using `readonly` or
+`declare -r`. This will help prevent certain hard to catch errors.
 
 ```bash
 readonly EXEC_NAME="$(realpath --canonicalize-missing "$0")"
