@@ -259,8 +259,6 @@ map_args() {
 
 ### Read-Only Variables
 
-__TODO review the following in a browser__
-
 If a global variable should not modified after first assignment, declare it using `readonly` or
 `declare -r`. This will help prevent certain hard to catch errors.
 
@@ -281,138 +279,7 @@ ExecName="$(basename "$(realpath -m "$0")")"
 ExecName="`basename \"\`readpath -m \\\"$0\\\"\`\"`"
 ```
 
-### `test`, `[ ]`, `[[ ]]`, and `(( ))`
-
-Use `[[ ]]` for testing conditions instead of `test` or `[ ]`, because it can prevent certain types
-of logic errors. `[[ ]]` doesn't perform filename expansion or word splitting, and you don't have
-to escape the `&&`, `||`, `<`, and `>` operators.
-
-```bash
-# This performs pattern matching of filename versus f*, so
-# it would write "Match" to stdout.
-if [[ filename == f* ]]; then
-	echo Match
-fi
-
-# This would likely generate an error, since Bash expands f*
-# within the contents of the current directory.
-if [ filename == f* ]; then
-	echo Match
-fi
-```
-
-This standard recommends the use of `(( ))` to test numeric conditions. The operators `<`, `<=`,
-`==`, `>=`, and `>` are more readable than the operators `-lt`, `-le`, `-eq`, `-ge`, and `-gt` that
-the other test constructs require. Also,  `(( ))` handles variable expansion, so the `$` operator
-isn't needed.
-
-```bash
-if (( a > b )); then
-	echo greater than
-fi
-
-if [[ "$a" -gt "$b" ]]; then
-	echo greater than
-fi
-```
-
-### Testing Strings
-
-Use the `-z` operator for checking if a string is empty and `-n` for checking if a string is
-non-empty. This makes it more clear what the code is testing.
-
-```bash
-# Do this
-if [[ -z "$var" ]]; then
-	echo Empty
-fi
-
-# not this
-if [[ "$var" == '' ]]; then
-	echo Empty
-fi
-```
-
-To avoid accidental assignment, use `==` instead of `=` for testing equality.
-
-### Wildcard Expansion of Filenames
-
-Since file names may begin with a `-`, use an explicit path when doing wildcard expansions of them.
-This avoids the risk of Bash interpreting a name as a flag. It's safer to expand wildcards of the
-form `./*` than `*`.
-
-In the following examples, assume the contents of the current directory are as follows.
-
-```bash
-prompt> ls
--r  SomeDirectory  some-file
-```
-
-Using `rm -v *` would incorrectly delete the directory `SomeDirectory` leaving the file `-r` alone.
-
-```bash
-prompt> rm -v *
-removed directory 'SomeDirectory'
-removed 'some-file'
-prompt> ls
--r
-```
-
-Using `rm -v ./*` would correctly delete the files `-r` and `some-file`, leaving the directory
-`SomeDirectory` alone.
-
-```bash
-prompt> rm -v ./*
-removed './-r'
-rm: cannot remove './SomeDirectory': Is a directory
-removed './some-file'
-prompt> ls
-SomeDirectory
-```
-
-### `eval`
-
-`eval` is dangerous, and you should generally avoid using it. It obfuscates the code. In some
-situations, it makes trapping run-time errors impossible.
-
-```bash
-# What happens if `func` writes a value to stdout with a
-# space in it?
-var="$(eval func)"
-```
-
-### Arrays
-
-Use a Bash array for an array or list of integers or strings, and use an associative array for a map
-of integers or strings, but do not use either of them to mimic more complex data structures. Instead
-consider using another scripting language such as Awk or Python.
-
-### Iterating over Command Output
-
-Use `readarray` plus a `for` loop instead of an `until` or `while` loop to iterate over the output
-of a command. This makes the flow of the script reflect the flow of its execution, improving its
-understandability.
-
-In this example, the flow of the script shows an iteration. When the reader scans to the bottom,
-they learn the iteration is over the output of `get_resources`. For all but the smallest `until` and
-`while` loops, this delay is disruptive to the reader.
-
-```bash
-while read -r resc; do
-	# ...
-done < <(get_resources "$srcColl")
-```
-
-In this example, the flow of the code has `get_resources` called before the iteration, so the reader
-doesn't need to go to the bottom of the loop to understand the logic.
-
-```bash
-readarray -t resources < <(get_resources "$srcColl")
-
-for resc in "${resources[@]}"; do
-  # ...
-done
-```
+__TODO review the following in a browser__
 
 ### Arithmetic
 
@@ -492,6 +359,140 @@ while (( cnt < 10 )); do
 done
 ```
 
+### Testing Conditions, `test`, `[ ]`, `[[ ]]`, and `(( ))`
+
+Use `[[ ]]` for testing conditions instead of `test` or `[ ]`, because it can prevent certain types
+of logic errors. `[[ ]]` doesn't perform filename expansion or word splitting, and you don't have
+to escape the `&&`, `||`, `<`, and `>` operators.
+
+```bash
+# This performs pattern matching of filename versus f*, so
+# it would write "Match" to stdout.
+if [[ filename == f* ]]; then
+	echo Match
+fi
+
+# This would likely generate an error, since Bash expands f*
+# within the context of the current directory.
+if [ filename == f* ]; then
+	echo Match
+fi
+```
+
+This standard recommends the use of `(( ))` to test numeric conditions. The operators `<`, `<=`,
+`==`, `>=`, and `>` are the common operators for numeric comparisons in other languages, so their
+intent is easier to understand than the operators `-lt`, `-le`, `-eq`, `-ge`, and `-gt` required by
+the other test constructs. As mentioned before,  `(( ))` handles variable expansion, so the `$`
+operator isn't needed.
+
+```bash
+if (( a > b )); then
+	echo greater than
+fi
+
+if [[ "$a" -gt "$b" ]]; then
+	echo greater than
+fi
+```
+
+### Testing Strings
+
+Use the `-z` operator for checking if a string is empty and `-n` for checking if a string is
+non-empty. This makes it more clear what the code is testing.
+
+```bash
+# Do this
+if [[ -z "$var" ]]; then
+	echo Empty
+fi
+
+# not this
+if [[ "$var" == '' ]]; then
+	echo Empty
+fi
+```
+
+To avoid accidental assignment, use `==` instead of `=` for testing equality.
+
+### Wildcard Expansion of Filenames
+
+Since file names may begin with a `-`, use an explicit path when doing wildcard expansions. This
+avoids the risk of Bash interpreting a name as a flag. It's safer to expand wildcards of the form
+`./*` than `*`.
+
+In the following examples, assume the contents of the current directory are as follows.
+
+```bash
+prompt> ls
+-r  SomeDirectory  some-file
+```
+
+Using `rm -v *` would incorrectly delete the directory `SomeDirectory` leaving the file `-r` alone.
+
+```bash
+prompt> rm -v *
+removed directory 'SomeDirectory'
+removed 'some-file'
+prompt> ls
+-r
+```
+
+Using `rm -v ./*` would delete the files `-r` and `some-file`, leaving the directory `SomeDirectory`
+alone.
+
+```bash
+prompt> rm -v ./*
+removed './-r'
+rm: cannot remove './SomeDirectory': Is a directory
+removed './some-file'
+prompt> ls
+SomeDirectory
+```
+
+### `eval`
+
+`eval` is dangerous, so you should generally avoid using it. It obfuscates the code. In some
+situations, it makes trapping run-time errors impossible.
+
+```bash
+# What happens if `func` writes a value to stdout with a
+# space in it?
+var="$(eval func)"
+```
+
+### Arrays
+
+Use a Bash array for an array or list of integers or strings, and use an associative array for a map
+of integers or strings, but do not use either of them to mimic more complex data structures. Instead
+consider using another scripting language such as Awk or Python.
+
+### Iterating over Command Output
+
+Use `readarray` plus a `for` loop instead of an `until` or `while` loop to iterate over the output
+of a command. This makes the flow of the script reflect the flow of its execution, improving its
+understandability.
+
+In this example, the flow of the script shows an iteration. When the reader scans to the bottom,
+they learn the iteration is over the output of `get_resources`. For all but the smallest `until` and
+`while` loops, this delay is disruptive to the reader.
+
+```bash
+while read -r resc; do
+	# ...
+done < <(get_resources "$srcColl")
+```
+
+In this example, the flow of the code has `get_resources` called before the iteration, so the reader
+doesn't need to go to the bottom of the loop to understand the logic.
+
+```bash
+readarray -t resources < <(get_resources "$srcColl")
+
+for resc in "${resources[@]}"; do
+  # ...
+done
+```
+
 ## Formatting
 
 A developer should use the following formatting guidelines when creating a new source file. When
@@ -502,9 +503,9 @@ poor style, the developer could adapt its style as a separate, refactoring task.
 
 The primary purpose of indentation is readability. To make it easier for the visually impaired (who
 often use code readers) to understand the logic, a developer should use tabs for indentation. This
-standard does not specify the length of tab. A study has shown that a tab length of 2 - 4 characters
-provides optimal readability. See ["Program Indentation and Comprehensibility" by Miaria et. al,
-Communications of the ACM 26, (Nov. 1983)
+standard does not specify the length of tab. However, a study has shown that a tab length of 2 - 4
+characters provides optimal readability. See ["Program Indentation and Comprehensibility" by Miaria
+et. al, Communications of the ACM 26, (Nov. 1983)
 p.861-867](https://www.cs.umd.edu/~ben/papers/Miara1983Program.pdf).
 
 A developer should use blank lines to separate code blocks. This will also improve readability.
@@ -599,7 +600,7 @@ variable name isn't obvious in an expression, delimit the variable in braces.
 readonly EXEC_NAME="$(basename "$EXEC_ABS_PATH")"
 
 # Preferred style for special variables
-echo Positional: "$1" "$2" ... "$9" "${10}" "${11}" ...
+echo Positional: "$1" "$2" '...' "$9" "${10}" "${11}" '...'
 echo Special: "$0" $# "$*" "$@" "$_" "$-" $? $$ $!
 
 # Brace-delimiting required
