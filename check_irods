@@ -1,6 +1,18 @@
 #!/bin/bash
-# TODO read all of nagios plugins development guidlines,
+# NB this should follow the Nagios plugin guidelines. See
 # https://nagios-plugins.org/doc/guidelines.html
+# TODO read nagios plugins development guidlments System Commands and Auxiliary
+# Files https://nagios-plugins.org/doc/guidelines.html#SYSCMDAUXFILES
+# TODO read nagios plugins development guidlines Runtime Timeouts
+# https://nagios-plugins.org/doc/guidelines.html#RUNTIME
+# TODO read nagios plugins development guidlines Plugin Options
+# https://nagios-plugins.org/doc/guidelines.html#PLUGOPTIONS
+# TODO read nagios plugins development guidlines Test Cases
+# https://nagios-plugins.org/doc/guidelines.html#TESTCASES
+# TODO read nagios plugins development guidlines Coding Guidlines
+# https://nagios-plugins.org/doc/guidelines.html#CODINGGUIDELINES
+
+# TODO remove all stderr output if not a tty
 
 print_usage() {
 	cat <<EOF
