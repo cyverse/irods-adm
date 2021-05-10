@@ -279,13 +279,14 @@ ExecName="$(basename "$(realpath -m "$0")")"
 ExecName="`basename \"\`readpath -m \\\"$0\\\"\`\"`"
 ```
 
-__TODO review the following in a browser__
-
 ### Arithmetic
 
 Use `(( ))` or `$(( ))` instead of `expr`, `let`, or `$[ ]` when doing arithmetic.
 
-Since `expr` is a utility program instead of a shell builtin, quoting can be error prone.
+__TODO review the following in a browser__
+
+Since `expr` is a utility program instead of a shell builtin, quoting can be error prone. Also, it
+takes a lot longer to execute than the shell's builtin arithmetic.
 
 ```bash
 prompt> echo $(expr 2 * 3)
@@ -296,11 +297,6 @@ prompt> echo $(expr 2 \* 3)
 6
 prompt> echo $(( 2 * 3 ))
 6
-```
-
-Also, `expr` takes a lot longer to execute than the shell's builtin arithmetic.
-
-```bash
 prompt> time echo $(expr 2 \* 3)
 6
 
@@ -326,7 +322,7 @@ prompt> let var=2*3
 prompt> var=$(( 2 * 3 ))
 ```
 
-The Bash standard has deprecated the form `$[ ]`, and it isn't portable.
+The Bash standard has deprecated the form `$[ ]`.
 
 The forms `$(( ))` and `(( ))` automatically expand variables, so the `$` operator isn't required
 inside. This standard recommends omitting the `$` operator to improve readability.
@@ -463,8 +459,8 @@ var="$(eval func)"
 ### Arrays
 
 Use a Bash array for an array or list of integers or strings, and use an associative array for a map
-of integers or strings, but do not use either of them to mimic more complex data structures. Instead
-consider using another scripting language such as Awk or Python.
+of strings to integers or strings, but do not use either of them to mimic more complex data
+structures. Instead consider using another scripting language such as Awk or Python.
 
 ### Iterating over Command Output
 
