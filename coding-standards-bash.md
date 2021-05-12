@@ -371,12 +371,10 @@ if [ filename == f* ]; then
 fi
 ```
 
-__TODO review the following in a browser__
-
 This standard recommends using `(( ))` to test numeric conditions. The operators `<`, `<=`, `==`,
 `>=`, and `>` are the common operators for numeric comparisons in other languages, so their intent
 is easier to understand for beginning Bash users than the operators `-lt`, `-le`, `-eq`, `-ge`, and
-`-gt` required by the other test constructs. As mentioned before,  `(( ))` handles variable
+`-gt` required by the other test constructs. As mentioned before, `(( ))` handles variable
 expansion, so the `$` operator isn't needed.
 
 ```bash
@@ -393,7 +391,7 @@ fi
 
 To avoid accidental assignment, use `==` instead of `=` for testing equality.
 
-This standard recommends using the `-z` operator for checking if a string is empty and `-n` for
+This standard suggests using the `-z` operator for checking if a string is empty and `-n` for
 checking if a string is non-empty. This makes it slightly more clear what the code is testing.
 
 ```bash
@@ -443,7 +441,7 @@ SomeDirectory
 
 ### `eval`
 
-`eval` is dangerous, so you should generally avoid using it. It obfuscates the code. In some
+`eval` is dangerous, so you should generally avoid using it. It obfuscates the code, and in some
 situations, it makes trapping run-time errors impossible.
 
 ```bash
@@ -518,7 +516,8 @@ by E. Ruder.
 
 If a pipeline fits on a single line, it should be on one. Otherwise, it should split before each `|`
 operator with each segment being on its own line and with all but the first line indented. The same
-policy applies to other chained expressions like a logical compound using `||` or `&&` operators.
+recommendation applies to other chained expressions like a logical compound using `||` or `&&`
+operators.
 
 ```bash
 od --address-radix n --read-bytes 4 | tr --delete ' '
@@ -554,6 +553,8 @@ case "$1" in
 		;;
 esac
 ```
+
+__TODO review the following in a browser__
 
 ### Conditionals and Loops
 
