@@ -3,8 +3,6 @@
 # NB this should follow the Nagios plugin guidelines. See
 # https://nagios-plugins.org/doc/guidelines.html
 
-# TODO read nagios plugins development guidlines Plugin Options
-# https://nagios-plugins.org/doc/guidelines.html#PLUGOPTIONS
 # TODO read nagios plugins development guidlines Test Cases
 # https://nagios-plugins.org/doc/guidelines.html#TESTCASES
 # TODO read nagios plugins development guidlines Coding Guidlines
@@ -15,6 +13,7 @@
 # TODO verify system commands aren't symlinks
 # TODO run network connection in separate process and kill it after a certain
 # amount of time. (nagios DEFAULT_SOCKET_TIMEOUT)
+# TODO switch to using -p (lowercase) for PORT option
 
 print_usage() {
 	cat <<EOF
