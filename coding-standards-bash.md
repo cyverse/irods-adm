@@ -554,8 +554,6 @@ case "$1" in
 esac
 ```
 
-__TODO review the following in a browser__
-
 ### Conditionals and Loops
 
 For a conditional or loop, the block initiator `then` or `do` should be on the same line as the
@@ -625,16 +623,20 @@ display_resp() {
 
 ### `main` function
 
-If an executable has at least one other function, an entry point function that encapsulates the
-remaining logic excluding includes, `set` statements, and environment variable and constant
-declarations is required. This makes the start of the program easy to find allows more variables to
-be made local.
+__TODO review the following in a browser__
 
-This function should be named `main` and should take the command line arguments as its own. Since
-the executable's header or `help` function describes the script, `main` should not have its own
-comment.
+If an executable has at least one other function, The script should have an entry point function
+that encapsulates the remaining logic excluding includes, `set` statements, and environment
+variable and constant declarations. This makes the start of the program easy to find, and it allows
+you to make more variables local.
 
-The last non-comment line in the file should be a call to `main`.
+This standard recommends naming this function `main`. This function should take the command line
+arguments as its own. Since the executable's header or `help` function describes the script, `main`
+should not have its own function comment.
+
+The last non-comment line in the file should be a call to `main` with the command line arguments
+passed in as separate values. This ensures that Bash knows about all function definitions before
+entering `main`, allowing you to define the other functions in any order you desire.
 
 ``bash
 main "$@"
