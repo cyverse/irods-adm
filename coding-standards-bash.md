@@ -623,9 +623,7 @@ display_resp() {
 
 ### `main` function
 
-__TODO review the following in a browser__
-
-If an executable has at least one other function, The script should have an entry point function
+If an executable has at least one other function, the script should have an entry point function
 that encapsulates the remaining logic excluding includes, `set` statements, and environment
 variable and constant declarations. This makes the start of the program easy to find, and it allows
 you to make more variables local.
@@ -638,16 +636,18 @@ The last non-comment line in the file should be a call to `main` with the comman
 passed in as separate values. This ensures that Bash knows about all function definitions before
 entering `main`, allowing you to define the other functions in any order you desire.
 
-``bash
+```bash
 main "$@"
 ```
 
 ### Executable File Organization
 
-If there is a `help` function, it should go at the top of the file just below the shebang line.
-Below this should come any includes, `set` statements, and environment variable and constant
-declarations. If the logic has been decomposed into functions, the functions other than `help`
-should be come next, followed by the invocation of `main`.
+__TODO review the following in a browser__
+
+If there is a `help` function, it's definition should go at the top of the file below the shebang
+line. Below this should come any includes, `set` statements, and environment variable and constant
+declarations. If there is a `main` function, it should come next, followed by any remaining
+functions and the invocation of `main` as the last non-comment statement at the bottom of the file.
 
 ```bash
 #!/bin/bash
@@ -673,7 +673,6 @@ main() {
 }
 
 
-
 # ...
 map_args() {
 	local mapVar="$1"
@@ -683,13 +682,12 @@ map_args() {
 
 
 main "$@"
-
 ```
 
 ## Naming Conventions
 
-This section describes the conventions that should be followed when naming source files, functions,
-constants, and variables.
+This section describes the recommended conventions for naming source files, functions, constants,
+and variables.
 
 ### Constant and Variable Names
 
@@ -698,11 +696,11 @@ words separated by an underscore (`_`). The name of any other variable should be
 global having the first letter upper case and a local having the first letter lower case.
 
 ```bash
-# constant
-readonly A_CONST=const
-
 # environment variable
 export ENV_VAR
+
+# constant
+readonly A_CONST=const
 
 # environment constant
 declare -r -x ENV_CONST=env-const
@@ -740,15 +738,15 @@ map_args() {
 # ...
 ```
 
-For a function that is part of library, its name should begin the library name followed by a `::`
-and a descriptive name. If the library nested within another library, both library names should be
-part of the function name with the library names being separated by a `::`. The library and
-descriptive names should be lower case with each pair of adjacent words separated by an `_`.
+For a function that is part of library, its name should begin with the library name followed by a
+two colons (`::`) and a descriptive name. If the library is nested within another library, both
+library names should be part of the function name with the library names separated by a two colons
+(`::`) as well. The library and descriptive names should be lower case with each pair of adjacent
+words separated by an underscore (`_`).
 
 ```bash
 # a nested library that demonstrations how to name a
-# function that is meant to be included in a program
-
+# function shared with other shell scripts.
 
 # ...
 chunk_transfer::chunk::get_resources() {
