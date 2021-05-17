@@ -642,8 +642,6 @@ main "$@"
 
 ### Executable File Organization
 
-__TODO review the following in a browser__
-
 If there is a `help` function, it's definition should go at the top of the file below the shebang
 line. Below this should come any includes, `set` statements, and environment variable and constant
 declarations. If there is a `main` function, it should come next, followed by any remaining
@@ -661,8 +659,6 @@ set -o errexit -o nounset -o pipefail
 
 source library.sh
 
-declare -r -x IRODS_SVC_ACNT=irods
-
 export PGUSER
 
 readonly DEFAULT_PORT=1247
@@ -675,8 +671,6 @@ main() {
 
 # ...
 map_args() {
-	local mapVar="$1"
-
 	# ...
 }
 
@@ -686,8 +680,10 @@ main "$@"
 
 ## Naming Conventions
 
-This section describes the recommended conventions for naming source files, functions, constants,
-and variables.
+__TODO review the following in a browser__
+
+This section describes the recommended conventions for naming constants, variables, functions, and
+source files.
 
 ### Constant and Variable Names
 
@@ -709,7 +705,6 @@ declare -r -x ENV_CONST=env-const
 declare GlobalVar
 
 
-# ...
 main() {
 	# local variable
 	local localVar
@@ -738,11 +733,11 @@ map_args() {
 # ...
 ```
 
-For a function that is part of library, its name should begin with the library name followed by a
-two colons (`::`) and a descriptive name. If the library is nested within another library, both
-library names should be part of the function name with the library names separated by a two colons
-(`::`) as well. The library and descriptive names should be lower case with each pair of adjacent
-words separated by an underscore (`_`).
+For a function that is part of library, its name should begin with the library name followed by two
+colons (`::`) and a descriptive name. If the function is part of a library nested within another
+library, its name should be prepended with the outer library name followed by two colons (`::`). The
+library and descriptive names should be lower case with each pair of adjacent words separated by an
+underscore (`_`).
 
 ```bash
 # a nested library that demonstrations how to name a
@@ -754,7 +749,7 @@ chunk_transfer::chunk::get_resources() {
 }
 ```
 
-For a function that is exported, its name should be all upper case.
+For an exported function, its name should be all upper case.
 
 ```bash
 #!/bin/bash
@@ -764,9 +759,6 @@ FIX_FILE_SIZE() {
 	# ...
 }
 export -f FIX_FILE_SIZE
-
-
-parallel --eta --no-notice --delimiter '\n' FIX_FILE_SIZE
 ```
 
 ### Source File Names
