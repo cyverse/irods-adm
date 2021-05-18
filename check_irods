@@ -3,17 +3,13 @@
 # NB this should follow the Nagios plugin guidelines. See
 # https://nagios-plugins.org/doc/guidelines.html
 
-# TODO read nagios plugins development guidlines Test Cases
-# https://nagios-plugins.org/doc/guidelines.html#TESTCASES
-# TODO read nagios plugins development guidlines Coding Guidlines
-# https://nagios-plugins.org/doc/guidelines.html#CODINGGUIDELINES
-
 # TODO remove all stderr output if not a tty
 # TODO replace all system commands with full path
 # TODO verify system commands aren't symlinks
 # TODO run network connection in separate process and kill it after a certain
 # amount of time. (nagios DEFAULT_SOCKET_TIMEOUT)
 # TODO switch to using -p (lowercase) for PORT option
+# TODO connecting to something other than iRODS should be a CRITICAL
 
 print_usage() {
 	cat <<EOF
@@ -145,7 +141,12 @@ main() {
 		fi
 
 		ping \
-			"${argMap[ies]}" "${argMap[port]}" "${argMap[service]}" "${argMap[zone]}" "${argMap[verbose]}"
+				"${argMap[ies]}" \
+				"${argMap[port]}" \
+				"${argMap[service]}" \
+				"${argMap[zone]}" \
+				"${argMap[verbose]}" \
+			2> /dev/null
 	fi
 }
 
@@ -279,9 +280,9 @@ print_version() {
 }
 
 
-# TODO ensure stderr is redirected to stdout
 # TODO add support for verbosity=1 See
 #  https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
+# TODO document function
 ping() {
 	local ies="$1"
 	local port="$2"
