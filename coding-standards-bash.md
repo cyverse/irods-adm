@@ -680,8 +680,6 @@ main "$@"
 
 ## Naming Conventions
 
-__TODO review the following in a browser__
-
 This section describes the recommended conventions for naming constants, variables, functions, and
 source files.
 
@@ -733,21 +731,7 @@ map_args() {
 # ...
 ```
 
-For a function that is part of library, its name should begin with the library name followed by two
-colons (`::`) and a descriptive name. If the function is part of a library nested within another
-library, its name should be prepended with the outer library name followed by two colons (`::`). The
-library and descriptive names should be lower case with each pair of adjacent words separated by an
-underscore (`_`).
-
-```bash
-# a nested library that demonstrations how to name a
-# function shared with other shell scripts.
-
-# ...
-chunk_transfer::chunk::get_resources() {
-	# ...
-}
-```
+__TODO review the following in a browser__
 
 For an exported function, its name should be all upper case.
 
@@ -760,6 +744,22 @@ FIX_FILE_SIZE() {
 }
 export -f FIX_FILE_SIZE
 ```
+
+For a function that is part of a library, its name should begin with the library name followed by
+two colons (`::`) and a descriptive name. If the library is part of a package, its name should begin
+with the package names followed by two colons (`::`) and a descriptive name. Each pair of adjacent
+package names should be separated by two colons (`::`).
+
+```bash
+# a nested library that demonstrations how to name a
+# function shared with other shell scripts.
+
+# ...
+library::inner_library::package::a_function() {
+	# ...
+}
+```
+
 
 ### Source File Names
 
