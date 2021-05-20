@@ -241,33 +241,51 @@ summarize_tasks() {
 }
 
 
+# generates a report on how many rule executions are scheduled for each hour
+# sorted chronologically.
+# INPUT:
+#  a list of execution blocks where each block has a single line of the form
+#  `RULE_EXEC_TIME = <YYYY>/<MM>/<DD>T<hh>` where <YYYY> is the four digit year,
+#  <MM> is the two digit month number, <DD> is the two digit day of the month,
+#  and <hh> is the two digit hour (00..23) for when the execution is scheduled
+#  to happen.
+# OUTPUT:
+#  a two column summary, where the second column is an hour when rule executions
+#  are scheduled to happen, and the first is the number of executions scheduled
+#  for that hour. The hour has the same form as in the input. The first column
+#  is right justified with a width of at least seven characters. The two columns
+#  are separated by a space, and the rows by line feeds. The output is in
+#  chronological order.
 summarize_times() {
 	sed --quiet 's/^RULE_EXEC_TIME = //p' | summarize
 }
 
 
-# generates a report of how many rules each user has in the rule queue
-# sort by rule count in reverse order
+# generates a report on how many rule executions each user has in the rule queue
+# sorted by execution count in descending order
 # INPUT:
-#  a list of rule queue report
+#  a list of execution blocks where each block has a single line of the form
+#  `RULE_EXEC_USER_NAME = <username>`, where <username> is the username that
+#  caused the execution to be scheduled.
 # OUTPUT:
 #  a two column summary, where the second column is a username and the first is
-#  the number of rules that user has queued. The first column is right justified
-#  with a width of at least seven characters. The two columns are separated by a
-#  blank, and the rows by newlines.
+#  the number of rule executions that username has queued. The first column is
+#  right justified with a width of at least seven characters. The two columns
+#  are separated by a space, and the rows by line feeds. The output is sorted by
+#  execution count in descending order.
 summarize_users() {
 	sed --quiet 's/^RULE_EXEC_USER_NAME = //p' | summarize | sort --numeric --reverse --key 1,1
 }
 
 
-# generates a report of how many times each entries appears in a list
+# generates a report on how many times each entries appears in a list
 # INPUT:
-#  the list of entries deliniated by newlines.
+#  the list of entries deliniated by line feeds.
 # OUTPUT:
 #  a two column summary, where the second column is an entry and the first is
 #  the number of time it appeared in the list. The first column is right
 #  justified with a width of at least seven characters. The two columns are
-#  separated by a blank, and the rows by newlines.
+#  separated by a space, and the rows by line feeds.
 summarize() {
 	sort | uniq --count
 }
