@@ -10,6 +10,8 @@
 # amount of time. (nagios DEFAULT_SOCKET_TIMEOUT)
 # TODO switch to using -p (lowercase) for PORT option
 # TODO connecting to something other than iRODS should be a CRITICAL
+# TODO add support for verbosity=1 See
+#  https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
 
 print_usage() {
 	cat <<EOF
@@ -210,6 +212,7 @@ map_args() {
 }
 
 
+# TODO document globals
 # formats the command line options like `getopt`
 # Arguments:
 #  the raw command line arguments
@@ -271,6 +274,7 @@ print_help() {
 }
 
 
+# TODO document globals
 # displays the program version in the format required of Nagios plugins
 # Globals:
 #  EXEC_NAME
@@ -280,9 +284,25 @@ print_version() {
 }
 
 
-# TODO add support for verbosity=1 See
-#  https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
-# TODO document function
+# attempt to connect to an IES and time how long it takes to establish a
+# connection
+# Arguments:
+#  ies        the IP address or hostname of the server hosting the IES
+#  port       the TCP port the IES listens on
+#  service    the name of service to report as the client user
+#  zone       the zone to report the proxy and service belonging to
+#  verbosity  the verbosity level
+# Globals:
+#  CRITICAL, OK, and UNKNOWN are all used as return statuses
+# Output:
+#  it writes the status of the IES to stdout in a form interpretable by nagios.
+#  When the plugin successfully connects to iRODS, it provides the amount of
+#  time it took to connect as a performance datum in the form "time=<duration>s"
+#  where <duration> is the amount of time in seconds.
+# Return:
+#  OK        connected to iRODS
+#  CRITICAL  failed to connect to iRODS
+#  UNKNOWN   an error occurred or connected to something other than iRODS
 ping() {
 	local ies="$1"
 	local port="$2"
@@ -341,6 +361,7 @@ ping() {
 }
 
 
+# TODO improve documentation
 # create an iRODS protocol request message
 # Arguments:
 #  type  the message type
@@ -390,6 +411,7 @@ parse_resp() {
 }
 
 
+# TODO improve documentation
 # create an iRODS protocol message header
 # Arguments:
 #  type    the message type
@@ -409,6 +431,7 @@ EOX
 }
 
 
+# TODO improve documentation
 # create an iRODS protocol startup message body
 # Arguments:
 #  clientUser  the username of the client to connect as
@@ -435,6 +458,7 @@ EOX
 }
 
 
+# TODO improve documentation
 # Encodes the length of a serialized iRODS protocol packet header
 encode_header_len() {
 	local len="$1"
