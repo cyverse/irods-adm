@@ -458,8 +458,11 @@ EOX
 }
 
 
-# TODO improve documentation
 # Encodes the length of a serialized iRODS protocol packet header
+# Arguments:
+#  the header length to encode
+# Output:
+#  the length encoded as 32 bit unsigned integer.
 encode_header_len() {
 	local len="$1"
 
@@ -469,9 +472,9 @@ encode_header_len() {
 
 # Decodes a serialized iRODS protocol packet header length
 # Input:
-#   the serialized length
+#  the serialized length
 # Output:
-#   the decimal value to stdout.
+#  the decimal value to stdout.
 decode_header_len() {
 	local lenHex
 	if ! lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"; then
