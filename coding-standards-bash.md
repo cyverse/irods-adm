@@ -711,16 +711,15 @@ main() {
 
 ### Function Names
 
-For a function that is local to an executable script, use lower case with each pair of adjacent
-words separated by an underscore (`_`).
+__TODO review the following in a browser__
+
+When naming a function, separate each pair of adjacent words with a underscore (`_`). An exported
+function should have an all upper case name. Any other function name should be all lower case.
 
 ```bash
 #!/bin/bash
-#
-# a program that demonstrates how to name a local function
 
 # ...
-
 
 # ...
 map_args() {
@@ -729,33 +728,25 @@ map_args() {
 
 
 # ...
-```
-
-__TODO review the following in a browser__
-
-For an exported function, its name should be all upper case.
-
-```bash
-#!/bin/bash
-
-# ...
 FIX_FILE_SIZE() {
 	# ...
 }
 export -f FIX_FILE_SIZE
+
+# ...
 ```
 
-For a function that is part of a library, its name should begin with the library name followed by
-two colons (`::`) and a descriptive name. If the library is part of a package, its name should begin
-with the package names followed by two colons (`::`) and a descriptive name. Each pair of adjacent
-package names should be separated by two colons (`::`).
+If a function is part of a library, use the library name to provide a namespace for the function by
+beginning the function's name with the library name followed by two colons (`::`). Likewise, if the
+library is part of a package, begin library's name with the package names followed by two colons,
+and separate each pair of adjacent package names with two colons.
 
 ```bash
 # a nested library that demonstrations how to name a
 # function shared with other shell scripts.
 
 # ...
-library::inner_library::package::a_function() {
+package::inner_package::library::a_function() {
 	# ...
 }
 ```
