@@ -236,20 +236,30 @@ EOAWK
 }
 
 
+# summarizes how many executions of each rule are scheduled
+# Input:
+#  a list of execution blocks where each block has a single line of the form
+#  `RULE_EXEC_NAME = <rule>` where <rule> is the rule to be executed.
+# Output:
+#  a two column summary, where the second column is the rule, and the first is
+#  the number of times its scheduled for execution. The first column is right
+#  justified with a width of at least seven characters. The two columns are
+#  separated by a space, and the rows by line feeds. The output is sorted by
+#  execution count in descending order.
 summarize_tasks() {
 	sed --quiet 's/^RULE_EXEC_NAME = //p' | summarize | sort --numeric --reverse --key 1,1
 }
 
 
-# generates a report on how many rule executions are scheduled for each hour
-# sorted chronologically.
-# INPUT:
+# summarizes how many rule executions are scheduled for each hour in
+# chronological order, hours without any rules scheduled are skipped
+# Input:
 #  a list of execution blocks where each block has a single line of the form
 #  `RULE_EXEC_TIME = <YYYY>/<MM>/<DD>T<hh>` where <YYYY> is the four digit year,
 #  <MM> is the two digit month number, <DD> is the two digit day of the month,
 #  and <hh> is the two digit hour (00..23) for when the execution is scheduled
 #  to happen.
-# OUTPUT:
+# Output:
 #  a two column summary, where the second column is an hour when rule executions
 #  are scheduled to happen, and the first is the number of executions scheduled
 #  for that hour. The hour has the same form as in the input. The first column
@@ -261,13 +271,13 @@ summarize_times() {
 }
 
 
-# generates a report on how many rule executions each user has in the rule queue
-# sorted by execution count in descending order
-# INPUT:
+# summarizes how many rule executions each user has in the rule queue sorted by
+# execution count in descending order
+# Input:
 #  a list of execution blocks where each block has a single line of the form
 #  `RULE_EXEC_USER_NAME = <username>`, where <username> is the username that
 #  caused the execution to be scheduled.
-# OUTPUT:
+# Ouput:
 #  a two column summary, where the second column is a username and the first is
 #  the number of rule executions that username has queued. The first column is
 #  right justified with a width of at least seven characters. The two columns
@@ -278,10 +288,10 @@ summarize_users() {
 }
 
 
-# generates a report on how many times each entries appears in a list
-# INPUT:
+# counts how many times each entries appears in a list
+# Input:
 #  the list of entries deliniated by line feeds.
-# OUTPUT:
+# Output:
 #  a two column summary, where the second column is an entry and the first is
 #  the number of time it appeared in the list. The first column is right
 #  justified with a width of at least seven characters. The two columns are
@@ -292,10 +302,10 @@ summarize() {
 
 
 # counts all of the rules
-# INPUT:
+# Input:
 #  It expects a list of information about rules separated by a line consisting
 #  of only 60 hyphens.
-# OUTPUT:
+# Output:
 #  the total number rules
 count_all() {
 	sed --quiet '/^------------------------------------------------------------$/p' | wc --lines
