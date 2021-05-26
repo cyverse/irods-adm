@@ -431,7 +431,6 @@ EOX
 }
 
 
-# TODO improve documentation
 # create an iRODS protocol startup message body
 # Arguments:
 #  clientUser  the username of the client to connect as
@@ -439,6 +438,8 @@ EOX
 # Globals:
 #  EXEC_NAME  used as the username of the proxy and as the option identifying
 #             the client program
+# Output:
+#  It writes the message body to stdout.
 mk_startup_pack() {
 	local clientUser="$1"
 	local rcatZone="$2"
