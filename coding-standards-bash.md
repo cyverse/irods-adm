@@ -711,42 +711,41 @@ main() {
 
 ### Function Names
 
-__TODO review the following in a browser__
-
-When naming a function, separate each pair of adjacent words with a underscore (`_`). An exported
+When naming a function, separate each pair of adjacent words with an underscore (`_`). An exported
 function should have an all upper case name. Any other function name should be all lower case.
 
 ```bash
 #!/bin/bash
-
 # ...
 
 # ...
-map_args() {
-	# ...
-}
-
-
-# ...
-FIX_FILE_SIZE() {
+EXPORTED_FUNCTION() {
 	# ...
 }
 export -f FIX_FILE_SIZE
 
+
+# ...
+a_function() {
+	# ...
+}
+
 # ...
 ```
 
-If a function is part of a library, use the library name to provide a namespace for the function by
-beginning the function's name with the library name followed by two colons (`::`). Likewise, if the
-library is part of a package, begin library's name with the package names followed by two colons,
-and separate each pair of adjacent package names with two colons.
+__TODO review the following in a browser__
+
+If a function is part of a library, use the library name to provide a namespace for the function.
+Begin the function's name with the library name followed by two colons (`::`). Likewise, if the
+library is part of a package, a collection of libraries organized in directory hierarchy, begin the
+library's name with the relative path to the library within the package followed by two colons.
+Also, separates names of each package within the path by two colons.
 
 ```bash
-# a nested library that demonstrations how to name a
-# function shared with other shell scripts.
+# ...
 
 # ...
-package::inner_package::library::a_function() {
+package::inner_package::library::shared_function() {
 	# ...
 }
 ```
@@ -754,10 +753,11 @@ package::inner_package::library::a_function() {
 
 ### Source File Names
 
-For an executable script, the file name should not have a file extension. It is suggested to use all
-lower case as well. For a library, the file name should have the `.sh` or `.bash` extension. The
-base name should be all lower case with an underscore (`_`) separating each pair of adjacent words.
-This allows the library prefix on the functions defined within to be the same as the file name.
+For an executable script, the file name should not have a file extension. For a library, the file
+name should have the `.sh` or `.bash` extension. The base name should be all lower case with an
+underscore (`_`) separating each pair of adjacent words. This allows the library functions to be
+prefixed with the library's name. Similarly, a package's directory name should be all lower case
+with an underscore separating words.
 
 ```bash
 prompt> cat project_storage.sh
