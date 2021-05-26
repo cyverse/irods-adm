@@ -4,6 +4,8 @@
 -- can be found at
 -- https://github.com/irods/irods/blob/4.2.8/scripts/irods/database_upgrade.py.
 
+\timing on
+
 -- Our database schema  version is 4, so the conversion steps for versions 2 - 4
 -- can be mostly skipped. We are mssing a specific query that was supposed to be
 -- added in version 3. The follow statement will add that query.
@@ -49,12 +51,28 @@ WHERE alias = 'DataObjInCollReCur';
 -- resources have a parent resource, meaning its resource hierarchy value will
 -- begin with the parent name followed by a semicolon (';') and end with the
 -- storage resource name. This means we can exclude the condition
--- `resc_hier = $resc_name`. Here's a rewrite as a single SQL statement of the
--- above pseudocode with these simplification as a single SQL statement.
+-- `resc_hier = $resc_name`. Here's a rewrite in SQL statement of the above
+-- pseudocode with these simplification as a single SQL statement.
+BEGIN;;
+
+CREATE TEMPORARY TABLE hierarchies(id, hier) ON COMMIT DROP AS
+WITH RECURSIVE hier_steps AS (
+	SELECT resc_id AS id, '' || resc_name AS hier, resc_parent AS parent
+	FROM r_resc_main
+	WHERE resc_children = ''
+	UNION
+	SELECT c.id, p.resc_name || ';' || c.hier, p.resc_parent
+	FROM r_resc_main AS p JOIN hier_steps AS c ON c.parent = p.resc_name )
+SELECT id, hier FROM hier_steps WHERE parent = '';
+
+CREATE INDEX idx_hierarchies ON hierarchies(hier, id);
+
 UPDATE r_data_main AS d
-SET resc_id = r.resc_id
-FROM r_resc_main AS r
-WHERE d.resc_hier LIKE '%;' || r.resc_name AND r.resc_name != 'bundleResc' AND r.resc_children = ''
+SET resc_id = r.id
+FROM hierarchies AS r
+WHERE d.resc_hier = r.hier AND r.hier != 'bundleResc';
+
+COMMIT;
 
 -- Repurpose r.resc_main.resc_parent to hold the Id of the parent resource
 -- instead of its name.
