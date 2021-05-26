@@ -53,7 +53,7 @@ WHERE alias = 'DataObjInCollReCur';
 -- storage resource name. This means we can exclude the condition
 -- `resc_hier = $resc_name`. Here's a rewrite in SQL statement of the above
 -- pseudocode with these simplification as a single SQL statement.
-BEGIN;;
+BEGIN;
 
 CREATE TEMPORARY TABLE hierarchies(id, hier) ON COMMIT DROP AS
 WITH RECURSIVE hier_steps AS (
