@@ -10,7 +10,7 @@
 -- can be mostly skipped. We are mssing a specific query that was supposed to be
 -- added in version 3. The follow statement will add that query.
 
--- Add the DataObjInCollReCur specific query.
+\echo adding missing the DataObjInCollReCur specific query.
 INSERT INTO r_specific_query (alias, sqlStr, create_ts)
 VALUES (
 	'DataObjInCollReCur',
@@ -18,24 +18,26 @@ VALUES (
 	-- XXX: create_ts should begin with 0 for consistency with its other values
 	/*'1388534400'*/ '01388534400' );
 
+\echo
+\echo begin conversion to schema version 5
 
--- Convert to schema version 5.
-
--- Add resc_id column to r_data_main to hold the Id of the storage resource.
--- This acts as a foreign key of r_resc_main.resc_id.
+\echo adding resc_id column to r_data_main
+-- This will hold the Id of the storage resource and act as a foreign key of
+-- r_resc_main.resc_id.
 ALTER TABLE r_data_main ADD resc_id BIGINT;
 
--- Add resc_parent_context column to r_resc_main
+\echo adding resc_parent_context column to r_resc_main
 ALTER TABLE r_resc_main ADD resc_parent_context VARCHAR(4000);
 
--- Change the definition of the DataObjInCollReCur specific query to use the
--- r_data_main.resc_id to identify the storage resource instead of the defunct
--- r_data_main.resc_hier column.
+\echo changing definition of the DataObjInCollReCur specific query
+-- It will use r_data_main.resc_id to identify the storage resource instead of
+-- the defunct r_data_main.resc_hier column.
 UPDATE r_specific_query
 SET sqlstr =
 	'WITH coll AS (SELECT coll_id, coll_name FROM R_COLL_MAIN WHERE R_COLL_MAIN.coll_name = ? OR R_COLL_MAIN.coll_name LIKE ?) SELECT DISTINCT d.data_id, (SELECT coll_name FROM coll WHERE coll.coll_id = d.coll_id) coll_name, d.data_name, d.data_repl_num, d.resc_name, d.data_path, d.resc_id FROM R_DATA_MAIN d WHERE d.coll_id = ANY(ARRAY(SELECT coll_id FROM coll)) ORDER BY coll_name, d.data_name, d.data_repl_num'
 WHERE alias = 'DataObjInCollReCur';
 
+\echo populating r_data_main.resc_id
 -- For each entry in r_data_main set resc_id by using r_resc_hier to look up the
 -- Id of the corresponding storage resource in r_resc_main. Here's a pseudocode
 -- summary of the logic in database_upgrade.py.
@@ -74,14 +76,14 @@ WHERE d.resc_hier = r.hier AND r.hier != 'bundleResc';
 
 COMMIT;
 
--- Repurpose r.resc_main.resc_parent to hold the Id of the parent resource
--- instead of its name.
+\echo repurposing r_resc_main.resc_parent as a foreign key to r_resc_main.resc_id
 UPDATE r_resc_main AS rdm
 SET resc_parent = am.resc_id
 FROM (SELECT resc_name, resc_id FROM r_resc_main) AS am
 WHERE am.resc_name = rdm.resc_parent;
 
--- For each child rsource in r_resc_main, set the value of resc_parent_context
+\echo populatiing r_resc_main.resc_parent_context
+-- For each child resource in r_resc_main, set the value of resc_parent_context
 -- from its value in the parent resource's resc_children entry. Here's a
 -- pseudocode summary of the logic in database_upgrade.py
 --
@@ -115,30 +117,29 @@ FROM (
 	) AS pr
 WHERE cr.resc_name = pr.child_context[1];
 
--- As the final step of the version 5 conversion, update the version value in
--- the DB.
+\echo completing conversion to schema version 5
 UPDATE r_grid_configuration
 SET option_value = 5
 WHERE namespace = 'database' AND option_name = 'schema_version';
 
+\echo
+\echo converting to schema version 6
 
--- Convert to schema version 6.
-
--- Create an index on r_data_main.resc_id.
+\echo creating index on r_data_main.resc_id
 CREATE INDEX idx_data_main7 ON r_data_main (resc_id);
 
--- Create an index on r_data_main.data_is_dirty.
+\echo creating index on r_data_main.data_is_dirty
 CREATE INDEX idx_data_main8 ON r_data_main (data_is_dirty);
 
--- As the final step of the version 6 conversion, update the version value in
--- the DB.
+\echo completing conversion to schema version 6
 UPDATE r_grid_configuration
 SET option_value = 6
 WHERE namespace = 'database' AND option_name = 'schema_version';
 
+\echo
+\echo converting to schema version 7
 
--- Convert to schema version 7.
-
+\echo ensuring all nonempty groups each consider themself as a member
 -- For each group with an entry in r_user_group, ensure there is an entry
 -- identifying the group as a member of itself. Here's a pseudocode summary of
 -- the logic in database_upgrade.py
@@ -162,7 +163,7 @@ FROM r_user_group
 WHERE group_user_id NOT IN (
 	SELECT DISTINCT group_user_id FROM r_user_group WHERE group_user_id = user_id );
 
--- Add the listGroupsForUser specific query.
+\echo adding listGroupsForUser specific query.
 INSERT INTO r_specific_query (alias, sqlStr, create_ts)
 VALUES (
 	'listGroupsForUser',
@@ -170,8 +171,7 @@ VALUES (
 	-- XXX: create_ts should begin with 0 for consistency with its other values
 	/*'1580297960'*/ '01580297960' );
 
--- As the final step of the version 7 conversion, update the version value in
--- the DB.
+\echo completing conversion to schema version 7
 UPDATE r_grid_configuration
 SET option_value = 7
 WHERE namespace = 'database' AND option_name = 'schema_version';
