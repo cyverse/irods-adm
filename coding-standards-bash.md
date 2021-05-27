@@ -733,13 +733,11 @@ a_function() {
 # ...
 ```
 
-__TODO review the following in a browser__
-
 If a function is part of a library, use the library name to provide a namespace for the function.
 Begin the function's name with the library name followed by two colons (`::`). Likewise, if the
-library is part of a package, a collection of libraries organized in directory hierarchy, begin the
-library's name with the relative path to the library within the package followed by two colons.
-Also, separates names of each package within the path by two colons.
+library is part of a package (a collection of libraries organized in directory hierarchy), begin the
+library's name with the relative path to the library within the package followed by two colons, and
+separate the names of each package within the path by two colons.
 
 ```bash
 # ...
@@ -755,25 +753,29 @@ package::inner_package::library::shared_function() {
 
 For an executable script, the file name should not have a file extension. For a library, the file
 name should have the `.sh` or `.bash` extension. The base name should be all lower case with an
-underscore (`_`) separating each pair of adjacent words. This allows the library functions to be
-prefixed with the library's name. Similarly, a package's directory name should be all lower case
-with an underscore separating words.
+underscore (`_`) separating each pair of adjacent words. This supports our namespace convention.
+Similarly, a package's directory name should be all lower case with an underscore separating words.
 
 ```bash
-prompt> cat project_storage.sh
+prompt> ls amqp
+project_storage.sh
+...
+
+prompt> cat amqp/project_storage.sh
 # ...
 
 # ...
-project_storage::report() {
+amqp::project_storage::report() {
 	# ...
 }
 ```
 
 ## Builtin vs. External Commands
 
-It is preferred to use a shell builtin command or operation instead of an external command that
-invokes a separate process. For example, builtin parameter expansion operations are more robust and
-portable than `sed`.
+__TODO review the following in a browser__
+
+Prefer a shell builtin command or operator instead of an external command that invokes a separate
+process. For example, builtin parameter expansion operations are more portable than `sed`.
 
 ```bash
 # builtin
