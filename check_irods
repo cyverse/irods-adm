@@ -384,7 +384,7 @@ mk_req() {
 }
 
 
-# parse an iRODS protocol response message
+# It parses an iRODS protocol response message.
 # Input:
 #  the response
 # Output:
@@ -411,11 +411,12 @@ parse_resp() {
 }
 
 
-# TODO improve documentation
-# create an iRODS protocol message header
+# It creates an iRODS protocol message header.
 # Arguments:
 #  type    the message type
 #  msgLen  the message body length in bytes
+# Output:
+#  It writes the message header to stdout.
 mk_header() {
 	local type="$1"
 	local msgLen="$2"
@@ -431,7 +432,7 @@ EOX
 }
 
 
-# create an iRODS protocol startup message body
+# It creates an iRODS protocol startup message body.
 # Arguments:
 #  clientUser  the username of the client to connect as
 #  rcatZone    the zone of the client and proxy to connect as
@@ -459,7 +460,7 @@ EOX
 }
 
 
-# Encodes the length of a serialized iRODS protocol packet header
+# It encodes the length of a serialized iRODS protocol packet header.
 # Arguments:
 #  the header length to encode
 # Output:
@@ -471,7 +472,7 @@ encode_header_len() {
 }
 
 
-# Decodes a serialized iRODS protocol packet header length
+# It decodes a serialized iRODS protocol packet header length.
 # Input:
 #  the serialized length
 # Output:
