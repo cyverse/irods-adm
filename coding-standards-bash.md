@@ -16,7 +16,7 @@ This document provides coding standards for developing Bash scripts.
 [Builtin vs. External Commands](#builtin-vs-external-commands)  
 [ShellCheck](#shellcheck)  
 [Conclusion](#conclusion)  
-[Acknowledgement](#acknowledgement)
+[Acknowledgment](#acknowledgment)
 
 ## Introduction
 
@@ -772,10 +772,9 @@ amqp::project_storage::report() {
 
 ## Builtin vs. External Commands
 
-__TODO review the following in a browser__
-
 Prefer a shell builtin command or operator instead of an external command that invokes a separate
-process. For example, builtin parameter expansion operations are more portable than `sed`.
+process. This reduces the number of dependencies the script, making it more portable. For example,
+builtin parameter expansion operations are more portable than `sed`.
 
 ```bash
 # builtin
@@ -789,28 +788,32 @@ msgLen="$(sed 's/^.*<msgLen>\(.*\)<.*$/\1/' <<< "$header")"
 ## ShellCheck
 
 The `shellcheck` program created by the [ShellCheck project](https://www.shellcheck.net) finds
-common bugs and weaknesses in Bash scripts. It is recommended to check all scripts with this
-program.
+common bugs and weaknesses in Bash scripts. This standard recommends checking all scripts with
+`shellcheck`.
 
 ## Conclusion
 
 The point of having a coding standard is to have a common vocabulary of coding, allowing maintainers
-to concentrate on the meaning of the code rather than on how it is written. This document defines a
-global vocabulary, but local standards are also important. If code newly added to a file looks
-drastically different from the existing code around it, the discontinuity can throw readers out of
-their rhythm when they read it. This should be avoided.
+to concentrate on the meaning of the code rather than on its style. This document defines a global
+vocabulary, but local standards are also important. If code newly added to a file looks drastically
+different from the existing code around it, the discontinuity can throw readers out of their rhythm
+when they read it.
 
-Before editing code, the style of the code should be understood. If spaces are used around
-conditional clauses, any added clauses should have spaces around them too. If comments have little
-boxes of stars around them, any added comments should too.
+__TODO review the following in a browser__
 
-Other than focusing on clarity, these standards are merely recommendations, not requirements. It is
-best to use common sense when chosing to violate a standard in a script, though inconsistently
-following a standard can itself obfuscate the code.
+Before editing code, learn the style of the code. If conditional clauses have spaces around then,
+any added conditional clauses should have spaces around them too. If comments have little boxes of
+stars around them, any added comments should too.
 
-## Acknowledgement
+Other than focusing on clarity, these standards are merely recommendations, not requirements. No
+standard can cover every situation. Adhering perfectly to a standard can obfuscate code too, so use
+common sense. If following a recommendation in this standard significantly impacts the clarity of a
+portion of the code, don't do it. 
+
+## Acknowledgment
 
 This standard is an adaptation of Google's
 [Shell Style Guide](https://google.github.io/styleguide/shellguide.html).
+
 
 <!-- vim: set tabstop=2: -->
