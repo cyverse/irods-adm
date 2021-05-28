@@ -361,11 +361,12 @@ ping() {
 }
 
 
-# TODO improve documentation
-# create an iRODS protocol request message
+# It creates an iRODS protocol request message.
 # Arguments:
 #  type  the message type
 #  msg   optional the message body
+# Output:
+#  It writes the serialized request to stdout.
 mk_req() {
 	local msgType="$1"
 
