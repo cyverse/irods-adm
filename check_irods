@@ -274,11 +274,10 @@ print_help() {
 }
 
 
-# TODO document globals
 # displays the program version in the format required of Nagios plugins
 # Globals:
-#  EXEC_NAME
-#  VERSION
+#  EXEC_NAME  indicates the program name in the version string
+#  VERSION    indicates the version identifier in the version string
 print_version() {
 	printf '%s v%s\n' "$EXEC_NAME" "$VERSION"
 }
@@ -293,7 +292,10 @@ print_version() {
 #  zone       the zone to report the proxy and service belonging to
 #  verbosity  the verbosity level
 # Globals:
-#  CRITICAL, OK, and UNKNOWN are all used as return statuses
+#  CRITICAL  return status when failed to connect to iRODS
+#  OK        return status when connected to iRODS
+#  UNKNOWN   return status when an error occurred or connected to something
+#            other than iRODS
 # Output:
 #  it writes the status of the IES to stdout in a form interpretable by nagios.
 #  When the plugin successfully connects to iRODS, it provides the amount of
