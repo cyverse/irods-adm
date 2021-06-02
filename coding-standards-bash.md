@@ -801,13 +801,13 @@ when they read it.
 
 __TODO review the following in a browser__
 
-Before editing a script, learn its style. If conditional clauses have spaces around then, any added
-conditional clauses should have spaces around them too. If comments have little boxes of stars
-around them, any added comments should too.
+Before editing a script, learn its style so you can adhere to it. If conditional clauses have spaces
+around then, any added conditional clauses should have spaces around them too. If comments have
+little boxes of stars around them, any added comments should too.
 
 Other than focusing on clarity, these standards are merely recommendations, not requirements. No
-standard can cover every situation. Dogmatically adhering to a standard can obfuscate code too, so
-use common sense. If following a recommendation in this standard impacts the clarity of a the code,
+standard can cover every situation. Dogmatically following a standard can obfuscate code too, so use
+common sense. If following a recommendation in this standard impacts the clarity of a the code,
 don't do it.
 
 ## Acknowledgment
