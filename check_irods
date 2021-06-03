@@ -3,7 +3,6 @@
 # NB this should follow the Nagios plugin guidelines. See
 # https://nagios-plugins.org/doc/guidelines.html
 
-# TODO remove all stderr output if not a tty
 # TODO replace all system commands with full path
 # TODO verify system commands aren't symlinks
 # TODO run network connection in separate process and kill it after a certain
@@ -94,8 +93,13 @@ declare -i -r CFG_DEBUG=2
 declare EXEC_NAME
 
 
-# TODO ensure a stdout message is written as well when indicating an error
 main() {
+	# If stderr isn't a terminal, redirect it to stdout
+	if ! [[ -t 2 ]]; then
+		exec 2>&-
+		exec 2>&1
+	fi
+
 	if ! EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"; then
 		printf 'cannot determine executable name, using %s\n' "$DEFAULT_EXEC_NAME" >&2 || true
 		EXEC_NAME="$DEFAULT_EXEC_NAME"
@@ -121,20 +125,14 @@ main() {
 		if ! print_help; then
 			return $UNKNOWN
 		fi
-
-		return $OK
 	elif [[ -n "${argMap[usage]}" ]]; then
 		if ! print_usage; then
 			return $UNKNOWN
 		fi
-
-		return $OK
 	elif [[ -n "${argMap[version]}" ]]; then
 		if ! print_version; then
 			return $UNKNOWN
 		fi
-
-		return $OK
 	else
 		if [[ -z "${argMap[ies]}" ]]; then
 			printf 'IES required\n' >&2 || true
@@ -149,7 +147,11 @@ main() {
 				"${argMap[zone]}" \
 				"${argMap[verbose]}" \
 			2> /dev/null
+
+		return
 	fi
+
+	return $OK
 }
 
 
