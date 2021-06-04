@@ -13,7 +13,7 @@
 #  https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
 
 print_usage() {
-	cat <<EOF
+	/bin/cat <<EOF
 Usage:
  $EXEC_NAME [-v|--verbose][(-P|--port) PORT][(-S|--service) SERVICE]
   [(-Z|--zone) ZONE] IES
@@ -25,7 +25,7 @@ EOF
 
 
 print_description() {
-	cat <<EOF
+	/bin/cat <<EOF
 Nagios plugin that checks to see is if an iRODS server is online. It supports
 Nagios version 2 or later and iRODS version 4 or later.
 
@@ -427,7 +427,7 @@ mk_header() {
 	local type="$1"
 	local msgLen="$2"
 
-	cat <<EOX
+	/bin/cat <<EOX
 <MsgHeader_PI>
 	<type>$type</type>
 	<msgLen>$msgLen</msgLen>
@@ -451,7 +451,7 @@ mk_startup_pack() {
 	local clientUser="$1"
 	local rcatZone="$2"
 
-	cat <<EOX
+	/bin/cat <<EOX
 <StartupPack_PI>
 	<connectCnt>0</connectCnt>
 	<proxyUser>$EXEC_NAME</proxyUser>
