@@ -3,7 +3,6 @@
 # NB this should follow the Nagios plugin guidelines. See
 # https://nagios-plugins.org/doc/guidelines.html
 
-# TODO replace all system commands with full path
 # TODO verify system commands aren't symlinks
 # TODO run network connection in separate process and kill it after a certain
 # amount of time. (nagios DEFAULT_SOCKET_TIMEOUT)
@@ -100,7 +99,7 @@ main() {
 		exec 2>&1
 	fi
 
-	if ! EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"; then
+	if ! EXEC_NAME="$(/usr/bin/basename "$(/usr/bin/realpath --canonicalize-missing "$0")")"; then
 		printf 'cannot determine executable name, using %s\n' "$DEFAULT_EXEC_NAME" >&2 || true
 		EXEC_NAME="$DEFAULT_EXEC_NAME"
 	fi
@@ -257,7 +256,7 @@ format_opts() {
 		fi
 	done
 
-	getopt \
+	/usr/bin/getopt \
 		--name "$EXEC_NAME" \
 		--longoptions help,port:,service:,usage,verbose,version,zone: \
 		--options 'hP:S:VvZ:' \
@@ -316,7 +315,7 @@ ping() {
 	local verbosity="$5"
 
 	local startTime
-	startTime="$(date +%s.%N)"
+	startTime="$(/bin/date +%s.%N)"
 
 	if ! exec 3<>/dev/tcp/"$ies"/"$port"; then
 		printf 'CRITICAL: down\n' || true
@@ -341,13 +340,13 @@ ping() {
 	fi
 
 	local stopTime
-	stopTime="$(date +%s.%N)"
+	stopTime="$(/bin/date +%s.%N)"
 
 	mk_req RODS_DISCONNECT >&3 || true
 
 	local dt
 	if [[ -n "$startTime" ]] && [[ -n "$stopTime" ]]; then
-		dt="$(printf '%s - %s\n' "$stopTime" "$startTime" | bc)"
+		dt="$(printf '%s - %s\n' "$stopTime" "$startTime" | /usr/bin/bc)"
 	fi
 
 	local status='OK: up'
@@ -474,22 +473,34 @@ EOX
 encode_header_len() {
 	local len="$1"
 
-	printf '0: %.8x' "$len" | xxd -revert -g 0
+	printf '0: %.8x' "$len" | /usr/bin/xxd -revert -g 0
 }
 
 
-# It decodes a serialized iRODS protocol packet header length.
+# It decodes a serialized iRODS protocol packet header length as a decimal
 # Input:
 #  the serialized length
 # Output:
 #  the decimal value to stdout.
 decode_header_len() {
 	local lenHex
-	if ! lenHex="$(od --address-radix n --format x1 --read-bytes 4 | tr --delete ' ')"; then
+	if ! lenHex="$(decode_header_len_hex)"; then
 		return 1
 	fi
 
 	printf '%d' $(( 16#$lenHex ))
+}
+
+
+# It decodes a serialized iRODS protocol packet header length as a hexadecimal
+# Input:
+#  the serialized length
+# Output:
+#  the hexadecimal value to stdout.
+decode_header_len_hex() {
+	if ! /usr/bin/od --address-radix n --format x1 --read-bytes 4 | /usr/bin/tr --delete ' '; then
+		return 1
+	fi
 }
 
 
