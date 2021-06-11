@@ -322,7 +322,9 @@ ping() {
 		return $CRITICAL
 	fi
 
-	trap 'exec 3<&- || true; exec 3>&- || true; trap - RETURN' RETURN
+	trap \
+		'mk_req RODS_DISCONNECT >&3 || true; exec 3<&- || true; exec 3>&- || true; trap - RETURN' \
+		RETURN
 
 	local connMsgBody
 	if ! connMsgBody="$(mk_startup_pack "$service" "$zone")"; then
@@ -341,8 +343,6 @@ ping() {
 
 	local stopTime
 	stopTime="$(/bin/date +%s.%N)"
-
-	mk_req RODS_DISCONNECT >&3 || true
 
 	local dt
 	if [[ -n "$startTime" ]] && [[ -n "$stopTime" ]]; then
