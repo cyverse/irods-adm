@@ -32,14 +32,34 @@
 # 2021/01/26T02 sriram     698577101 1078121923 _syncReplicas
 # 2021/01/26T08 sriram     699269568 2119481675 _syncReplicas
 
-# TODO document RULE_EXEC
+set -o errexit -o nounset -o pipefail
 
+# Pertenent Internal Data Structures
+#
 # RULE_EXEC_REPORT
 # Internally, this script passes around a RULE_EXEC_REPORT text object. It is a
 # set of RULE_EXEC objects where each RULE_EXEC is followed by a line of 60
 # hyphens (`-`).
-
-set -o errexit -o nounset -o pipefail
+#
+# RULE_EXEC
+# A RULE_EXEC text object is a description of scheduled rule execution. It
+# consistents of a sequence of key-value pairs of the form "<key> = <value>"
+# where each pair is separated by a line feed. The sequence of keys are the
+# following.
+#
+# RULE_EXEC_ID             the rule execution Id
+# RULE_EXEC_REI_FILE_PATH  the absolute path to the REI file on the IES
+# RULE_EXEC_STATUS         the current status of the rule execution, the only
+#                          value of interest is "RUNNING", which means the
+#                          rule is currently being executed
+# RULE_EXEC_TIME           the local time when the rule execution is schedule in
+#                          the form "<YYYY>/<MM>/<DD>T<hh>" where <YYYY> is the
+#                          four digit Gregorian year, <MM> is the two digit month
+#                          number, <DD> is the two digit day of the month, and
+#                          <hh> is the two digit 24-hour clock hour
+# RULE_EXEC_USER_NAME      the user account that caused the rule execution to be
+#                          scheduled
+# RULE_EXEC_NAME           the rule to be executed
 
 
 main() {
@@ -204,22 +224,13 @@ EOAWK
 
 # filter an sequence of execution blocks for those currently running
 # Input:
-#  a list of execution blocks where each block has the entries
-#  `RULE_EXEC_ID = <id>`, `RULE_EXEC_REI_FILE_PATH = <rei-path>`,
-#  `RULE_EXEC_STATUS = <status>`, `RULE_EXEC_TIME = <YYYY>/<MM>/<DD>T<hh>`,
-#  `RULE_EXEC_USER_NAME = <username>`, and `RULE_EXEC_NAME = <rule>`, where <id>
-#  is the executions id, <rei-path> is the absolute path to the rei state file
-#  on the IES, <status> is a rule execution status reported by `iqstat`, <YYYY>
-#  is the four digit year, <MM> is the two digit month number, <DD> is the two
-#  digit day of the month, and <hh> is the two digit hour (00..23) for when the
-#  execution is scheduled to happen, <username> is the username that caused the
-#  execution to be scheduled, and <rule> is the rule to be executed. Each block
-#  is separated by the line
-#  `------------------------------------------------------------`.
+#  a RULE_EXEC_REPORT object
 # Output:
 #  For each execution, on a single line it writes the <id>, <time>, <user>,
-#  <rei-id>, and <rule-summary> separated by tabs, where <rei-id> is the rei
-#  state Id, and <rule-summary> is the first line of the rule.
+#  <rei-id>, and <rule> separated by tabs, where <id> is the rule execution id,
+#  <time> is the hour or execution, <user> is the account that caused the
+#  execution to be scheduled, <rei-id> is the REI state Id, and <rule-summary>
+#  is the rule to be executed. Each execution is separated by a line feed.
 filter_running() {
 	awk --file - <(cat) <<'EOAWK'
 /RULE_EXEC_ID/ {
