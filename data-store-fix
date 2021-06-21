@@ -6,7 +6,7 @@ show_help() {
 $EXEC_NAME version $VERSION
 
 Usage:
- $EXEC_NAME [options] [HOST]
+ $EXEC_NAME [options]
 
 This script generates two reports, one for collections and one for data objects.
 Each report lists all collections or data objects, respectively, that were
@@ -14,15 +14,14 @@ created before the cutoff time and are missing the own permission for the
 rodsadmin group or don't have one and only one UUID assigned to it. The data
 object report includes information on missing checksums.
 
-Parameters:
- HOST  the domain name or IP address of the server where the PostgreSQL DBMS
-       containing the ICAT DB runs, default is "localhost"
-
 Options:
  -A, --age AGE              how many days old a collection or data object must
                             be before it will be considered, default is 0
  -U, --db-user DB-USER      the user used to authenticate the connection to the
                             DB, default is "irods"
+ -H, --dbms-host DBMS-HOST  the domain name or IP address of the server where
+                            the PostgreSQL DBMS containing the ICAT DB runs,
+														default is "localhost"
  -P, --dbms-port DBMS-PORT  the TCP port the DBMS listens on, default is 5432
  -d, --debug                will cause the script to generate describing what it
                             is doing
@@ -70,6 +69,10 @@ main() {
 				PGUSER="$2"
 				shift 2
 				;;
+			-H|--dbms-host)
+				PGHOST="$2"
+				shift 2
+				;;
 			-P|--dbms-port)
 				PGPORT="$2"
 				shift 2
@@ -99,11 +102,6 @@ main() {
 
 	readonly DEBUG
 
-	if [ "$#" -ge 1 ]
-	then
-		PGHOST="$1"
-	fi
-
 	readonly CUTOFF_TIME="$(date --iso-8601 --date "$age days ago")"
 
 	check_existing_instance
@@ -130,8 +128,8 @@ main() {
 format_opts() {
 	getopt \
 		--name "$EXEC_NAME" \
-		--longoptions age:,db-user:,dbms-port:,debug,help,version \
-		--options A:dhP:U:v \
+		--longoptions age:,db-user:,dbms-host:,dbms-port:,debug,help,version \
+		--options A:dH:hP:U:v \
 		-- "$@"
 }
 
