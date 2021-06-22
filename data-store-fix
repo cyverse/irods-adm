@@ -8,23 +8,31 @@ $EXEC_NAME version $VERSION
 Usage:
  $EXEC_NAME [options]
 
-This script generates two reports, one for collections and one for data objects.
-Each report lists all collections or data objects, respectively, that were
-created before the cutoff time and are missing the own permission for the
-rodsadmin group or don't have one and only one UUID assigned to it. The data
-object report includes information on missing checksums.
+This script fixes the following three common problems that happen when an upload
+fails.
+
+1. The rodsadmin group isn't given own permission on a new collection or data
+   object.
+2. A new collection or data object doesn't receive a UUID.
+3. A checksum isn't computed for a new or modified data object replica.
+
+This script generates two reports: one for collections and one for data objects.
+Each report lists all collections or data objects, respectively, that had one or
+more of the problems. For each problem, the report indicates if the script was
+able to fix the problem. If the script wasn't able to, the error encountered
+while attempting the fix will be included at the bottom of the relevant report.
 
 Options:
  -A, --age AGE              how many days old a collection or data object must
                             be before it will be considered, default is 0
- -U, --db-user DB-USER      the user used to authenticate the connection to the
-                            DB, default is "irods"
- -H, --dbms-host DBMS-HOST  the domain name or IP address of the server where
-                            the PostgreSQL DBMS containing the ICAT DB runs,
-														default is "localhost"
+ -U, --db-user DB-USER      the account used to authorized the connection to the
+                            ICAT database, default is "irods"
+ -H, --dbms-host DBMS-HOST  the domain name or IP address of the server hosting
+                            the PostgreSQL DBMS containing the DB, default is
+                            "localhost"
  -P, --dbms-port DBMS-PORT  the TCP port the DBMS listens on, default is 5432
- -d, --debug                will cause the script to generate describing what it
-                            is doing
+ -d, --debug                will cause the script to display messages describing
+                            what it is doing
  -h, --help                 show help and exit
  -v, --version              show version and exit
 EOF
