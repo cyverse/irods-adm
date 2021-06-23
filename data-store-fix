@@ -6,7 +6,10 @@ show_help() {
 $EXEC_NAME version $VERSION
 
 Usage:
- $EXEC_NAME [options]
+ $EXEC_NAME [-d|--debug | (-A|--age) AGE | (-U|--db-user) DB-USER |
+    (-H|--dbms-host) DBMS-HOST | (-P|--dbms-port) DBMS-PORT]...
+ $EXEC_NAME -h|--help
+ $EXEC_NAME -v|--version
 
 This script fixes the following three common problems that happen when an upload
 fails.
