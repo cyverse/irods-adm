@@ -290,7 +290,7 @@ SELECT
 	COALESCE((SELECT du.uuid_count FROM data_uuid_probs AS du WHERE du.data_id = d.data_id), 1)
 		AS "UUID Count",
 	d.data_owner_name || '#' || d.data_owner_zone    AS "Owner",
-	d.resc_hier                                      AS "Resource",
+	d.data_repl_num                                  AS "Replica",
 	TO_TIMESTAMP(CAST(d.create_ts AS INTEGER))       AS "Create Time",
 	REPLACE(REPLACE(c.coll_name || '/' || d.data_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')
 		AS "Data Object"
@@ -550,15 +550,13 @@ EOF
 
 process_chksum_issue() {
 	local issue="$1"
-	local resc="$2"
+	local repl="$2"
 	local obj="$3"
-
-	resc="${resc%%;*}"
 
 	if [ "${issue// /}" = t ]
 	then
 		local err retCode
-		err=$(ichksum --silent -R "$resc" "$obj" 2>&1 > /dev/null)
+		err=$(ichksum --silent -n "$repl" "$obj" 2>&1 > /dev/null)
 		retCode="$?"
 
     if [[ "$err" =~ 'does not exist' ]]
@@ -626,17 +624,10 @@ fix_collection_problems() {
 fix_object_problems() {
 	pass_hdr_thru
 
-  local cnt=0
+	local cnt=0
 
-	local permIssue
-	local missingChksum
-	local uuidCnt
-	local owner
-	local rescField
-	local createTime
-	local objField
-
-	while IFS='|' read -r permIssue missingChksum uuidCnt owner rescField createTime objField
+	local permIssue missingChksum uuidCnt owner replField createTime objField
+	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField
 	do
 		if [ -z "$objField" ]
 		then
@@ -649,26 +640,26 @@ fix_object_problems() {
 		local obj
 		obj=$(unescape "$escObj")
 
-		local resc
-		resc=$(trim "$rescField")
+		local repl
+		repl="$(trim "$replField")"
 
 		if ! permIssue=$(process_perm_issue "$permIssue" "$obj")
 		then
 			continue
 		fi
 
-		if ! missingChksum=$(process_chksum_issue "$missingChksum" "$resc" "$obj")
+		if ! missingChksum="$(process_chksum_issue "$missingChksum" "$repl" "$obj")"
 		then
 			continue
 		fi
 
 		if ! uuidCnt=$(process_uuid_issue "$uuidCnt" obj "$obj")
-    then
+		then
 			continue
 		fi
 
 		printf '%s|%s|%s|%s|%s|%s|%s\n' \
-			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$rescField" "$createTime" "$objField"
+			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
 
 		cnt=$((cnt + 1))
 	done
