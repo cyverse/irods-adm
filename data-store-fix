@@ -29,11 +29,10 @@ Options:
  -A, --age AGE              how many days old a collection or data object must
                             be before it will be considered, default is 0
  -U, --db-user DB-USER      the account used to authorized the connection to the
-                            ICAT database, default is "irods"
+                            ICAT database
  -H, --dbms-host DBMS-HOST  the domain name or IP address of the server hosting
-                            the PostgreSQL DBMS containing the DB, default is
-                            "localhost"
- -P, --dbms-port DBMS-PORT  the TCP port the DBMS listens on, default is 5432
+                            the PostgreSQL DBMS containing the DB
+ -P, --dbms-port DBMS-PORT  the TCP port the DBMS listens on
  -d, --debug                will cause the script to display messages describing
                             what it is doing
  -h, --help                 show help and exit
@@ -42,13 +41,13 @@ EOF
 }
 
 
-readonly VERSION=3
+readonly VERSION=4
 
 set -o errexit -o nounset -o pipefail
 
-export PGHOST=localhost
-export PGPORT=5432
-export PGUSER=irods
+export PGHOST
+export PGPORT
+export PGUSER
 
 readonly DEFAULT_AGE=0
 readonly EXEC_ABS_PATH=$(readlink --canonicalize "$0")
