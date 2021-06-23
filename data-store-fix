@@ -11,19 +11,19 @@ Usage:
  $EXEC_NAME -h|--help
  $EXEC_NAME -v|--version
 
-This script fixes the following three common problems that happen when an upload
-fails.
+This program fixes the following three common problems that happen when an 
+upload fails.
 
 1. The rodsadmin group isn't given own permission on a new collection or data
    object.
 2. A new collection or data object doesn't receive a UUID.
 3. A checksum isn't computed for a new or modified data object replica.
 
-This script generates two reports: one for collections and one for data objects.
-Each report lists all collections or data objects, respectively, that had one or
-more of the problems. For each problem, the report indicates if the script was
-able to fix the problem. If the script wasn't able to, the error encountered
-while attempting the fix will be included at the bottom of the relevant report.
+It generates two reports: one for collections and one for data objects. Each 
+report lists all collections or data objects, respectively, that had one or more 
+of the problems. For each problem, the report indicates if the script was able 
+to fix the problem. If the program wasn't able to, the error encountered while 
+attempting the fix will be included at the bottom of the relevant report.
 
 Options:
  -A, --age AGE              how many days old a collection or data object must
@@ -33,10 +33,17 @@ Options:
  -H, --dbms-host DBMS-HOST  the domain name or IP address of the server hosting
                             the PostgreSQL DBMS containing the DB
  -P, --dbms-port DBMS-PORT  the TCP port the DBMS listens on
- -d, --debug                will cause the script to display messages describing
-                            what it is doing
+ -d, --debug                will cause the program to display messages 
+                            describing what it is doing
  -h, --help                 show help and exit
  -v, --version              show version and exit
+
+Environment Variables:
+ PGHOST  provides the default value for the DBMS host, default is "localhost"
+ PGPORT  provides the default value for the TCP port the DBMS listens on, 
+         default is 5432
+ PGUSER  provides the default value for the account used to authorize the 
+         connection, default is the user executing this program.
 EOF
 }
 
