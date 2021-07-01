@@ -196,6 +196,7 @@ function build_rule_line(startIdx, endIdx,  line, i) {
 /------------------------------------------------------------/ {
 	printf "RULE_EXEC_NAME = %s\n", rule;
 	print $0;
+	rule = "";
 	next;
 }
 
@@ -232,6 +233,11 @@ filter_running() {
 
 /------------------------------------------------------------/ {
 	if (status == "RE_RUNNING") { printf "%s\t%s\t%s\t%s\t%s\n", id, time, user, rei, rule; }
+	id = "";
+	time = "";
+	user = "";
+	rei = "";
+	rule = "";
 }
 EOAWK
 }
