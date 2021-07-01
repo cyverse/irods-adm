@@ -159,50 +159,39 @@ clean_rules() {
 	awk --file - <(cat) <<'EOAWK'
 function build_rule_line(startIdx, endIdx,  line, i) {
 	line = $startIdx;
-
-	for (i = startIdx + 1; i <= endIdx; i++) {
-		line = line " " $i;
-	}
-
+	for (i = startIdx + 1; i <= endIdx; i++) { line = line " " $i; }
 	return gensub(/ *(\||\\)$/, "", "", line);
 }
-
 
 /RULE_EXEC_ID/ {
 	print $0;
 	next;
 }
 
-
 /RULE_EXEC_REI_FILE_PATH/ {
 	print $0;
 	next;
 }
-
 
 /RULE_EXEC_STATUS/ {
 	print $0;
 	next;
 }
 
-
 /RULE_EXEC_TIME/ {
 	printf "RULE_EXEC_TIME = %s\n", strftime("%Y/%m/%dT%H", $3);
 	next;
 }
-
 
 /RULE_EXEC_USER_NAME/ {
 	print $0;
 	next;
 }
 
-
 /RULE_EXEC_NAME/ {
 	rule = build_rule_line(3, NF);
 	next;
 }
-
 
 /------------------------------------------------------------/ {
 	printf "RULE_EXEC_NAME = %s\n", rule;
@@ -210,12 +199,8 @@ function build_rule_line(startIdx, endIdx,  line, i) {
 	next;
 }
 
-
 {
-	if (rule != "") {
-		rule = rule " ";
-	}
-
+	if (rule != "") { rule = rule " "; }
 	rule = rule build_rule_line(1, NF);
 }
 EOAWK
@@ -233,40 +218,20 @@ EOAWK
 #  is the rule to be executed. Each execution is separated by a line feed.
 filter_running() {
 	awk --file - <(cat) <<'EOAWK'
-/RULE_EXEC_ID/ {
-	id = $3;
-}
+/RULE_EXEC_ID/ { id = $3; }
 
+/RULE_EXEC_REI_FILE_PATH/ { rei = gensub(/^.*\./, "", "", $3); }
 
-/RULE_EXEC_REI_FILE_PATH/ {
-	rei = gensub(/^.*\./, "", "", $3);
-}
+/RULE_EXEC_STATUS/ { status = $3; }
 
+/RULE_EXEC_TIME/ { time = $3; }
 
-/RULE_EXEC_STATUS/ {
-	status = $3;
-}
+/RULE_EXEC_USER_NAME/ { user = $3; }
 
-
-/RULE_EXEC_TIME/ {
-	time = $3;
-}
-
-
-/RULE_EXEC_USER_NAME/ {
-	user = $3;
-}
-
-
-/RULE_EXEC_NAME/ {
-	rule = gensub(/^RULE_EXEC_NAME = /, "", "", $0);
-}
-
+/RULE_EXEC_NAME/ { rule = gensub(/^RULE_EXEC_NAME = /, "", "", $0); }
 
 /------------------------------------------------------------/ {
-	if (status == "RE_RUNNING") {
-		printf "%s\t%s\t%s\t%s\t%s\n", id, time, user, rei, rule;
-	}
+	if (status == "RE_RUNNING") { printf "%s\t%s\t%s\t%s\t%s\n", id, time, user, rei, rule; }
 }
 EOAWK
 }
