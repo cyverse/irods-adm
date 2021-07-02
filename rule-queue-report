@@ -37,29 +37,30 @@ set -o errexit -o nounset -o pipefail
 # Pertenent Internal Data Structures
 #
 # RULE_EXEC_REPORT
-# Internally, this script passes around a RULE_EXEC_REPORT text object. It is a
-# set of RULE_EXEC objects where each RULE_EXEC is followed by a line of 60
-# hyphens (`-`).
+#  Internally, this script passes around a RULE_EXEC_REPORT text object. It is a
+#  set of RULE_EXEC objects where each RULE_EXEC is followed by a line of 60
+#  hyphens ("-"").
 #
 # RULE_EXEC
-# A RULE_EXEC text object is a description of scheduled rule execution. It
-# consistents of a sequence of key-value pairs of the form "<key> = <value>"
-# where each pair is separated by a line feed. The sequence of keys are the
-# following.
+#  A RULE_EXEC text object is a description of scheduled rule execution. It
+#  consists of a sequence of key-value pairs of the form "<key> = <value>" where 
+#  each pair is separated by a line feed. The sequence of keys are the 
+#  following.
 #
-# RULE_EXEC_ID             the rule execution Id
-# RULE_EXEC_REI_FILE_PATH  the absolute path to the REI file on the IES
-# RULE_EXEC_STATUS         the current status of the rule execution, the only
-#                          value of interest is "RUNNING", which means the
-#                          rule is currently being executed
-# RULE_EXEC_TIME           the local time when the rule execution is schedule in
-#                          the form "<YYYY>/<MM>/<DD>T<hh>" where <YYYY> is the
-#                          four digit Gregorian year, <MM> is the two digit month
-#                          number, <DD> is the two digit day of the month, and
-#                          <hh> is the two digit 24-hour clock hour
-# RULE_EXEC_USER_NAME      the user account that caused the rule execution to be
-#                          scheduled
-# RULE_EXEC_NAME           the rule to be executed
+#  RULE_EXEC_ID             the rule execution Id
+#  RULE_EXEC_REI_FILE_PATH  the absolute path to the REI file on the rule engine 
+#                           host
+#  RULE_EXEC_STATUS         the current status of the rule execution, the only
+#                           value of interest is "RUNNING", which means the
+#                           rule is currently being executed
+#  RULE_EXEC_TIME           the local time when the rule execution is schedule 
+#                           in the form "<YYYY>/<MM>/<DD>T<hh>" where <YYYY> is 
+#                           the four digit Gregorian year, <MM> is the two digit 
+#                           month number, <DD> is the two digit day of the 
+#                           month, and <hh> is the two digit 24-hour clock hour
+#  RULE_EXEC_USER_NAME      the user account that caused the rule execution to 
+#                           be scheduled
+#  RULE_EXEC_NAME           the rule to be executed
 
 
 main() {
@@ -155,6 +156,20 @@ gather_rules() {
 }
 
 
+# converts the raw output of `iquest` into rule execution report
+# Input:
+#  It expects a set of objects delineated by a line of 60 hyphens ("-"). Each 
+#  object consists of a sequence of key-value pairs of the form 
+#  "<key> = <value>" where a <key> is at the beginning of a line. A <value> may 
+#  contain line feeds, The keys are the following: "RULE_EXEC_ID" holds the rule 
+#  execution Id, "RULE_EXEC_REI_FILE_PATH" holds the absolute path to the REI 
+#  file on the rule engine host, "RULE_EXEC_STATUS? holds the current status of 
+#  the rule execution, "RULE_EXEC_TIME" holds the time when the rule execution 
+#  is schedule in seconds since the POSIX epoch, "RULE_EXEC_USER_NAME" holds the 
+#  user account that caused the rule execution to be scheduled, and 
+#  "RULE_EXEC_NAME" holds the rule to be executed.
+# Output:
+#  a RULE_EXEC_REPORT object 
 clean_rules() {
 	awk --file - <(cat) <<'EOAWK'
 function build_rule_line(startIdx, endIdx,  line, i) {
@@ -208,7 +223,7 @@ EOAWK
 }
 
 
-# filter an sequence of execution blocks for those currently running
+# filter a rule execution report for those currently running
 # Input:
 #  a RULE_EXEC_REPORT object
 # Output:
