@@ -142,6 +142,10 @@ report_user_summary() {
 }
 
 
+# generates a report describing the rule engine's current set of scheduled rule
+# executions.
+# Output:
+#  a RULE_EXEC_REPORT object 
 gather_rules() {
 	iquest --no-page \
 			no-distinct \
