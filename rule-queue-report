@@ -62,6 +62,8 @@ set -o errexit -o nounset -o pipefail
 #                           be scheduled
 #  RULE_EXEC_NAME           the rule to be executed
 
+set -o errexit -o nounset -o pipefail
+
 
 main() {
 	local queueContents
@@ -70,8 +72,8 @@ main() {
 	# shellcheck disable=SC2064
 	trap "rm --force '$queueContents'" EXIT
 
-	gather_rules > "$queueContents"
-
+ 	gather_rules > "$queueContents"
+ 
 	local reportWidth
 	reportWidth="$(tput cols)"
 
@@ -176,10 +178,10 @@ gather_rules() {
 #  a RULE_EXEC_REPORT object 
 clean_rules() {
 	awk --file - <(cat) <<'EOAWK'
-function build_rule_line(startIdx, endIdx,  line, i) {
+function build_rule_line(startIdx, endIdx) {
 	line = $startIdx;
 	for (i = startIdx + 1; i <= endIdx; i++) { line = line " " $i; }
-	return gensub(/ *(\||\\)$/, "", "", line);
+	return gensub(/ *(\||\\)$/, "", "1", line);
 }
 
 /RULE_EXEC_ID/ {
@@ -240,7 +242,7 @@ filter_running() {
 	awk --file - <(cat) <<'EOAWK'
 /RULE_EXEC_ID/ { id = $3; }
 
-/RULE_EXEC_REI_FILE_PATH/ { rei = gensub(/^.*\./, "", "", $3); }
+/RULE_EXEC_REI_FILE_PATH/ { rei = gensub(/^.*\./, "", "1", $3); }
 
 /RULE_EXEC_STATUS/ { status = $3; }
 
@@ -248,7 +250,7 @@ filter_running() {
 
 /RULE_EXEC_USER_NAME/ { user = $3; }
 
-/RULE_EXEC_NAME/ { rule = gensub(/^RULE_EXEC_NAME = /, "", "", $0); }
+/RULE_EXEC_NAME/ { rule = gensub(/^RULE_EXEC_NAME = /, "", "1", $0); }
 
 /------------------------------------------------------------/ {
 	if (status == "RE_RUNNING") { printf "%s\t%s\t%s\t%s\t%s\n", id, time, user, rei, rule; }
