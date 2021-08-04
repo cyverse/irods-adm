@@ -62,8 +62,6 @@ set -o errexit -o nounset -o pipefail
 #                           be scheduled
 #  RULE_EXEC_NAME           the rule to be executed
 
-set -o errexit -o nounset -o pipefail
-
 
 main() {
 	local queueContents
