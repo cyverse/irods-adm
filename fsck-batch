@@ -3,10 +3,10 @@
 show_help() {
 	cat <<EOF
 
-$ExecName version $Version
+$EXEC_NAME version $VERSION
 
 Usage:
- $ExecName [options] CLASS-BASE
+ $EXEC_NAME [options] CLASS-BASE
 
 checks data object replicas for correct sizes and checksums
 
@@ -39,11 +39,11 @@ EOF
 }
 
 
-readonly Version=4
+readonly VERSION=4
 
 set -o errexit -o nounset -o pipefail
 
-readonly ExecName="$(basename "$0")"
+readonly EXEC_NAME="$(basename "$0")"
 
 
 # formats the command line arguments for getopt style
@@ -53,12 +53,12 @@ readonly ExecName="$(basename "$0")"
 # Output:
 #   The formatted arguments
 format_opts() {
-	getopt --name "$ExecName" --options hJ:R:v --longoptions help,jobs:,resource:,version -- "$@"
+	getopt --name "$EXEC_NAME" --options hJ:R:v --longoptions help,jobs:,resource:,version -- "$@"
 }
 
 
 show_version() {
-	printf '%s\n' "$Version"
+	printf '%s\n' "$VERSION"
 }
 
 
@@ -84,11 +84,11 @@ do
 			exit 0
 			;;
 		-J|--jobs)
-			readonly Jobs="$2"
+			readonly JOBS="$2"
 			shift 2
 			;;
 		-R|--resource)
-			readonly Resc="$2"
+			readonly RESC="$2"
 			shift 2
 			;;
 		-v|--version)
@@ -110,9 +110,9 @@ then
 	exit_with_help
 fi
 
-readonly ClassBase="$1"
+readonly CLASS_BASE="$1"
 
-export ERR_LOG="$ClassBase".errors
+export ERR_LOG="$CLASS_BASE".errors
 
 
 # For a given data object, this fuction retrieves the size, checksum, resource,
@@ -212,10 +212,10 @@ log() {
 	do
 		if [ "$reason" = size ]
 		then
-			printf '%s\n' "$entry" >> "$ClassBase".bad_size
+			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_size
 		elif [ "$reason" = checksum ]
 		then
-			printf '%s\n' "$entry" >> "$ClassBase".bad_chksum
+			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_chksum
 		else
 			printf '%s %s\n' "$reason" "$entry" >> "$ERR_LOG"
 		fi
@@ -223,9 +223,9 @@ log() {
 }
 
 
-if [ -n "$Jobs" ]
+if [ -n "$JOBS" ]
 then
-	readonly JobsOpt="-j$Jobs"
+	readonly JOBS_OPT="-j$JOBS"
 fi
 
-parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" CHECK_OBJ "${Resc-}" | log
+parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JOBS_OPT" CHECK_OBJ "${RESC-}" | log
