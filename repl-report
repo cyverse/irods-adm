@@ -159,7 +159,9 @@ $(inject_debug_msg Gathering unreplicated data)
 CREATE TEMPORARY TABLE unreplicated_data(id) ON COMMIT DROP AS
 SELECT data_id FROM r_data_main
 WHERE ($(inject_collection_restriction "$collection"))
-	AND ($(inject_time_restriction "$age")); 
+	AND ($(inject_time_restriction "$age"))
+GROUP BY data_id
+HAVING COUNT(resc_id) = 1;
 
 CREATE INDEX idx_unreplicated_data_id ON unreplicated_data(id);
 
