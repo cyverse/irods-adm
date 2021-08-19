@@ -149,18 +149,51 @@ mk_report() {
 $(inject_debug_stmt \\timing on)
 $(inject_debug_quiet off)
 
-BEGIN;
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
 
 $(inject_debug_msg Gathering unreplicated data)
-CREATE TEMPORARY TABLE unreplicated_data(root_resc, store_resc, size) ON COMMIT DROP AS
-SELECT d.resc_name, SUBSTRING(d.resc_hier FROM '(%;)*#"[^;]+#"' FOR '#'), d.data_size
-FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
-	AND ($(inject_collection_restriction c "$collection"))
-	AND ($(inject_time_restriction d "$age"));
 
-CREATE INDEX idx_unreplicated_root_resc ON unreplicated_data(root_resc);
-CREATE INDEX idx_unreplicated_store_resc ON unreplicated_data(store_resc);
+CREATE TEMPORARY TABLE unreplicated_data(id) ON COMMIT DROP AS
+SELECT data_id FROM r_data_main
+WHERE ($(inject_collection_restriction "$collection"))
+	AND ($(inject_time_restriction "$age")); 
+
+CREATE INDEX idx_unreplicated_data_id ON unreplicated_data(id);
+
+
+$(inject_debug_msg Creating storage to root resource mapping)
+
+CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
+WITH RECURSIVE resc_ancestor_mapping AS (
+	SELECT 
+			resc_id AS id, 
+			resc_name AS name, 
+			resc_parent::BIGINT AS ancestor_id, 
+			resc_name AS ancestor_child 
+		FROM r_resc_main 
+		WHERE resc_children = '' AND resc_name != 'bundleResc' 
+	UNION SELECT 
+			m.id,
+			m.name,
+			CASE WHEN r.resc_parent = '' THEN NULL ELSE r.resc_parent::BIGINT END AS ancestor_id, 
+			r.resc_name AS ancestor_child 
+		FROM resc_ancestor_mapping AS m JOIN r_resc_main AS r ON r.resc_id = m.ancestor_id ) 
+SELECT id, name, ancestor_child FROM resc_ancestor_mapping WHERE ancestor_id IS NULL;
+
+CREATE INDEX idx_storage_root_mapping_storage_id ON storage_root_mapping(storage_id);
+
+
+$(inject_debug_msg Gathering unreplicated replicas)
+
+CREATE TEMPORARY TABLE unreplicated_replicas(root_resc, store_resc, size) ON COMMIT DROP AS
+SELECT s.root_name, s.storage_name, d.data_size
+FROM storage_root_mapping AS s JOIN r_data_main AS d ON d.resc_id = s.storage_id
+WHERE d.data_id IN (SELECT id FROM unreplicated_data);
+
+CREATE INDEX idx_unreplicated_replicas_root_resc ON unreplicated_replicas(root_resc);
+CREATE INDEX idx_unreplicated_replicas_store_resc ON unreplicated_replicas(store_resc);
+
 
 \\echo
 
@@ -170,9 +203,10 @@ SELECT
 	store_resc                                     AS "Storage Resource",
 	COUNT(*)                                       AS "Count",
 	ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)  AS "Volume (TiB)"
-FROM unreplicated_data
+FROM unreplicated_replicas
 GROUP BY store_resc
 ORDER BY store_resc;
+
 
 $(inject_debug_newline)
 $(inject_set_title Unreplicated in Root Resources)
@@ -180,9 +214,10 @@ SELECT
 	root_resc                                      AS "Root Resource",
 	COUNT(*)                                       AS "Count",
 	ROUND(CAST(SUM(size) / 2 ^ 40 AS NUMERIC), 3)  AS "Volume (TiB)"
-	FROM unreplicated_data
+	FROM unreplicated_replicas
 GROUP BY root_resc
 ORDER BY root_resc;
+
 
 $(inject_debug_newline)
 $(inject_debug_newline)
@@ -231,13 +266,16 @@ inject_set_title() {
 
 
 inject_collection_restriction() {
-	local collTable="$1"
-	local collection="$2"
+	local collection="$1"
 
 	if [[ -n "$collection" ]]
 	then
-		local colName="$collTable".coll_name
-		printf $'%s = \'%s\' OR %s LIKE \'%s/%%\'' "$colName" "$collection" "$colName" "$collection"
+		local collQuery
+		printf -v collQuery \
+			$'SELECT coll_id FROM r_coll_main WHERE coll_name = \'%s\' OR coll_name LIKE \'%s/%%\'' \
+			"$collection" "$collection"
+
+		printf 'coll_id IN (%s)' "$collQuery" 
 	else
 		printf TRUE
 	fi
@@ -245,8 +283,7 @@ inject_collection_restriction() {
 
 
 inject_time_restriction() {
-	local dataTable="$1"
-	local age="$2"
+	local age="$1"
 
 	if [[ "$age" -lt 0 ]]
 	then
@@ -261,7 +298,7 @@ inject_time_restriction() {
 
 		local supCreateTs
 		supCreateTs="$(date --date "$supCreateDate" '+%s')"
-		printf $'%s.create_ts < \'%011d\'' "$dataTable" "$supCreateTs"
+		printf $'create_ts < \'%011d\'' "$supCreateTs"
 	fi
 }
 
