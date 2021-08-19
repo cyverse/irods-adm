@@ -3,10 +3,10 @@
 help() {
 	cat <<EOF
 
-$ExecName version $Version
+$EXEC_NAME version $VERSION
 
 Usage:
- $ExecName [options]
+ $EXEC_NAME [options]
 
 This program generates a report on the data objects in the home collections of
 the local zone that need to be replicated. An object needs to be replicated if
@@ -38,15 +38,15 @@ EOF
 }
 
 
-readonly Version=8
+readonly VERSION=8
 
 set -o errexit -o nounset -o pipefail
 
 export PGHOST PGPORT PGUSER
 
-readonly ExecPath="$(realpath --canonicalize-missing "$0")"
-readonly ExecName="$(basename "$ExecPath")"
-readonly DefaultAge=1
+readonly EXEC_PATH="$(realpath --canonicalize-missing "$0")"
+readonly EXEC_NAME="$(basename "$EXEC_PATH")"
+readonly DEFAULT_AGE=1
 
 declare Debug
 
@@ -61,7 +61,7 @@ main() {
 
 	eval set -- "$opts"
 
-	local age="$DefaultAge"
+	local age="$DEFAULT_AGE"
 
 	local collection
 	local help
@@ -121,7 +121,7 @@ main() {
 
 	if [[ -n "${version-}" ]]
 	then
-		printf '%s\n' "$Version"
+		printf '%s\n' "$VERSION"
 		return 0
 	fi
 
@@ -133,7 +133,7 @@ prep_opts() {
 	getopt \
 		--longoptions age:,collection:,debug,help,host:,port:,user:,version \
 		--options A:C:dhH:P:U:v \
-		--name "$ExecName" \
+		--name "$EXEC_NAME" \
 		-- \
 		"$@"
 }
