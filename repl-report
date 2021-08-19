@@ -17,6 +17,8 @@ the storage resource holding the corresponding files.
 The caller must have an initialized iRODS session, i.e., called \`iinit\` to open
 an iRODS session with a cached authentication credentials.
 
+This works with iRODS 4.2.8 or later.
+
 Options:
  -A, --age AGE                how many days old a data object must be to be
                               replicated. A negative number means no time
@@ -32,13 +34,13 @@ Options:
                               of the default
  -v, --version                display version and exit
 
-© 2020, The Arizona Board of Regents on behalf of The University of Arizona. For
+© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
 EOF
 }
 
 
-readonly VERSION=8
+readonly VERSION=9
 
 set -o errexit -o nounset -o pipefail
 
