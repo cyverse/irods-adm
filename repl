@@ -8,7 +8,12 @@ $EXEC_NAME version $VERSION
 Usage:
  $EXEC_NAME [options]
 
-replicates data objects
+This program replicates data objects that were created before yesterday. It only
+replicates objects to the DEST-RESC if a replica doesn't already exist there. It
+writes progress to standard error and all messages, error or otherwise, to
+standard out.
+
+This works with iRODS 4.2.8 or later.
 
 Options:
  -A, --age AGE                how many days old a data object must be to be
@@ -34,12 +39,6 @@ Options:
                               of the default
  -v, --verison                show version and exit
 
-Summary:
-This program replicates data objects that were created before yesterday. It only
-replicates objects to the DEST-RESC if a replica doesn't already exist there. It
-writes progress to standard error and all messages, error or otherwise, to
-standard out.
-
 Prerequisites:
  1) The user must be initialized with iRODS as an admin user.
  2) The user must be able to connect to the ICAT DB without providing a
@@ -51,7 +50,7 @@ EOF
 }
 
 
-readonly VERSION=6
+readonly VERSION=7
 
 set -o errexit -o nounset -o pipefail
 
@@ -264,10 +263,10 @@ replicate() {
 	local resCond
 	if [[ -n "$srcResc" ]]
 	then
-		resCond="d.resc_name = '$srcResc'"
+		resCond="$(mk_resc_cond "$srcResc")"
 	elif [[ -n "$destResc" ]]
 	then
-		resCond="d.resc_name != '$destResc'"
+		resCond="$(mk_resc_cond "$destResc")"
 	else
 		resCond=TRUE
 	fi
@@ -463,6 +462,28 @@ mk_prog_msg() {
 }
 
 
+mk_resc_cond() {
+	local resc="$1"
+
+cat <<SQL
+d.resc_id IN (
+	WITH RECURSIVE resc_ancestor_mapping AS (
+		SELECT 
+				resc_id AS id, 
+				resc_parent::BIGINT AS ancestor_id, 
+				resc_name AS ancestor_child 
+			FROM r_resc_main 
+			WHERE resc_children = '' AND resc_name != 'bundleResc' 
+		UNION SELECT 
+				m.id,
+				CASE WHEN r.resc_parent = '' THEN NULL ELSE r.resc_parent::BIGINT END AS ancestor_id, 
+				r.resc_name AS ancestor_child 
+			FROM resc_ancestor_mapping AS m JOIN r_resc_main AS r ON r.resc_id = m.ancestor_id )
+	SELECT id FROM resc_ancestor_mapping WHERE ancestor_child = '$srcResc' )
+SQL
+}
+
+
 mk_repl_query() {
 	local maxTime="$1"
 	local baseCond="$2"
@@ -471,7 +492,7 @@ mk_repl_query() {
 	cat <<EOSQL
 SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE d.data_id = ANY(ARRAY(SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1))
+WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
 	AND d.create_ts < '0$maxTime'
 	AND ($baseCond)
 	AND ($resCond)
@@ -693,10 +714,11 @@ REPL_BATCH() {
 		replArgs+=(-R "$destResc")
 	fi
 
-	if [[ -n "$srcResc" ]]
-	then
-		replArgs+=(-S "$srcResc")
-	fi
+	# XXX - irepl -S doesn't work in 4.2.8, but it's fixed in 4.2.9
+	#if [[ -n "$srcResc" ]]
+	#then
+   #	replArgs+=(-S "$srcResc")
+	#fi
 
 	local replStatus=0
 	irepl "${replArgs[@]}" "$@" || replStatus="$?"
