@@ -479,7 +479,7 @@ d.resc_id IN (
 				CASE WHEN r.resc_parent = '' THEN NULL ELSE r.resc_parent::BIGINT END AS ancestor_id, 
 				r.resc_name AS ancestor_child 
 			FROM resc_ancestor_mapping AS m JOIN r_resc_main AS r ON r.resc_id = m.ancestor_id )
-	SELECT id FROM resc_ancestor_mapping WHERE ancestor_child = '$srcResc' )
+	SELECT id FROM resc_ancestor_mapping WHERE ancestor_child = '$resc' )
 SQL
 }
 
