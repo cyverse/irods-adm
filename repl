@@ -62,7 +62,7 @@ export TIMEDOUT=3
 readonly DEFAULT_AGE=1
 readonly DEFAULT_MAX_THREADS=16
 readonly DEFAULT_PROC_MULT=1
-readonly EXEC_PATH="$(readlink --canonicalize "$0")"
+readonly EXEC_PATH="$(realpath --canonicalize-missing "$0")"
 readonly EXEC_NAME="$(basename "$EXEC_PATH")"
 readonly LOG=3
 
