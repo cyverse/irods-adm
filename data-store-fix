@@ -395,21 +395,21 @@ process_uuid_issue() {
 	uuidCntField=${uuidCnt#  }
 	declare -i cnt=$uuidCntField
 
-  if [[ $cnt -eq 1 ]]
+	if [[ $cnt -eq 1 ]]
 	then
 		printf '%s  ' "$uuidCntField"
 		return 0
 	fi
 
-  local imetaFlag
+	local imetaFlag
 	if [ "$entityType" = coll ]
 	then
-		local imetaFlag=-c
+		local imetaFlag=-C
 	else
 		local imetaFlag=-d
 	fi
 
-  local statusMsg
+	local statusMsg
 	if [[ $cnt -eq 0 ]]
 	then
 		statusMsg="$(add_missing_uuid "$entity" "$imetaFlag")"
@@ -435,7 +435,7 @@ process_uuid_issue() {
 
 
 add_missing_uuid() {
-  local entity="$1"
+	local entity="$1"
 	local imetaFlag="$2"
 
 	local uuid
@@ -462,7 +462,7 @@ rm_extra_uuids() {
 	local entity="$1"
 	local imetaFlag="$2"
 
-  local failed
+	local failed
 
 	local uuidMap
 	if ! uuidMap=$(get_meta_id_uuid_map "$entity" "$imetaFlag" 2>&1)
@@ -490,11 +490,11 @@ rm_extra_uuids() {
 				fi
 			fi
 		done <<< "$uuidMap"
-  fi
+	fi
 
-  if [[ -z "${failed-}" ]]
+	if [[ -z "${failed-}" ]]
 	then
-	  printf SUCCESS
+		printf SUCCESS
 	else
 		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
   fi
@@ -507,14 +507,14 @@ get_meta_id_uuid_map() {
 	local imetaFlag="$2"
 
 	local query
-	if [[ "$imetaFlag" = -c ]]
+	if [[ "$imetaFlag" = -C ]]
 	then
 		query="$(mk_coll_uuid_query "$entityPath")"
 	else
 		query="$(mk_data_uuid_query "$(dirname "$entityPath")" "$(basename "$entityPath")")"
 	fi
 
-  local results
+	local results
 	if ! results=$(iquest --no-page '%s %s' "$query")
 	then
 		return 1
@@ -562,7 +562,7 @@ process_chksum_issue() {
 		err=$(ichksum --silent -n "$repl" "$obj" 2>&1 > /dev/null)
 		retCode="$?"
 
-    if [[ "$err" =~ 'does not exist' ]]
+		if [[ "$err" =~ 'does not exist' ]]
 		then
 			printf '%s' "${issue/%  /👻 }"
 		elif [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]
@@ -586,7 +586,7 @@ process_chksum_issue() {
 fix_collection_problems() {
 	pass_hdr_thru
 
-  local cnt=0
+	local cnt=0
 
 	local permIssue
 	local uuidCnt
