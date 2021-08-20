@@ -44,6 +44,9 @@ Environment Variables:
          default is 5432
  PGUSER  provides the default value for the account used to authorize the 
          connection, default is the user executing this program.
+
+© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+license information, see https://cyverse.org/license.
 EOF
 }
 
