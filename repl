@@ -470,7 +470,7 @@ d.resc_id IN (
 	WITH RECURSIVE resc_ancestor_mapping AS (
 		SELECT 
 				resc_id AS id, 
-				resc_parent::BIGINT AS ancestor_id, 
+				CASE WHEN resc_parent = '' THEN NULL ELSE resc_parent::BIGINT END AS ancestor_id, 
 				resc_name AS ancestor_child 
 			FROM r_resc_main 
 			WHERE resc_children = '' AND resc_name != 'bundleResc' 
