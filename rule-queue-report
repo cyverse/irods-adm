@@ -87,8 +87,9 @@ main() {
 		report_rule_summary "$reportWidth" < "$queueContents"
 		printf '\n'
 		report_user_summary < "$queueContents"
-		printf '\n'
-		report_running_rules "$reportWidth" < "$queueContents"
+# XXX - https://github.com/irods/irods/issues/5785
+# 		printf '\n'
+# 		report_running_rules "$reportWidth" < "$queueContents"
 	fi
 }
 
