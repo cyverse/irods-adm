@@ -39,6 +39,11 @@ Options:
                               of the default
  -v, --verison                show version and exit
 
+Environment Variables:
+ PGHOST  the default PostgreSQL host
+ PGPORT  the default PostgreSQL listening port
+ PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection 
+
 Prerequisites:
  1) The user must be initialized with iRODS as an admin user.
  2) The user must be able to connect to the ICAT DB without providing a
