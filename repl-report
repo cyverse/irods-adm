@@ -165,7 +165,7 @@ SELECT data_id FROM r_data_main
 WHERE ($(inject_collection_restriction "$collection"))
 	AND ($(inject_time_restriction "$age"))
 GROUP BY data_id
-HAVING COUNT(resc_id) = 1;
+HAVING COUNT(*) = 1;
 
 CREATE INDEX idx_unreplicated_data_id ON unreplicated_data(id);
 
@@ -173,21 +173,17 @@ CREATE INDEX idx_unreplicated_data_id ON unreplicated_data(id);
 $(inject_debug_msg Creating storage to root resource mapping)
 
 CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
-WITH RECURSIVE resc_ancestor_mapping AS (
+WITH RECURSIVE child_mapping AS (
 	SELECT 
 			resc_id AS id, 
 			resc_name AS name, 
-			CASE WHEN resc_parent = '' THEN NULL ELSE resc_parent::BIGINT END AS ancestor_id, 
-			resc_name AS ancestor_child 
+			(resc_net != 'EMPTY_RESC_HOST') AS storage, 
+			resc_name AS root 
 		FROM r_resc_main 
-		WHERE resc_children = '' AND resc_name != 'bundleResc' 
-	UNION SELECT 
-			m.id,
-			m.name,
-			CASE WHEN r.resc_parent = '' THEN NULL ELSE r.resc_parent::BIGINT END AS ancestor_id, 
-			r.resc_name AS ancestor_child 
-		FROM resc_ancestor_mapping AS m JOIN r_resc_main AS r ON r.resc_id = m.ancestor_id ) 
-SELECT id, name, ancestor_child FROM resc_ancestor_mapping WHERE ancestor_id IS NULL;
+		WHERE resc_parent = '' AND resc_name != 'bundleResc' 
+	UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root 
+		FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent ) 
+SELECT id, name, root FROM child_mapping where storage;
 
 CREATE INDEX idx_storage_root_mapping_storage_id ON storage_root_mapping(storage_id);
 
