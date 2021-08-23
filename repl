@@ -472,19 +472,13 @@ mk_resc_cond() {
 
 cat <<SQL
 d.resc_id IN (
-	WITH RECURSIVE resc_ancestor_mapping AS (
-		SELECT 
-				resc_id AS id, 
-				CASE WHEN resc_parent = '' THEN NULL ELSE resc_parent::BIGINT END AS ancestor_id, 
-				resc_name AS ancestor_child 
+	WITH RECURSIVE child_mapping AS (
+		SELECT resc_id AS id, (resc_net != 'EMPTY_RESC_HOST') AS storage, resc_name AS root 
 			FROM r_resc_main 
-			WHERE resc_children = '' AND resc_name != 'bundleResc' 
-		UNION SELECT 
-				m.id,
-				CASE WHEN r.resc_parent = '' THEN NULL ELSE r.resc_parent::BIGINT END AS ancestor_id, 
-				r.resc_name AS ancestor_child 
-			FROM resc_ancestor_mapping AS m JOIN r_resc_main AS r ON r.resc_id = m.ancestor_id )
-	SELECT id FROM resc_ancestor_mapping WHERE ancestor_child = '$resc' )
+			WHERE resc_name = '$resc'
+		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root 
+			FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent )
+	SELECT id FROM child_mapping WHERE storage )
 SQL
 }
 
