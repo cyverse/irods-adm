@@ -59,7 +59,6 @@ readonly VERSION=7
 
 set -o errexit -o nounset -o pipefail
 
-# Ensure these are declared for PostgreSQL
 export PGHOST PGPORT PGUSER
 
 export TIMEDOUT=3
@@ -70,6 +69,7 @@ readonly DEFAULT_PROC_MULT=1
 readonly EXEC_PATH="$(realpath --canonicalize-missing "$0")"
 readonly EXEC_NAME="$(basename "$EXEC_PATH")"
 readonly LOG=3
+readonly TRANSFER_BUF_SZ=32
 
 
 main() {
@@ -347,8 +347,11 @@ replicate() {
 			local minSize
 			minSize="$(threads_to_MB "$maxThreads")"
 
-			if [[ "$minSize" -lt 480 ]]
+			local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (16 - 1) ))
+
+			if (( minSize < lastCohortMinSz ))
 			then
+				# transfer remaining files not in last Cohort
 				cnt="$(\
 					select_cohort_by_size \
 							"$cnt" \
@@ -359,14 +362,22 @@ replicate() {
 							"$maxThreads" \
 							"$untilTS" \
 							"$minSize" \
-							480 \
-						< "$objList" )"  # < 480 MiB transfers
+							lastCohortMinSz \
+						< "$objList" )" 
 			fi
 
+			# last cohort transfers
 			cnt="$(\
 				select_cohort_by_size \
-						"$cnt" "$tot" "$srcResc" "$destResc" "$procMult" "$maxThreads" "$untilTS" 480 \
-					< "$objList" )"  # >= 480 MiB transfers
+						"$cnt" \ 
+						"$tot" \
+						"$srcResc" \ 
+						"$destResc" \
+						"$procMult" \
+						"$maxThreads" \
+						"$untilTS" \
+						"$lastCohortMinSz" \
+					< "$objList" )"
 
 			# zero byte files
 			cnt="$(\
@@ -691,7 +702,7 @@ select_cohort_by_size() {
 threads_to_MB() {
   local threads="$1"
 
-	echo $(( threads * 32 ))
+	echo $(( threads * TRANSFER_BUF_SZ ))
 }
 
 
