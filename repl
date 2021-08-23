@@ -69,7 +69,7 @@ readonly DEFAULT_PROC_MULT=1
 readonly EXEC_PATH="$(realpath --canonicalize-missing "$0")"
 readonly EXEC_NAME="$(basename "$EXEC_PATH")"
 readonly LOG=3
-readonly TRANSFER_BUF_SZ=32
+readonly TRANSFER_BUF_SZ=100
 
 
 main() {
