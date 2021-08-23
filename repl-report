@@ -162,8 +162,7 @@ $(inject_debug_msg Gathering unreplicated data)
 
 CREATE TEMPORARY TABLE unreplicated_data(id) ON COMMIT DROP AS
 SELECT data_id FROM r_data_main
-WHERE ($(inject_collection_restriction "$collection"))
-	AND ($(inject_time_restriction "$age"))
+WHERE ( $(inject_collection_restriction r_data_main "$collection") )
 GROUP BY data_id
 HAVING COUNT(*) = 1;
 
@@ -193,7 +192,8 @@ $(inject_debug_msg Gathering unreplicated replicas)
 CREATE TEMPORARY TABLE unreplicated_replicas(root_resc, store_resc, size) ON COMMIT DROP AS
 SELECT s.root_name, s.storage_name, d.data_size
 FROM storage_root_mapping AS s JOIN r_data_main AS d ON d.resc_id = s.storage_id
-WHERE d.data_id IN (SELECT id FROM unreplicated_data);
+WHERE d.data_id IN (SELECT id FROM unreplicated_data)
+	AND ( $(inject_time_restriction d "$age") );
 
 CREATE INDEX idx_unreplicated_replicas_root_resc ON unreplicated_replicas(root_resc);
 CREATE INDEX idx_unreplicated_replicas_store_resc ON unreplicated_replicas(store_resc);
@@ -270,7 +270,8 @@ inject_set_title() {
 
 
 inject_collection_restriction() {
-	local collection="$1"
+	local table="$1"
+	local collection="$2"
 
 	if [[ -n "$collection" ]]
 	then
@@ -279,7 +280,7 @@ inject_collection_restriction() {
 			$'SELECT coll_id FROM r_coll_main WHERE coll_name = \'%s\' OR coll_name LIKE \'%s/%%\'' \
 			"$collection" "$collection"
 
-		printf 'coll_id IN (%s)' "$collQuery" 
+		printf '%s.coll_id IN (%s)' "$table" "$collQuery" 
 	else
 		printf TRUE
 	fi
@@ -287,7 +288,8 @@ inject_collection_restriction() {
 
 
 inject_time_restriction() {
-	local age="$1"
+	local table="$1"
+	local age="$2"
 
 	if [[ "$age" -lt 0 ]]
 	then
@@ -302,7 +304,7 @@ inject_time_restriction() {
 
 		local supCreateTs
 		supCreateTs="$(date --date "$supCreateDate" '+%s')"
-		printf $'create_ts < \'%011d\'' "$supCreateTs"
+		printf $'%s.create_ts < \'%011d\'' "$table" "$supCreateTs"
 	fi
 }
 
