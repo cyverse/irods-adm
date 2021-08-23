@@ -34,6 +34,11 @@ Options:
                               of the default
  -v, --version                display version and exit
 
+Environment Variables:
+ PGHOST  the default PostgreSQL host
+ PGPORT  the default PostgreSQL listening port
+ PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection 
+
 © 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
 EOF
