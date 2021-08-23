@@ -183,7 +183,7 @@ WITH RECURSIVE child_mapping AS (
 		WHERE resc_parent = '' AND resc_name != 'bundleResc' 
 	UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root 
 		FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent ) 
-SELECT id, name, root FROM child_mapping where storage;
+SELECT id, name, root FROM child_mapping WHERE storage;
 
 CREATE INDEX idx_storage_root_mapping_storage_id ON storage_root_mapping(storage_id);
 
