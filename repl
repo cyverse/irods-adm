@@ -369,9 +369,9 @@ replicate() {
 			# last cohort transfers
 			cnt="$(\
 				select_cohort_by_size \
-						"$cnt" \ 
+						"$cnt" \
 						"$tot" \
-						"$srcResc" \ 
+						"$srcResc" \
 						"$destResc" \
 						"$procMult" \
 						"$maxThreads" \
