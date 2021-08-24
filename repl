@@ -44,6 +44,10 @@ Environment Variables:
  PGPORT  the default PostgreSQL listening port
  PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection 
 
+Output:
+The program echos the output of the underlying \`irepl -v\` calls to stdout. It
+writes overall progress to stderr in way suitable for display on a terminal. 
+
 Prerequisites:
  1) The user must be initialized with iRODS as an admin user.
  2) The user must be able to connect to the ICAT DB without providing a
