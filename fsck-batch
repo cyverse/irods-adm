@@ -68,53 +68,6 @@ exit_with_help() {
 }
 
 
-if ! opts="$(format_opts "$@")"
-then
-	printf '\n' >&2
-	exit_with_help
-fi
-
-eval set -- "$opts"
-
-while true
-do
-	case "$1" in
-		-h|--help)
-			show_help
-			exit 0
-			;;
-		-J|--jobs)
-			readonly JOBS="$2"
-			shift 2
-			;;
-		-R|--resource)
-			readonly RESC="$2"
-			shift 2
-			;;
-		-v|--version)
-			show_version
-			exit 0
-			;;
-		--)
-			shift
-			break
-			;;
-		*)
-			exit_with_help
-			;;
-	esac
-done
-
-if [ "$#" -lt 1 ]
-then
-	exit_with_help
-fi
-
-readonly CLASS_BASE="$1"
-
-export ERR_LOG="$CLASS_BASE".errors
-
-
 # For a given data object, this fuction retrieves the size, checksum, resource,
 # and file path for each of its replicas.
 # Arguments:
@@ -222,6 +175,52 @@ log() {
 	done
 }
 
+
+if ! opts="$(format_opts "$@")"
+then
+	printf '\n' >&2
+	exit_with_help
+fi
+
+eval set -- "$opts"
+
+while true
+do
+	case "$1" in
+		-h|--help)
+			show_help
+			exit 0
+			;;
+		-J|--jobs)
+			readonly JOBS="$2"
+			shift 2
+			;;
+		-R|--resource)
+			readonly RESC="$2"
+			shift 2
+			;;
+		-v|--version)
+			show_version
+			exit 0
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			exit_with_help
+			;;
+	esac
+done
+
+if [ "$#" -lt 1 ]
+then
+	exit_with_help
+fi
+
+readonly CLASS_BASE="$1"
+
+export ERR_LOG="$CLASS_BASE".errors
 
 if [ -n "$JOBS" ]
 then
