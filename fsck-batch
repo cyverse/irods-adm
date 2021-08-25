@@ -22,9 +22,9 @@ Options:
  -v, --version        display version and exit
 
 Summary:
-The script reads a list of iRODS data object paths from standard in, one per
-line, and checks to see if any of the replicas have an incorrect checksum or
-size. The ones with incorrect sizes are appended to the file
+The script reads a NUL-delimited list of iRODS data object paths from standard 
+in, one per line, and checks to see if any of the replicas have an incorrect 
+checksum or size. The ones with incorrect sizes are appended to the file
 \`CLASS-BASE.bad_size\`. The ones with incorrect checksums are appended to the
 file \`CLASS-BASE.bad_chksum\`. If an error occurs while checking a replica, the
 error is written to \`CLASS-BASE\`.errors. In any case, at most one log entry
@@ -39,7 +39,7 @@ EOF
 }
 
 
-readonly VERSION=4
+readonly VERSION=5
 
 set -o errexit -o nounset -o pipefail
 
@@ -227,4 +227,4 @@ then
 	readonly JOBS_OPT="-j$JOBS"
 fi
 
-parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JOBS_OPT" CHECK_OBJ "${RESC-}" | log
+parallel --eta --no-notice --null --max-args 1 "$JOBS_OPT" CHECK_OBJ "${RESC-}" | log
