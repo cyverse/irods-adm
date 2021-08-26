@@ -59,8 +59,7 @@ declare Debug
 
 main() {
 	local opts
-	if ! opts="$(prep_opts "$@")"
-	then
+	if ! opts="$(prep_opts "$@")"; then
 		help >&2
 		return 1
 	fi
@@ -73,8 +72,7 @@ main() {
 	local help
 	local version
 
-	while true
-	do
+	while true; do
 		case "$1" in
 			-A|--age)
 				age="$2"
@@ -119,14 +117,12 @@ main() {
 		esac
 	done
 
-	if [[ -n "${help-}" ]]
-	then
+	if [[ -n "${help-}" ]]; then
 		help
 		return 0
 	fi
 
-	if [[ -n "${version-}" ]]
-	then
+	if [[ -n "${version-}" ]]; then
 		printf '%s\n' "$VERSION"
 		return 0
 	fi
@@ -253,8 +249,7 @@ inject_debug_quiet() {
 inject_debug_stmt() {
 	local stmt="$*"
 
-	if [[ -n "${Debug-}" ]]
-	then
+	if [[ -n "${Debug-}" ]]; then
 		printf '%s\n' "$stmt"
 	fi
 }
@@ -273,8 +268,7 @@ inject_collection_restriction() {
 	local table="$1"
 	local collection="$2"
 
-	if [[ -n "$collection" ]]
-	then
+	if [[ -n "$collection" ]]; then
 		local collQuery
 		printf -v collQuery \
 			$'SELECT coll_id FROM r_coll_main WHERE coll_name = \'%s\' OR coll_name LIKE \'%s/%%\'' \
@@ -291,8 +285,7 @@ inject_time_restriction() {
 	local table="$1"
 	local age="$2"
 
-	if [[ "$age" -lt 0 ]]
-	then
+	if [[ "$age" -lt 0 ]]; then
 		# No time restriction
 
  		printf TRUE
