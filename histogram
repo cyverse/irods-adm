@@ -1,13 +1,5 @@
 #!/bin/bash
 
-set -e
-
-readonly ExecName=$(basename "$0")
-readonly SizeQuery="$*"
-
-readonly HIST_WID=60
-
-
 print_help()
 {
   cat <<EOF
@@ -19,6 +11,14 @@ should return a single column of sizes in bytes. The generated histogram will be
 base-2 logarithmically binned.
 EOF
 }
+
+
+set -e
+
+readonly ExecName=$(basename "$0")
+readonly SizeQuery="$*"
+
+readonly HIST_WID=60
 
 
 if [ -z "$SizeQuery" ]
