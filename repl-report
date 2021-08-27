@@ -68,10 +68,7 @@ main() {
 
 	local age="$DEFAULT_AGE"
 
-	local collection
-	local help
-	local version
-
+	local collection help version
 	while true; do
 		case "$1" in
 			-A|--age)
