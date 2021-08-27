@@ -27,7 +27,7 @@ then
   exit 1
 fi
 
-export PGHOST=irods-db3.iplantcollaborative.org
+export PGHOST
 export PGPORT=5432
 
 psql --quiet ICAT icat_reader <<EOF
