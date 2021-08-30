@@ -16,21 +16,24 @@ EOF
 set -e
 
 readonly ExecName=$(basename "$0")
-readonly SizeQuery="$*"
 
-readonly HIST_WID=60
+main()
+{
+  readonly SizeQuery="$*"
+
+  readonly HIST_WID=60
 
 
-if [ -z "$SizeQuery" ]
-then
-  print_help >&2
-  exit 1
-fi
+  if [ -z "$SizeQuery" ]
+  then
+    print_help >&2
+    exit 1
+  fi
 
-export PGHOST
-export PGPORT=5432
+  export PGHOST
+  export PGPORT=5432
 
-psql --quiet ICAT icat_reader <<EOF
+  psql --quiet ICAT icat_reader <<EOF
 \\pset footer off
 
 BEGIN;
@@ -97,3 +100,7 @@ SELECT
 
 ROLLBACK;
 EOF
+}
+
+
+main "$@"
