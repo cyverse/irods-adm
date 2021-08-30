@@ -3,10 +3,10 @@
 show_help() {
 	cat <<EOF
 
-$ExecName version $Version
+$EXEC_NAME version $VERSION
 
 Usage:
- $ExecName [options] CLASS-BASE
+ $EXEC_NAME [options] CLASS-BASE
 
 Reads the output of the \`repl\` command and groups the data objects that failed
 to replicate into different files based on the error that occurred.
@@ -55,19 +55,19 @@ EOF
 }
 
 
-readonly Version=4
+readonly VERSION=4
 
 set -o errexit -o nounset -o pipefail
 
-readonly ExecAbsPath=$(readlink --canonicalize "$0")
-readonly ExecName=$(basename "$ExecAbsPath")
+readonly EXEC_ABS_PATH=$(readlink --canonicalize "$0")
+readonly EXEC_NAME=$(basename "$EXEC_ABS_PATH")
 
 declare -a TempFiles
 
 
 main() {
 	local opts
-	if ! opts=$(getopt --name "$ExecName" --options hv --longoptions help,version -- "$@")
+	if ! opts=$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")
 	then
  		show_help >&2
 		return 1
@@ -108,7 +108,7 @@ main() {
 
 	if [[ -n "${version-}" ]]
 	then
-		printf '%s\n' "$Version"
+		printf '%s\n' "$VERSION"
 		return 0
 	fi
 
