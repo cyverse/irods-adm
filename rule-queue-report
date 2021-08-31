@@ -137,6 +137,7 @@ report_time_summary() {
 }
 
 
+# displays the portion of the report summarizing top per user rule counts
 report_user_summary() {
 	printf 'Total Rules by User\n'
 	summarize_users
