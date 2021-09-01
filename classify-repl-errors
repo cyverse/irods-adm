@@ -59,15 +59,15 @@ readonly VERSION=4
 
 set -o errexit -o nounset -o pipefail
 
-readonly EXEC_ABS_PATH=$(readlink --canonicalize "$0")
-readonly EXEC_NAME=$(basename "$EXEC_ABS_PATH")
+readonly EXEC_ABS_PATH="$(readlink --canonicalize "$0")"
+readonly EXEC_NAME="$(basename "$EXEC_ABS_PATH")"
 
 declare -a TempFiles
 
 
 main() {
 	local opts
-	if ! opts=$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")
+	if ! opts="$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")"
 	then
  		show_help >&2
 		return 1
@@ -137,13 +137,13 @@ process_input() {
 	local logBase="$1"
 
 	local errorsFile
-	errorsFile=$(mktemp)
+	errorsFile="$(mktemp)"
 	TempFiles+=("$errorsFile")
 
 	filter_errors | sort > "$errorsFile"
 
 	local errCnt
-	errCnt=$(wc --lines < "$errorsFile")
+	errCnt="$(wc --lines < "$errorsFile")"
 
 	display_error_count errors "$errCnt" "$errCnt"
 	classify_errors "$errorsFile" "$errCnt" "$logBase"
@@ -169,16 +169,16 @@ classify_errors() {
 	local logBase="$3"
 
 	local sPECnt
-	sPECnt=$(split_out_class \
+	sPECnt="$(split_out_class \
 		"$errorsFile" \
 		'^replUtil: srcPath \(.*\) does not exist$' \
 		'\1' \
-		"$logBase".src_path_errors)
+		"$logBase".src_path_errors)"
 
 	display_error_count 'source path errors' "$sPECnt" "$errCnt"
 
 	local replErrorsFile
-	replErrorsFile=$(mktemp)
+	replErrorsFile="$(mktemp)"
 	TempFiles+=("$replErrorsFile")
 
 	split_out_class "$errorsFile" '^replUtil: repl error for ' '' "$replErrorsFile" > /dev/null
@@ -186,7 +186,7 @@ classify_errors() {
 	classify_repl_errors "$replErrorsFile" "$errCnt" "$logBase"
 
 	local unclassifiedErrCnt
-	unclassifiedErrCnt=$(wc --lines < "$errorsFile")
+	unclassifiedErrCnt="$(wc --lines < "$errorsFile")"
 
 	display_error_count 'unclassified errors' "$unclassifiedErrCnt" "$errCnt"
 
@@ -203,50 +203,51 @@ classify_repl_errors() {
 	local logBase="$3"
 
 	local shrlCnt
-	shrlCnt=$(split_out_repl_class \
+	shrlCnt="$(split_out_repl_class \
 		"$replErrorsFile" \
 		-4000 \
 		SYS_HEADER_READ_LEN_ERR \
-		"$logBase".broken_conn)
+		"$logBase".broken_conn)"
 
 	local ssrCnt
-	ssrCnt+=$(split_out_repl_class \
+	ssrCnt+="$(split_out_repl_class \
 		"$replErrorsFile" \
 		-116104 \
 		'SYS_SOCK_READ_ERR, Connection reset by peer' \
-		"$logBase".broken_conn)
+		"$logBase".broken_conn)"
 
 	local bcCnt=$(( shrlCnt + ssrCnt ))
 
 	local sCLECnt
-	sCLECnt=$(split_out_repl_class "$replErrorsFile" -27000 SYS_COPY_LEN_ERR "$logBase".short_file)
+	sCLECnt="$(split_out_repl_class "$replErrorsFile" -27000 SYS_COPY_LEN_ERR "$logBase".short_file)"
 
 	local sSRTCnt
-	sSRTCnt=$(split_out_repl_class \
+	sSRTCnt="$(split_out_repl_class \
 		"$replErrorsFile" \
 		-115000 \
 		SYS_SOCK_READ_TIMEDOUT \
-		"$logBase".timeout)
+		"$logBase".timeout)"
 
 	local uSCECnt
-	uSCECnt=$(split_out_repl_class "$replErrorsFile" -305101 USER_SOCK_CONNECT_ERR "$logBase".network)
+	uSCECnt="$(\
+		split_out_repl_class "$replErrorsFile" -305101 USER_SOCK_CONNECT_ERR "$logBase".network )"
 
 	local uCMCnt
-	uCMCnt=$(split_out_repl_class \
+	uCMCnt="$(split_out_repl_class \
 		"$replErrorsFile" \
 		-314000 \
 		USER_CHKSUM_MISMATCH \
-		"$logBase".chksum_mismatches)
+		"$logBase".chksum_mismatches)"
 
 	local uFOECnt
-	uFOECnt=$(split_out_repl_class \
+	uFOECnt="$(split_out_repl_class \
 		"$replErrorsFile" \
 		-510002 \
 		'UNIX_FILE_OPEN_ERR, No such file or directory' \
-		"$logBase".missing_file)
+		"$logBase".missing_file)"
 
 	local unclassifiedReplErrCnt
-	unclassifiedReplErrCnt=$(wc --lines < "$replErrorsFile")
+	unclassifiedReplErrCnt="$(wc --lines < "$replErrorsFile")"
 
 	if [[ "$unclassifiedReplErrCnt" -gt 0 ]]
 	then
@@ -289,10 +290,10 @@ split_out_class() {
 	local classFile="$4"
 
 	local errors
-	errors=$(cat "$errorsFile")
+	errors="$(cat "$errorsFile")"
 
 	local classifiedErrors
-	classifiedErrors=$(sed --quiet "/$classifier/p" <<< "$errors")
+	classifiedErrors="$(sed --quiet "/$classifier/p" <<< "$errors")"
 
 	if [[ -n "$classifiedErrors" ]]
 	then
