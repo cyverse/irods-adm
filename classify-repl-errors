@@ -198,65 +198,55 @@ classify_errors() {
 
 
 classify_repl_errors() {
-	local replErrorsFile="$1"
+	local errorsFile="$1"
 	local totErrCnt="$2"
 	local logBase="$3"
 
-	local shrlCnt
-	shrlCnt="$(split_out_repl_class \
-		"$replErrorsFile" \
-		-4000 \
-		SYS_HEADER_READ_LEN_ERR \
-		"$logBase".broken_conn)"
-
-	local ssrCnt
-	ssrCnt+="$(split_out_repl_class \
-		"$replErrorsFile" \
-		-116104 \
-		'SYS_SOCK_READ_ERR, Connection reset by peer' \
-		"$logBase".broken_conn)"
-
-	local bcCnt=$(( shrlCnt + ssrCnt ))
+	local bcCnt
+	bcCnt="$(split_out_broken_conn_errs "$errorsFile" "$logBase")"
 
 	local sCLECnt
-	sCLECnt="$(split_out_repl_class "$replErrorsFile" -27000 SYS_COPY_LEN_ERR "$logBase".short_file)"
+	sCLECnt="$(split_out_repl_class "$errorsFile" -27000 SYS_COPY_LEN_ERR "$logBase".short_file)"
 
 	local sSRTCnt
-	sSRTCnt="$(split_out_repl_class \
-		"$replErrorsFile" \
-		-115000 \
-		SYS_SOCK_READ_TIMEDOUT \
-		"$logBase".timeout)"
+	sSRTCnt="$(\
+		split_out_repl_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$logBase".timeout )"
 
 	local uSCECnt
-	uSCECnt="$(\
-		split_out_repl_class "$replErrorsFile" -305101 USER_SOCK_CONNECT_ERR "$logBase".network )"
+	uSCECnt="$(split_out_repl_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$logBase".network )"
 
 	local uCMCnt
-	uCMCnt="$(split_out_repl_class \
-		"$replErrorsFile" \
-		-314000 \
-		USER_CHKSUM_MISMATCH \
-		"$logBase".chksum_mismatches)"
+	uCMCnt="$(\
+		split_out_repl_class \
+			"$errorsFile" -314000 USER_CHKSUM_MISMATCH "$logBase".chksum_mismatches )"
 
-	local uFOECnt
-	uFOECnt="$(split_out_repl_class \
-		"$replErrorsFile" \
-		-510002 \
-		'UNIX_FILE_OPEN_ERR, No such file or directory' \
-		"$logBase".missing_file)"
+	local uFOEMissingCnt
+	uFOEMissingCnt="$(\
+		split_out_repl_class \
+			"$errorsFile" \
+			-510002 \
+			'UNIX_FILE_OPEN_ERR, No such file or directory' \
+			"$logBase".missing_replicas )"
+
+   local uFOEFSErrCnt
+	uFOEFSErrCnt="$(\
+		split_out_repl_class \
+			"$errorsFile" \
+			-510117 \
+			'UNIX_FILE_OPEN_ERR, Structure needs cleaning' \
+			"$logBase".fs_errors )"
 
 	local unclassifiedReplErrCnt
-	unclassifiedReplErrCnt="$(wc --lines < "$replErrorsFile")"
+	unclassifiedReplErrCnt="$(wc --lines < "$errorsFile")"
 
-	if [[ "$unclassifiedReplErrCnt" -gt 0 ]]
-	then
-		mv "$replErrorsFile" "$logBase".unclassified_repl_errors
+	if (( unclassifiedReplErrCnt > 0 )); then
+		mv "$errorsFile" "$logBase".unclassified_repl_errors
 	fi
 
 	display_error_count 'broken connections' "$bcCnt" "$totErrCnt"
 	display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
-	display_error_count 'file open errors' "$uFOECnt" "$totErrCnt"
+	display_error_count 'file open errors' "$uFOEMissingCnt" "$totErrCnt"
+	display_error_count 'filesystem errors' "$uFOEFSErrCnt" "$totErrCnt"
 	display_error_count 'short files' "$sCLECnt" "$totErrCnt"
 	display_error_count 'network unreacable' "$uSCECnt" "$totErrCnt"
 	display_error_count timeouts "$sSRTCnt" "$totErrCnt"
@@ -270,6 +260,26 @@ display_error_count() {
 	local total="$3"
 
 	printf '%*d %s\n' "${#total}" "$count" "$label"
+}
+
+
+split_out_broken_conn_errs() {
+	local errorsFile="$1"
+	local logBase="$2"
+
+	local shrlCnt
+	shrlCnt="$(\
+		split_out_repl_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$logBase".broken_conn )"
+
+	local ssrCnt
+	ssrCnt+="$(\
+		split_out_repl_class \
+			"$errorsFile" \
+			-116104 \
+			'SYS_SOCK_READ_ERR, Connection reset by peer' \
+			"$logBase".broken_conn )"
+
+	echo $(( shrlCnt + ssrCnt ))
 }
 
 
