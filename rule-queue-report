@@ -123,6 +123,10 @@ report_running_rules() {
 }
 
 
+# displays the portion of the report that breaks down the number of rule
+# executions scheduled by rule
+# Parameters:
+#  reportWidth  the report row length in characters
 report_rule_summary() {
 	local reportWidth="$1"
 
@@ -131,15 +135,16 @@ report_rule_summary() {
 }
 
 
-# displays the portion of the report that breaks down the number of rules
-# scheduled for a given hour
+# displays the portion of the report that breaks down the number of rule
+# executions scheduled for a given hour
 report_time_summary() {
 	printf 'Total Rules by Scheduled Hour\n'
 	summarize_times
 }
 
 
-# displays the portion of the report summarizing top per user rule counts
+# displays the portion of the report that breaks down the number of rule
+# executions scheduled by user
 report_user_summary() {
 	printf 'Total Rules by User\n'
 	summarize_users
