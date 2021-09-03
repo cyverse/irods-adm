@@ -51,8 +51,8 @@ set -o errexit -o nounset -o pipefail
 
 export PGHOST PGPORT PGUSER
 
-readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly DEFAULT_AGE=1
+readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 
 declare Debug
 
