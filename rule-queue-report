@@ -94,6 +94,9 @@ main() {
 }
 
 
+# displays the portion of the report on the rules currently being run
+# Parameters:
+#  reportWidth  the report row length in characters
 report_running_rules() {
 	local reportWidth="$1"
 
