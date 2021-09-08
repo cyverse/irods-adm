@@ -37,24 +37,20 @@ selected log files on a given server.
 The program `session-intervals` can be used to extract session time intervals
 from a sequence of sessions.
 
-
 ## Monitoring
 
 The program `check_irods` checks to see if an iRODS service is online. It is
 intended for use with Nagios.
-
 
 ## Moving files to another resource
 
 The program `phymv` can be used to move groups of files from one resource to
 another more efficiently that `iphymv`.
 
-
 ## Repair
 
 The program `data-store-fix` can be used to detect and repair issues with the
 Data Store.
-
 
 ## Replication
 
@@ -69,7 +65,6 @@ errors by type.
 
 The program `get-replicas` looks up information on the replicas of a data
 object.
-
 
 ## Report generation
 
@@ -107,7 +102,6 @@ there is.
 The program `transfer-report` generates a report summarizing the amount of data
 uploaded and downloaded over a time period.
 
-
 ## Resources
 
 The program `resc-create-times` lists all of the root resources sorted by
@@ -115,7 +109,6 @@ creation time.
 
 The program `rm-resc` can be used to remove all of the files from a given
 resource.
-
 
 ## Synchronizing data object and file sizes
 
