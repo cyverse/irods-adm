@@ -1,7 +1,6 @@
 #!/bin/bash
 
-show_help()
-{
+show_help() {
   cat <<EOF
 
 $ExecName version $Version
@@ -33,8 +32,7 @@ readonly ExecName=$(basename "$0")
 readonly Version=3
 
 
-main()
-{
+main() {
   local opts
   if ! opts=$(getopt --name "$ExecName" --options hv --longoptions help,version -- "$@")
   then
@@ -97,8 +95,7 @@ format_report() {
 
 
 # Generate the report
-generate_report()
-{
+generate_report() {
   local irodsHost
   irodsHost=$(ienv | sed --quiet 's/^.*irods_host - //p')
 
@@ -250,8 +247,7 @@ EOS
 #
 # stdout:
 #   the resolved domain. This will be cname if cname isn't an alias.
-resolve_name()
-{
+resolve_name() {
   local cname="$1"
 
   local name=
@@ -272,8 +268,7 @@ resolve_name()
 }
 
 
-show_version()
-{
+show_version() {
   printf '%s\n' "$Version"
 }
 
