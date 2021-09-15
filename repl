@@ -366,7 +366,7 @@ replicate() {
 							"$maxThreads" \
 							"$untilTS" \
 							"$minSize" \
-							lastCohortMinSz \
+							"$lastCohortMinSz" \
 						< "$objList" )" 
 			fi
 
