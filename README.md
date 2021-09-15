@@ -2,6 +2,11 @@
 
 A collection of scripts for administering an iRODS grid
 
+## Chunked Data Set Transfer
+
+[`chunk-transfer`](/chunk-transfer/README.md) is a collection of programs for
+performing chunked data transfers from iRODS to a client.
+
 ## iRODS Sessions
 
 A session is a group of log messages that occurred during a single connection.
