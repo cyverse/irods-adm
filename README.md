@@ -107,4 +107,4 @@ The program `rm-resc` can be used to remove all of the files from a given resour
 The program `fsck-batch` can be used to find data objects that are out of sync with their files.
 
 The program `fix-file-size` can be used to set the sizes of a group of data objects with the sizes 
-of their respective files.
+of their respective replicas.
