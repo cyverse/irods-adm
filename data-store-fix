@@ -58,7 +58,7 @@ set -o errexit -o nounset -o pipefail
 export PGHOST PGPORT PGUSER
 
 readonly DEFAULT_AGE=0
-readonly EXEC_ABS_PATH="$(readlink --canonicalize "$0")"
+readonly EXEC_ABS_PATH="$(realpath --canonicalize-missing "$0")"
 readonly EXEC_NAME="$(basename "$EXEC_ABS_PATH")"
 readonly MAX_FIX_LOG_SIZE=16777216
 
