@@ -60,6 +60,7 @@ export PGHOST PGPORT PGUSER
 readonly DEFAULT_AGE=0
 readonly EXEC_ABS_PATH="$(readlink --canonicalize "$0")"
 readonly EXEC_NAME="$(basename "$EXEC_ABS_PATH")"
+readonly MAX_FIX_LOG_SIZE=16777216
 
 declare DEBUG
 
@@ -124,17 +125,16 @@ main() {
 
 	check_existing_instance
 
+	local fixLog
+	fixLog="$(mktemp)"
+
 	readonly ErrorLog="$(mktemp)"
+	
+	# shellcheck disable=SC2064
+	trap "rm --force '$fixLog' '$ErrorLog'" EXIT
 
-	display_problems | strip_noise | fix_problems 2>"$ErrorLog"
-
-	if [ -s "$ErrorLog" ]
-	then
-		printf '\n\nErrors Occuring While Attempting to Fix Problems\n\n'
-		cat "$ErrorLog"
-	fi
-
-	rm --force "$ErrorLog"
+	display_problems | strip_noise | fix_problems > "$fixLog" 2> "$ErrorLog"
+	generate_report "$fixLog" "$ErrorLog"
 }
 
 
@@ -169,6 +169,39 @@ check_existing_instance() {
 		fi
 	done
 }
+
+
+generate_report() {
+	local fixLog="$1"
+	local errLog="$2"
+
+	printf '\t%s DATA STORE REPAIR REPORT\n\n' "$CUTOFF_TIME"
+
+	local fixLogSize
+	fixLogSize="$(stat --format '%s' "$fixLog")"
+
+	if (( fixLogSize > MAX_FIX_LOG_SIZE ))
+	then
+		local reportHost
+		reportHost="$(hostname --fqdn)"
+
+		local reportLog=/tmp/"$EXEC_NAME"@"$CUTOFF_TIME".log
+		mv "$fixLog" "$reportLog"
+
+		printf '\n'
+		printf 'The itemized list of attempted repairs is too large to send by email. '
+		printf 'It may be found at %s:%s\n' "$reportHost" "$reportLog"
+	else
+		cat "$fixLog"
+	fi
+
+	if [[ -s "$errLog" ]]
+	then
+		printf '\n\nREPAIR ATTEMPT FAILURES\n\n'
+		cat "$errLog"
+	fi
+}
+
 
 inject_debug_stmt() {
 	local stmt="$*"
@@ -582,6 +615,7 @@ process_chksum_issue() {
 
 
 fix_collection_problems() {
+	printf '\nITEMIZED LIST OF COLLECTION REPAIR ATTEMPTS\n'
 	pass_hdr_thru
 
 	local cnt=0
@@ -623,6 +657,7 @@ fix_collection_problems() {
 
 
 fix_object_problems() {
+	printf '\nITEMIZED LIST OF DATA OBJECT REPAIR ATTEMPTS\n'
 	pass_hdr_thru
 
 	local cnt=0
