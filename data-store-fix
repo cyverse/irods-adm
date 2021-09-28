@@ -189,7 +189,7 @@ generate_report() {
 		mv "$fixLog" "$reportLog"
 
 		printf '\n'
-		printf 'The itemized list of attempted repairs is too large to send by email. '
+		printf 'The itemized lists of attempted repairs is too large to send by email. '
 		printf 'It may be found at %s:%s\n' "$reportHost" "$reportLog"
 	else
 		cat "$fixLog"
