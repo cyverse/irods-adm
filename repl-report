@@ -54,7 +54,7 @@ export PGHOST PGPORT PGUSER
 readonly DEFAULT_AGE=1
 readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 
-declare Debug
+declare DEBUG
 
 
 main() {
@@ -80,7 +80,7 @@ main() {
 				shift 2
 				;;
 			-d|--debug)
-				Debug=debug
+				DEBUG=debug
 				shift
 				;;
 				-h|--help)
@@ -113,6 +113,8 @@ main() {
 				;;
 		esac
 	done
+
+	readonly DEBUG
 
 	if [[ -n "${help-}" ]]; then
 		help
@@ -246,7 +248,7 @@ inject_debug_quiet() {
 inject_debug_stmt() {
 	local stmt="$*"
 
-	if [[ -n "${Debug-}" ]]; then
+	if [[ -n "${DEBUG-}" ]]; then
 		printf '%s\n' "$stmt"
 	fi
 }
