@@ -89,6 +89,9 @@ The program `list-rods-logs` can be used to list the iRODS log files on a given 
 
 The program `resource-report` generates a report on the size of the root resources.
 
+The program `rule-queue-report` generates a report describing the current state of the deferred rule
+execution queue.
+
 The program `sharing-report` generates a report on the amount of user data that has been shared.
 
 The program `transfer-report` generates a report summarizing the amount of data uploaded and 
