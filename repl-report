@@ -6,8 +6,11 @@ help() {
 $EXEC_NAME version $VERSION
 
 Usage:
- $EXEC_NAME [options]
-
+ $EXEC_NAME (-h|--help)
+ $EXEC_NAME (-v|--version)
+ $EXEC_NAME [-d|--debug][(-A|--age) AGE][(-C|--collection) COLLECTION]
+  [(-H|--host) HOST][(-P|--port) PORT][(-U|--user) USER]
+ 
 This program generates a report on the data objects in the home collections of
 the local zone that need to be replicated. An object needs to be replicated if
 it was created before a given day at midnight and has no replica yet. The report
