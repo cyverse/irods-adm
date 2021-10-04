@@ -58,33 +58,58 @@ declare DEBUG
 
 
 main() {
+	declare -A optMap=(
+		[help]=''
+		[version]=''
+		[age]="$DEFAULT_AGE"
+		[collection]='' )
+
+	if ! map_opts optMap "$@"; then
+		help >&2
+		return 1
+	fi
+
+	if [[ -n "${optMap[help]}" ]]; then
+		help
+		return 0
+	fi
+
+	if [[ -n "${optMap[version]}" ]]; then
+		printf '%s\n' "$VERSION"
+		return 0
+	fi
+
+	mk_report "${optMap[age]}" "${optMap[collection]}"
+}
+
+
+map_opts() {
+	local mapVar="$1"
+	shift
+
 	local opts
 	if ! opts="$(prep_opts "$@")"; then
-		help >&2
 		return 1
 	fi
 
 	eval set -- "$opts"
 
-	local age="$DEFAULT_AGE"
-
-	local collection help version
 	while true; do
 		case "$1" in
 			-A|--age)
-				age="$2"
+				eval "$mapVar"'[age]='"'$2'"
 				shift 2
 				;;
 			-C|--collection)
-				collection="$2"
+				eval "$mapVar"'[collection]='"'$2'"
 				shift 2
 				;;
 			-d|--debug)
 				DEBUG=debug
 				shift
 				;;
-				-h|--help)
-				help=help
+			-h|--help)
+				eval "$mapVar"'[help]=help'
 				shift
 				;;
 			-H|--host)
@@ -100,33 +125,17 @@ main() {
 				shift 2
 				;;
 			-v|--version)
-				version=version
+				eval "$mapVar"'[version]=version'
 				shift
 				;;
 			--)
 				shift
 				break
 				;;
-			*)
-				help >&2
-				return 1
-				;;
 		esac
 	done
 
 	readonly DEBUG
-
-	if [[ -n "${help-}" ]]; then
-		help
-		return 0
-	fi
-
-	if [[ -n "${version-}" ]]; then
-		printf '%s\n' "$VERSION"
-		return 0
-	fi
-
-	mk_report "$age" "${collection-}"
 }
 
 
