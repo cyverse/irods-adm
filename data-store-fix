@@ -68,8 +68,7 @@ declare DEBUG
 
 main() {
 	local opts
-	if ! opts="$(format_opts "$@")"
-	then
+	if ! opts="$(format_opts "$@")"; then
 		show_help >&2
 		return 1
 	fi
@@ -78,8 +77,7 @@ main() {
 
 	local age="$DEFAULT_AGE"
 
-	while true
-	do
+	while true; do
 		case "$1" in
 			-A|--age)
 				age="$2"
@@ -156,14 +154,12 @@ format_opts() {
 
 check_existing_instance() {
 	local pidofExec
-	if ! pidofExec="$(command -v pidof)"
-	then
+	if ! pidofExec="$(command -v pidof)"; then
 		pidofExec=/sbin/pidof
 	fi
 
 	currPid=$$
-	for pid in $("$pidofExec" -x "$EXEC_NAME")
-	do
+	for pid in $("$pidofExec" -x "$EXEC_NAME"); do
 		if [ "$pid" -ne $currPid ]; then
 			printf "\n%s already running at PID %s\n" "$EXEC_NAME" "$pid" 1>&2
 			printf "exiting\n\n" 1>&2
@@ -183,8 +179,7 @@ generate_report() {
 	local fixLogSize
 	fixLogSize="$(stat --format '%s' "$fixLog")"
 
-	if (( fixLogSize > MAX_FIX_LOG_SIZE ))
-	then
+	if (( fixLogSize > MAX_FIX_LOG_SIZE )); then
 		local reportHost
 		reportHost="$(hostname --fqdn)"
 
@@ -200,8 +195,7 @@ generate_report() {
 
 	printf '\n\nREPAIR ATTEMPT FAILURES\n\n'
 
-	if [[ -s "$errLog" ]]
-	then
+	if [[ -s "$errLog" ]]; then
 		cat "$errLog"
 	else
 		printf 'All of problems were fixed.\n'
@@ -212,8 +206,7 @@ generate_report() {
 inject_debug_stmt() {
 	local stmt="$*"
 
-	if [[ -n "${DEBUG-}" ]]
-	then
+	if [[ -n "${DEBUG-}" ]]; then
 		printf '%s\n' "$stmt"
 	fi
 }
@@ -364,12 +357,10 @@ EOF
 
 
 pass_hdr_thru() {
-	while read -r
-	do
+	while read -r; do
 		printf '%s\n' "$REPLY"
 
-		if [[ "$REPLY" =~ ^- ]]
-		then
+		if [[ "$REPLY" =~ ^- ]]; then
 			break
 		fi
 	done
@@ -390,14 +381,11 @@ unescape() {
 	local entity=
 	local escaped=0
 
-	for i in $(seq 0 $((${#escEntity} - 1)))
-	do
+	for i in $(seq 0 $(( ${#escEntity} - 1 ))); do
 		local curChar="${escEntity:$i:1}"
 
-		if [ $escaped -eq 1 ]
-		then
-			if [ "$curChar" = n ]
-			then
+		if [ $escaped -eq 1 ]; then
+			if [ "$curChar" = n ]; then
 				printf -v entity '%s\n' "$entity"
 			else
 				entity="$entity$curChar"
@@ -405,8 +393,7 @@ unescape() {
 
 			escaped=0
 		else
-			if [ "$curChar" = \\ ]
-			then
+			if [ "$curChar" = \\ ]; then
 				escaped=1
 			else
 				entity="$entity$curChar"
@@ -422,14 +409,11 @@ process_perm_issue() {
 	local issue="$1"
 	local entity="$2"
 
-	if [ "${issue// /}" = t ]
-	then
+	if [ "${issue// /}" = t ]; then
 		local err
-		if err="$(ichmod -M own rodsadmin "$entity" > /dev/null 2>&1)"
-		then
+		if err="$(ichmod -M own rodsadmin "$entity" > /dev/null 2>&1)"; then
 			printf '%s' "${issue/%  /✓ }"
-		elif [[ "$err" =~ CAT_INVALID_ARGUMENT ]]
-		then
+		elif [[ "$err" =~ CAT_INVALID_ARGUMENT ]]; then
 			printf '%s' "${issue/%  /👻 }"
 		else
 			printf '%s' "${issue/%  /✗ }"
@@ -450,23 +434,20 @@ process_uuid_issue() {
 	uuidCntField="${uuidCnt#  }"
 	declare -i cnt=$uuidCntField
 
-	if [[ $cnt -eq 1 ]]
-	then
+	if [[ $cnt -eq 1 ]]; then
 		printf '%s  ' "$uuidCntField"
 		return 0
 	fi
 
 	local imetaFlag
-	if [ "$entityType" = coll ]
-	then
+	if [ "$entityType" = coll ]; then
 		local imetaFlag=-C
 	else
 		local imetaFlag=-d
 	fi
 
 	local statusMsg
-	if [[ $cnt -eq 0 ]]
-	then
+	if [[ $cnt -eq 0 ]]; then
 		statusMsg="$(add_missing_uuid "$entity" "$imetaFlag")"
 	else
 		statusMsg="$(rm_extra_uuids "$entity" "$imetaFlag")"
@@ -497,12 +478,10 @@ add_missing_uuid() {
 	uuid="$(uuidgen -t)"
 
 	local err
-	if err="$(imeta set "$imetaFlag" "$entity" ipc_UUID "$uuid" 2>&1)"
-	then
+	if err="$(imeta set "$imetaFlag" "$entity" ipc_UUID "$uuid" 2>&1)"; then
 		printf SUCCESS
 	else
-		if [[ "$err" =~ (CAT_UNKNOWN_COLLECTION|CAT_UNKNOWN_FILE) ]]
-		then
+		if [[ "$err" =~ (CAT_UNKNOWN_COLLECTION|CAT_UNKNOWN_FILE) ]]; then
 			printf MISSING
 			return 1
 		else
@@ -520,12 +499,10 @@ rm_extra_uuids() {
 	local failed
 
 	local uuidMap
-	if ! uuidMap="$(get_meta_id_uuid_map "$entity" "$imetaFlag" 2>&1)"
-	then
+	if ! uuidMap="$(get_meta_id_uuid_map "$entity" "$imetaFlag" 2>&1)"; then
 		failed=failed
 
-		if [[ "$uuidMap" = UNKNOWN_ENTITY ]]
-		then
+		if [[ "$uuidMap" = UNKNOWN_ENTITY ]]; then
 			printf MISSING
 		else
 			echo "$uuidMap" >&2
@@ -534,25 +511,21 @@ rm_extra_uuids() {
 		local cnt=0
 
 		local uuid
-		while read -r _ uuid
-		do
+		while read -r _ uuid; do
 			# The first UUID created will have the first DB Id
-			if [[ $(( ++cnt )) -gt 1 ]]
-			then
-				if ! imeta rm "$imetaFlag" "$entity" ipc_UUID "$uuid"
-				then
+			if [[ $(( ++cnt )) -gt 1 ]]; then
+				if ! imeta rm "$imetaFlag" "$entity" ipc_UUID "$uuid"; then
 					failed=failed
 				fi
 			fi
 		done <<< "$uuidMap"
 	fi
 
-	if [[ -z "${failed-}" ]]
-	then
+	if [[ -z "${failed-}" ]]; then
 		printf SUCCESS
 	else
 		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
-  fi
+	fi
 }
 
 
@@ -562,21 +535,18 @@ get_meta_id_uuid_map() {
 	local imetaFlag="$2"
 
 	local query
-	if [[ "$imetaFlag" = -C ]]
-	then
+	if [[ "$imetaFlag" = -C ]]; then
 		query="$(mk_coll_uuid_query "$entityPath")"
 	else
 		query="$(mk_data_uuid_query "$(dirname "$entityPath")" "$(basename "$entityPath")")"
 	fi
 
 	local results
-	if ! results="$(iquest --no-page '%s %s' "$query")"
-	then
+	if ! results="$(iquest --no-page '%s %s' "$query")"; then
 		return 1
 	fi
 
-	if [[ "$results" =~ CAT_NO_ROWS_FOUND ]]
-	then
+	if [[ "$results" =~ CAT_NO_ROWS_FOUND ]]; then
 		printf UNKNOWN_ENTITY >&2
 		return 1
 	fi
@@ -611,21 +581,17 @@ process_chksum_issue() {
 	local repl="$2"
 	local obj="$3"
 
-	if [ "${issue// /}" = t ]
-	then
+	if [ "${issue// /}" = t ]; then
 		local err retCode
 		err="$(ichksum --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
 		retCode="$?"
 
-		if [[ "$err" =~ 'does not exist' ]]
-		then
+		if [[ "$err" =~ 'does not exist' ]]; then
 			printf '%s' "${issue/%  /👻 }"
-		elif [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]
-		then
+		elif [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]; then
 			printf '%s' "${issue/%  /✓ }"
 		else
-			if [[ -n "$err" ]]
-			then
+			if [[ -n "$err" ]]; then
 				echo "$err" >&2
 			fi
 
@@ -648,10 +614,8 @@ fix_collection_problems() {
 	local owner
 	local createTime
 	local collField
-	while IFS='|' read -r permIssue uuidCnt owner createTime collField
-	do
-		if [ -z "$collField" ]
-		then
+	while IFS='|' read -r permIssue uuidCnt owner createTime collField; do
+		if [ -z "$collField" ]; then
 			break
 		fi
 
@@ -661,13 +625,11 @@ fix_collection_problems() {
 		local coll
 		coll="$(unescape "$escColl")"
 
-		if ! permIssue="$(process_perm_issue "$permIssue" "$coll")"
-		then
+		if ! permIssue="$(process_perm_issue "$permIssue" "$coll")"; then
 			continue
 		fi
 
-		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" coll "$coll")"
-		then
+		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" coll "$coll")"; then
 			continue
 		fi
 
@@ -685,10 +647,8 @@ fix_object_problems() {
 	local cnt=0
 
 	local permIssue missingChksum uuidCnt owner replField createTime objField
-	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField
-	do
-		if [ -z "$objField" ]
-		then
+	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField; do
+		if [ -z "$objField" ]; then
 			break
 		fi
 
@@ -701,25 +661,22 @@ fix_object_problems() {
 		local repl
 		repl="$(trim "$replField")"
 
-		if ! permIssue="$(process_perm_issue "$permIssue" "$obj")"
-		then
+		if ! permIssue="$(process_perm_issue "$permIssue" "$obj")"; then
 			continue
 		fi
 
-		if ! missingChksum="$(process_chksum_issue "$missingChksum" "$repl" "$obj")"
-		then
+		if ! missingChksum="$(process_chksum_issue "$missingChksum" "$repl" "$obj")"; then
 			continue
 		fi
 
-		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" obj "$obj")"
-		then
+		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" obj "$obj")"; then
 			continue
 		fi
 
 		printf '%s|%s|%s|%s|%s|%s|%s\n' \
 			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
 
-		cnt=$((cnt + 1))
+		cnt=$(( cnt + 1 ))
 	done
 
 	printf '(%d rows)' "$cnt"
@@ -727,8 +684,7 @@ fix_object_problems() {
 
 
 fix_problems() {
-	while IFS= read -r
-	do
+	while IFS= read -r; do
 		printf '%s\n' "$REPLY"
 
 		case "$REPLY" in
@@ -746,10 +702,8 @@ fix_problems() {
 
 
 strip_noise() {
-	while IFS= read -r
-	do
-		if [[ -n "${DEBUG-}" ]]
-		then
+	while IFS= read -r; do
+		if [[ -n "${DEBUG-}" ]]; then
 			printf '%s\n' "$REPLY"
 		else
 			case "$REPLY" in
