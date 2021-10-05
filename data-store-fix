@@ -132,7 +132,8 @@ main() {
 	# shellcheck disable=SC2064
 	trap "rm --force '$fixLog' '$ErrorLog'" EXIT
 
-	display_problems | strip_noise | fix_problems > "$fixLog" 2> "$ErrorLog"
+	trap true SIGINT SIGTERM
+	display_problems | strip_noise | fix_problems > "$fixLog" 2> "$ErrorLog" || true
 	generate_report "$fixLog" "$ErrorLog"
 }
 
