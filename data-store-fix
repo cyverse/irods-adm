@@ -57,6 +57,8 @@ set -o errexit -o nounset -o pipefail
 
 export PGHOST PGPORT PGUSER
 
+readonly COLL_TABLE_TITLE='Collection Repair Attempts'
+readonly DATA_TABLE_TITLE='Data Object Repair Attempts'
 readonly DEFAULT_AGE=0
 readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly MAX_FIX_LOG_SIZE=16777216
@@ -175,7 +177,8 @@ generate_report() {
 	local fixLog="$1"
 	local errLog="$2"
 
-	printf '\t%s DATA STORE REPAIR REPORT\n\n' "$CUTOFF_TIME"
+	printf '\t%s DATA STORE REPAIR REPORT\n\n\n' "$CUTOFF_TIME"
+	printf 'ITEMIZED REPAIR ATTEMPTS\n\n'
 
 	local fixLogSize
 	fixLogSize="$(stat --format '%s' "$fixLog")"
@@ -195,10 +198,13 @@ generate_report() {
 		cat "$fixLog"
 	fi
 
+	printf '\n\nREPAIR ATTEMPT FAILURES\n\n'
+
 	if [[ -s "$errLog" ]]
 	then
-		printf '\n\nREPAIR ATTEMPT FAILURES\n\n'
 		cat "$errLog"
+	else
+		printf 'All of problems were fixed.\n'
 	fi
 }
 
@@ -223,6 +229,22 @@ inject_debug_msg() {
 
 	inject_debug_newline
 	inject_debug_stmt "\\echo '$msg'"
+}
+
+
+inject_set_title() {
+	local title="$*"
+
+	inject_debug_quiet on
+	printf $'\pset title \'%s\'\n' "$title"
+	inject_debug_quiet off
+}
+
+
+inject_debug_quiet() {
+	local state="$1"
+
+	printf $'\\set QUIET %s\n' "$state"
 }
 
 
@@ -299,8 +321,7 @@ FROM r_data_main
 WHERE create_ts < '$cutoffTS' AND (data_checksum IS NULL OR data_checksum = '');
 
 $(inject_debug_newline)
-\echo '1. Problem Collections Created Before $CUTOFF_TIME:'
-\echo ''
+$(inject_set_title $COLL_TABLE_TITLE)
 SELECT
 	coll_id IN (SELECT * FROM coll_perm_probs)                           AS "Permission Issue",
 	COALESCE((SELECT cu.uuid_count FROM coll_uuid_probs AS cu WHERE cu.coll_id = c.coll_id), 1)
@@ -316,8 +337,7 @@ WHERE coll_id IN (SELECT * FROM coll_perm_probs UNION SELECT coll_id FROM coll_u
 ORDER BY create_ts;
 
 \echo ''
-\echo '2. Problem Data Objects Created Before $CUTOFF_TIME:'
-\echo ''
+$(inject_set_title $DATA_TABLE_TITLE)
 SELECT
 	d.data_id IN (SELECT * FROM data_perm_probs)     AS "Permission Issue",
 	d.data_checksum IS NULL OR d.data_checksum = ''  AS "Missing Checksum",
@@ -344,10 +364,14 @@ EOF
 
 
 pass_hdr_thru() {
-	for i in {1..3}
+	while read -r
 	do
-		read -r
 		printf '%s\n' "$REPLY"
+
+		if [[ "$REPLY" =~ ^- ]]
+		then
+			break
+		fi
 	done
 }
 
@@ -615,7 +639,6 @@ process_chksum_issue() {
 
 
 fix_collection_problems() {
-	printf '\nITEMIZED LIST OF COLLECTION REPAIR ATTEMPTS\n'
 	pass_hdr_thru
 
 	local cnt=0
@@ -657,7 +680,6 @@ fix_collection_problems() {
 
 
 fix_object_problems() {
-	printf '\nITEMIZED LIST OF DATA OBJECT REPAIR ATTEMPTS\n'
 	pass_hdr_thru
 
 	local cnt=0
@@ -707,15 +729,16 @@ fix_object_problems() {
 fix_problems() {
 	while IFS= read -r
 	do
+		printf '%s\n' "$REPLY"
+
 		case "$REPLY" in
-			1.*)
+			*"$COLL_TABLE_TITLE")
 				fix_collection_problems
 				;;
-			2.*)
+			*"$DATA_TABLE_TITLE")
 				fix_object_problems
 				;;
 			*)
-				printf '%s\n' "$REPLY"
 				;;
 		esac
 	done
