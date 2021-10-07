@@ -6,10 +6,10 @@ show_help() {
 $EXEC_NAME version $VERSION
 
 Usage:
- $EXEC_NAME [-d|--debug | (-A|--age) AGE | (-U|--db-user) DB-USER |
-    (-H|--dbms-host) DBMS-HOST | (-P|--dbms-port) DBMS-PORT]...
  $EXEC_NAME -h|--help
  $EXEC_NAME -v|--version
+ $EXEC_NAME [-d|--debug | (-A|--age) AGE | (-U|--db-user) DB-USER |
+    (-H|--dbms-host) DBMS-HOST | (-P|--dbms-port) DBMS-PORT]...
 
 This program fixes the following three common problems that happen when an 
 upload fails.
@@ -51,7 +51,7 @@ EOF
 }
 
 
-readonly VERSION=4
+readonly VERSION=5
 
 set -o errexit -o nounset -o pipefail
 
@@ -77,6 +77,7 @@ main() {
 
 	local age="$DEFAULT_AGE"
 
+	local help version
 	while true; do
 		case "$1" in
 			-A|--age)
@@ -100,12 +101,12 @@ main() {
 				shift
 				;;
 			-h|--help)
-				show_help
-				return 0
+				help=help
+				shift
 				;;
 			-v|--version)
-				printf '%s\n' "$VERSION"
-				return 0
+				version=version
+				shift
 				;;
 			--)
  				shift
@@ -115,6 +116,16 @@ main() {
 	done
 
 	readonly DEBUG
+
+	if [[ -n "${help-}" ]]; then
+		show_help
+		return 0
+	fi
+
+	if [[ -n "${version-}" ]]; then
+		printf '%s\n' "$VERSION"
+		return 0
+	fi
 
 	local cutoffTime
 	cutoffTime="$(date --iso-8601 --date "$age days ago")"
