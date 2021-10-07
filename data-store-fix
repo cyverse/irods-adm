@@ -116,7 +116,8 @@ main() {
 
 	readonly DEBUG
 
-	readonly CUTOFF_TIME="$(date --iso-8601 --date "$age days ago")"
+	local cutoffTime
+	cutoffTime="$(date --iso-8601 --date "$age days ago")"
 
 	check_existing_instance
 
@@ -129,8 +130,8 @@ main() {
 	trap "rm --force '$fixLog' '$ErrorLog'" EXIT
 
 	trap true SIGINT SIGTERM
-	display_problems | strip_noise | fix_problems > "$fixLog" 2> "$ErrorLog" || true
-	generate_report "$fixLog" "$ErrorLog"
+	display_problems "$cutoffTime" | strip_noise | fix_problems > "$fixLog" 2> "$ErrorLog" || true
+	generate_report "$cutoffTime" "$fixLog" "$ErrorLog"
 }
 
 
@@ -166,10 +167,11 @@ check_existing_instance() {
 
 
 generate_report() {
-	local fixLog="$1"
-	local errLog="$2"
+	local cutoffTime="$1"
+	local fixLog="$2"
+	local errLog="$3"
 
-	printf '\t%s DATA STORE REPAIR REPORT\n\n\n' "$CUTOFF_TIME"
+	printf '\t%s DATA STORE REPAIR REPORT\n\n\n' "$cutoffTime"
 	printf 'ITEMIZED REPAIR ATTEMPTS\n\n'
 
 	local fixLogSize
@@ -179,7 +181,7 @@ generate_report() {
 		local reportHost
 		reportHost="$(hostname --fqdn)"
 
-		local reportLog=/tmp/"$EXEC_NAME"@"$CUTOFF_TIME".log
+		local reportLog=/tmp/"$EXEC_NAME"@"$cutoffTime".log
 		mv "$fixLog" "$reportLog"
 
 		printf '\n'
@@ -238,8 +240,10 @@ inject_debug_quiet() {
 
 
 display_problems() {
+	local cutoffTime="$1"
+
 	local cutoffTS
-	cutoffTS="$(date --date="$CUTOFF_TIME" '+0%s')"
+	cutoffTS="$(date --date="$cutoffTime" '+0%s')"
 
 	psql ICAT <<EOF
 $(inject_debug_stmt '\timing on')
