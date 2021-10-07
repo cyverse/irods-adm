@@ -140,7 +140,7 @@ main() {
 	# shellcheck disable=SC2064
 	trap "rm --force '$fixLog' '$ErrorLog'" EXIT
 
-	trap true SIGINT SIGTERM
+	trap 'if [[ "${FUNCNAME[0]}" != main ]]; then return; fi' SIGINT SIGTERM
 	display_problems "$cutoffTime" | strip_noise | fix_problems > "$fixLog" 2> "$ErrorLog" || true
 	generate_report "$cutoffTime" "$fixLog" "$ErrorLog"
 }
@@ -207,7 +207,7 @@ generate_report() {
 	if [[ -s "$errLog" ]]; then
 		cat "$errLog"
 	else
-		printf 'All of problems were fixed.\n'
+		printf 'All problems were fixed.\n'
 	fi
 }
 
@@ -618,7 +618,14 @@ process_chksum_issue() {
 fix_collection_problems() {
 	pass_hdr_thru
 
-	local cnt=0
+	CollCnt=0
+
+	trap \
+		$'
+			if [[ "${FUNCNAME[0]}" == fix_collection_problems ]]; then 
+				printf \'(%d rows)\' "$CollCnt"
+			fi ' \
+		EXIT RETURN
 
 	local permIssue
 	local uuidCnt
@@ -645,17 +652,19 @@ fix_collection_problems() {
 		fi
 
 		printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
-		cnt=$((cnt + 1))
+		: $(( CollCnt++ ))
 	done
-
-	printf '(%d rows)' "$cnt"
 }
 
 
 fix_object_problems() {
 	pass_hdr_thru
 
-	local cnt=0
+	ObjCnt=0
+
+	trap \
+		$'if [[ "${FUNCNAME[0]}" == fix_object_problems ]]; then printf \'(%d rows)\' "$ObjCnt"; fi' \
+		EXIT RETURN
 
 	local permIssue missingChksum uuidCnt owner replField createTime objField
 	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField; do
@@ -687,10 +696,8 @@ fix_object_problems() {
 		printf '%s|%s|%s|%s|%s|%s|%s\n' \
 			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
 
-		cnt=$(( cnt + 1 ))
+		: $(( ObjCnt++ ))	
 	done
-
-	printf '(%d rows)' "$cnt"
 }
 
 
