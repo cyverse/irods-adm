@@ -314,7 +314,7 @@ FROM r_data_main
 WHERE create_ts < '$cutoffTS' AND (data_checksum IS NULL OR data_checksum = '');
 
 $(inject_debug_newline)
-$(inject_set_title $COLL_TABLE_TITLE)
+$(inject_set_title "$COLL_TABLE_TITLE")
 SELECT
 	coll_id IN (SELECT * FROM coll_perm_probs)                           AS "Permission Issue",
 	COALESCE((SELECT cu.uuid_count FROM coll_uuid_probs AS cu WHERE cu.coll_id = c.coll_id), 1)
@@ -330,7 +330,7 @@ WHERE coll_id IN (SELECT * FROM coll_perm_probs UNION SELECT coll_id FROM coll_u
 ORDER BY create_ts;
 
 \echo ''
-$(inject_set_title $DATA_TABLE_TITLE)
+$(inject_set_title "$DATA_TABLE_TITLE")
 SELECT
 	d.data_id IN (SELECT * FROM data_perm_probs)     AS "Permission Issue",
 	d.data_checksum IS NULL OR d.data_checksum = ''  AS "Missing Checksum",
