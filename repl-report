@@ -237,44 +237,6 @@ EOSQL
 }
 
 
-inject_debug_msg() {
-	local msg="$*"
-
-	inject_debug_newline
-	inject_debug_stmt "\echo '$msg'"
-}
-
-
-inject_debug_newline() {
-	inject_debug_stmt \\echo
-}
-
-
-inject_debug_quiet() {
-	local state="$1"
-
-	inject_debug_stmt \\set QUIET "$state"
-}
-
-
-inject_debug_stmt() {
-	local stmt="$*"
-
-	if [[ -n "${DEBUG-}" ]]; then
-		printf '%s\n' "$stmt"
-	fi
-}
-
-
-inject_set_title() {
-	local title="$*"
-
-	inject_debug_quiet on
-	printf $'\pset title \'%s\'\n' "$title"
-	inject_debug_quiet off
-}
-
-
 inject_collection_restriction() {
 	local table="$1"
 	local collection="$2"
@@ -309,6 +271,44 @@ inject_time_restriction() {
 		local supCreateTs
 		supCreateTs="$(date --date "$supCreateDate" '+%s')"
 		printf $'%s.create_ts < \'%011d\'' "$table" "$supCreateTs"
+	fi
+}
+
+
+inject_set_title() {
+	local title="$*"
+
+	inject_debug_quiet on
+	printf $'\pset title \'%s\'\n' "$title"
+	inject_debug_quiet off
+}
+
+
+inject_debug_quiet() {
+	local state="$1"
+
+	inject_debug_stmt \\set QUIET "$state"
+}
+
+
+inject_debug_msg() {
+	local msg="$*"
+
+	inject_debug_newline
+	inject_debug_stmt "\echo '$msg'"
+}
+
+
+inject_debug_newline() {
+	inject_debug_stmt \\echo
+}
+
+
+inject_debug_stmt() {
+	local stmt="$*"
+
+	if [[ -n "${DEBUG-}" ]]; then
+		printf '%s\n' "$stmt"
 	fi
 }
 
