@@ -115,22 +115,15 @@ CREATE INDEX private_project_data_idx ON private_project_data(project);
 \\pset title 'Public and Private Data Volume for Projects'	
 SELECT 
 	COALESCE(pub.project, priv.project) AS "Project",
-	COALESCE(
-			CASE WHEN pub.volume >= 10 * 2^30 
-				THEN ROUND(pub.volume / 2^30) 
-				ELSE TO_CHAR(pub.volume / 2^30, '9.9EEEE')::NUMERIC END, 
-			0 ) 
-		AS "Public Volume (GiB)",
-	COALESCE(
-			CASE WHEN priv.volume >= 10 * 2^30 
-				THEN ROUND(priv.volume / 2^30) 
-				ELSE TO_CHAR(priv.volume / 2^30, '9.9EEEE')::NUMERIC END, 
-			0 ) 
-		AS "Private Volume (GiB)"
+	ROUND(COALESCE(pub.volume / 2^30, 0)::NUMERIC, 3) AS "Public Volume (GiB)",
+	ROUND(COALESCE(priv.volume / 2^30, 0)::NUMERIC, 3) AS "Private Volume (GiB)"
 FROM (SELECT project, SUM(data_size) AS volume FROM public_project_data GROUP BY project) AS pub
-FULL JOIN (SELECT project, SUM(data_size) AS volume FROM private_project_data GROUP BY project) 
-	AS priv 
-ON priv.project = pub.project;
+	FULL JOIN (
+				SELECT project, SUM(data_size) AS volume FROM private_project_data GROUP BY project
+			) AS priv 
+		ON priv.project = pub.project
+ORDER BY 1;
+
 
 ROLLBACK;
 SQL
