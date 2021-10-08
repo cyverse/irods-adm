@@ -1,0 +1,166 @@
+#!/bin/bash
+#
+# This program generates a report on the amount of public and private data each 
+# project has in CyVerseRes.  
+
+set -o errexit -o nounset -o pipefail
+
+export PGHOST PGPORT PGUSER
+
+readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
+
+
+main() {
+	local opts
+	if ! opts="$(prep_opts "$@")"; then
+		return 1
+	fi
+
+	eval set -- "$opts"
+
+	while true; do
+		case "$1" in
+			-H|--host)
+				PGHOST="$2"
+				shift 2
+				;;
+			-P|--port)
+				PGPORT="$2"
+				shift 2
+				;;
+			-U|--user)
+				PGUSER="$2"
+				shift 2
+				;;
+			--)
+				shift
+				break
+		esac
+	done
+
+	local resources="$@"
+
+	gen_report "$(get_local_zone)" "$resources"
+}
+
+
+prep_opts() {
+	getopt --longoptions host:,port:,user: --options H:P:U: --name "$EXEC_NAME" -- "$@"
+}
+
+
+gen_report() {
+	local zone="$1"
+	local rootRescs="$2"
+
+	psql --quiet ICAT <<SQL
+\\pset footer off
+
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+
+CREATE TEMPORARY TABLE storage_resources (id) ON COMMIT DROP AS
+WITH RECURSIVE resc_hier(resc_id, resc_net) AS (
+	SELECT resc_id, resc_net 
+		FROM r_resc_main
+		WHERE resc_name IN ($(fmt_sql_list "$rootRescs"))
+	UNION SELECT m.resc_id, m.resc_net
+		FROM resc_hier AS h JOIN r_resc_main AS m ON m.resc_parent = h.resc_id::TEXT
+		WHERE h.resc_net = 'EMPTY_RESC_HOST' )
+SELECT resc_id FROM resc_hier;
+
+CREATE INDEX storage_resources_idx ON storage_resources(id);
+
+
+CREATE TEMPORARY TABLE public_objects (id) ON COMMIT DROP AS
+SELECT object_id
+FROM r_objt_access
+WHERE user_id = (SELECT user_id FROM r_user_main WHERE user_name = 'public');
+
+CREATE INDEX public_objects_idx ON public_objects(id);
+
+
+CREATE TEMPORARY TABLE project_data (project, coll_id, data_id, data_size) ON COMMIT DROP AS
+SELECT 
+	REGEXP_REPLACE(c.coll_name, '/$zone/home/shared/([^/]+).*', E'\\\\1'), 
+	d.coll_id,
+	d.data_id, 
+	d.data_size
+FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
+WHERE c.coll_name LIKE '/$zone/home/shared/%'
+	AND c.coll_name NOT SIMILAR TO '/$zone/home/shared/commons_repo(/%)?'
+	AND d.resc_id IN (SELECT id FROM storage_resources);
+
+CREATE INDEX project_data_coll_data_idx ON project_data(coll_id, data_id);
+CREATE INDEX project_data_data_idx ON project_data(data_id);
+
+
+CREATE TEMPORARY TABLE public_project_data (project, data_id, data_size) ON COMMIT DROP AS
+SELECT project, data_id, data_size
+FROM project_data
+WHERE coll_id IN (SELECT id FROM public_objects) AND data_id IN (SELECT id FROM public_objects);
+
+CREATE INDEX public_project_data_data_idx ON public_project_data(data_id);
+CREATE INDEX public_project_data_project_idx ON public_project_data(project);
+
+
+CREATE TEMPORARY TABLE private_project_data (project, data_size) ON COMMIT DROP AS
+SELECT project, data_size 
+FROM project_data 
+WHERE data_id NOT IN (SELECT data_id FROM public_project_data);
+
+CREATE INDEX private_project_data_idx ON private_project_data(project);
+
+
+\\pset title 'Public and Private Data Volume for Projects'	
+SELECT 
+	COALESCE(pub.project, priv.project) AS "Project",
+	COALESCE(
+			CASE WHEN pub.volume >= 10 * 2^30 
+				THEN ROUND(pub.volume / 2^30) 
+				ELSE TO_CHAR(pub.volume / 2^30, '9.9EEEE')::NUMERIC END, 
+			0 ) 
+		AS "Public Volume (GiB)",
+	COALESCE(
+			CASE WHEN priv.volume >= 10 * 2^30 
+				THEN ROUND(priv.volume / 2^30) 
+				ELSE TO_CHAR(priv.volume / 2^30, '9.9EEEE')::NUMERIC END, 
+			0 ) 
+		AS "Private Volume (GiB)"
+FROM (SELECT project, SUM(data_size) AS volume FROM public_project_data GROUP BY project) AS pub
+FULL JOIN (SELECT project, SUM(data_size) AS volume FROM private_project_data GROUP BY project) 
+	AS priv 
+ON priv.project = pub.project;
+
+ROLLBACK;
+SQL
+}
+
+
+fmt_sql_list() {
+	local elmts
+	readarray -t elmts <<< "$@"
+
+	local list=''
+
+	local elmt
+	for elmt in ${elmts[@]}; do
+		if [[ -n "$list" ]]; then
+			list+=', '
+		fi
+
+		list+="'$elmt'"
+	done
+
+	echo "$list"
+}
+
+
+get_local_zone() {
+	psql --no-align --tuples-only \
+		--command="SELECT zone_name FROM r_zone_main WHERE zone_type_name = 'local'" \
+		ICAT
+}
+
+
+main "$@"
