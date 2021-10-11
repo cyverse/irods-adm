@@ -87,6 +87,9 @@ proxy.
 
 The program `list-rods-logs` can be used to list the iRODS log files on a given server.
 
+The program `project-storage-report` reports the amount of storage each project has used during each
+year.
+
 The program `resource-report` generates a report on the size of the root resources.
 
 The program `rule-queue-report` generates a report describing the current state of the deferred rule
