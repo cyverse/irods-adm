@@ -87,6 +87,9 @@ proxy.
 
 The program `list-rods-logs` can be used to list the iRODS log files on a given server.
 
+The project `project-current-usage-report` reports the amount of public and private data each 
+project currently has on a given set of resources.
+
 The program `project-storage-report` reports the amount of storage each project has used during each
 year.
 
