@@ -53,11 +53,14 @@ gen_report() {
 	local zone="$1"
 	local rootRescs="$2"
 
-	psql --quiet ICAT <<SQL
+	psql ICAT <<SQL
 \\pset footer off
+\\timing on
 
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
+
+\\echo Determining storage resources
 
 CREATE TEMPORARY TABLE storage_resources (id) ON COMMIT DROP AS
 WITH RECURSIVE resc_hier(resc_id, resc_net) AS (
@@ -72,13 +75,7 @@ SELECT resc_id FROM resc_hier;
 CREATE INDEX storage_resources_idx ON storage_resources(id);
 
 
-CREATE TEMPORARY TABLE public_objects (id) ON COMMIT DROP AS
-SELECT object_id
-FROM r_objt_access
-WHERE user_id = (SELECT user_id FROM r_user_main WHERE user_name = 'public');
-
-CREATE INDEX public_objects_idx ON public_objects(id);
-
+\\echo Determing project data
 
 CREATE TEMPORARY TABLE project_data (project, coll_id, data_id, data_size) ON COMMIT DROP AS
 SELECT 
@@ -95,6 +92,21 @@ CREATE INDEX project_data_coll_data_idx ON project_data(coll_id, data_id);
 CREATE INDEX project_data_data_idx ON project_data(data_id);
 
 
+DROP TABLE storage_resources;
+
+
+\\echo Determining publicly accessible objects
+
+CREATE TEMPORARY TABLE public_objects (id) ON COMMIT DROP AS
+SELECT object_id
+FROM r_objt_access
+WHERE user_id = (SELECT user_id FROM r_user_main WHERE user_name = 'public');
+
+CREATE INDEX public_objects_idx ON public_objects(id);
+
+
+\\echo Determining public project data
+
 CREATE TEMPORARY TABLE public_project_data (project, data_id, data_size) ON COMMIT DROP AS
 SELECT project, data_id, data_size
 FROM project_data
@@ -104,25 +116,24 @@ CREATE INDEX public_project_data_data_idx ON public_project_data(data_id);
 CREATE INDEX public_project_data_project_idx ON public_project_data(project);
 
 
-CREATE TEMPORARY TABLE private_project_data (project, data_size) ON COMMIT DROP AS
-SELECT project, data_size 
-FROM project_data 
-WHERE data_id NOT IN (SELECT data_id FROM public_project_data);
-
-CREATE INDEX private_project_data_idx ON private_project_data(project);
+DROP TABLE public_objects;
 
 
 \\pset title 'Public and Private Data Volume for Projects'	
-SELECT 
-	COALESCE(pub.project, priv.project) AS "Project",
-	ROUND(COALESCE(pub.volume / 2^30, 0)::NUMERIC, 3) AS "Public Volume (GiB)",
-	ROUND(COALESCE(priv.volume / 2^30, 0)::NUMERIC, 3) AS "Private Volume (GiB)"
-FROM (SELECT project, SUM(data_size) AS volume FROM public_project_data GROUP BY project) AS pub
-	FULL JOIN (
-				SELECT project, SUM(data_size) AS volume FROM private_project_data GROUP BY project
-			) AS priv 
-		ON priv.project = pub.project
-ORDER BY 1;
+\\echo
+SELECT
+	project AS "Project",
+	ROUND((public_volume / 2^30)::NUMERIC, 3) AS "Public Volume (GiB)",
+	ROUND(((total_volume - public_volume) / 2^30)::NUMERIC, 3) AS "Private Volume (GiB)"
+FROM (
+		SELECT 
+			a.project, 
+			SUM(a.data_size) AS total_volume, 
+			COALESCE(SUM(p.data_size), 0) AS public_volume
+		FROM project_data AS a LEFT JOIN public_project_data AS p ON p.data_id = a.data_id
+		GROUP BY a.project
+	) AS t
+ORDER BY project;
 
 
 ROLLBACK;
