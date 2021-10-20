@@ -211,8 +211,12 @@ classify_repl_errors() {
 	sSRTCnt="$(\
 		split_out_repl_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$logBase".timeout )"
 
-	local uSCECnt
-	uSCECnt="$(split_out_repl_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$logBase".network )"
+	local nCnt uSCTCnt uSCECnt 
+	uSCTCnt="$(
+		split_out_repl_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$logBase".network )"	
+	uSCECnt="$(split_out_repl_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$logBase".network)"
+
+	local nCnt=$(( uSCTCnt + uSCECnt ))
 
 	local uCMCnt
 	uCMCnt="$(\
@@ -247,7 +251,7 @@ classify_repl_errors() {
 	display_error_count 'file open errors' "$uFOEMissingCnt" "$totErrCnt"
 	display_error_count 'filesystem errors' "$uFOEFSErrCnt" "$totErrCnt"
 	display_error_count 'short files' "$sCLECnt" "$totErrCnt"
-	display_error_count 'network unreacable' "$uSCECnt" "$totErrCnt"
+	display_error_count 'network connection issues' "$nCnt" "$totErrCnt"
 	display_error_count timeouts "$sSRTCnt" "$totErrCnt"
 	display_error_count 'unclassified replication errors' "$unclassifiedReplErrCnt" "$totErrCnt"
 }
