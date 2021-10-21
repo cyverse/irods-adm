@@ -1,7 +1,7 @@
 #!/bin/bash
 
 show_help() {
-  cat <<EOF
+	cat <<EOF
 
 $ExecName version $Version
 
@@ -36,21 +36,21 @@ readonly ExecName=$(basename "$ExecPath")
 
 
 show_version() {
-  printf '%s\n' "$Version"
+	printf '%s\n' "$Version"
 }
 
 
 EXEC_ON_RS() {
-  local rs="$1"
-  local cmd="$2"
+	local rs="$1"
+	local cmd="$2"
 
-  #shellcheck disable=SC2087
-  ssh -q -t "$rs" <<EOSSH
+	#shellcheck disable=SC2087
+	ssh -q -t "$rs" <<EOSSH
 if [[ "\$USER" = irods ]]
 then
-  $cmd
+	$cmd
 else
-  sudo -i -u irods <<'EOSUDO'
+	sudo -i -u irods <<'EOSUDO'
 $cmd
 EOSUDO
 fi
@@ -60,84 +60,84 @@ export -f EXEC_ON_RS
 
 
 FIX_CMD() {
-  local obj="$1"
-  local resc="$2"
-  local file="$3"
+	local obj="$1"
+	local resc="$2"
+	local file="$3"
 
-  cat <<EOCMD
+	cat <<EOCMD
 readonly TmpFile='$file'.tmp
 
 mv --no-clobber '$file' "\$TmpFile" && \\
-  touch '$file' && \\
-  (irsync -K -s -v -R '$resc' "\$TmpFile" i:'$obj'; mv "\$TmpFile" '$file')
+	touch '$file' && \\
+	(irsync -K -s -v -R '$resc' "\$TmpFile" i:'$obj'; mv "\$TmpFile" '$file')
 EOCMD
 }
 export -f FIX_CMD
 
 
 FIX() {
-  local objPath="$1"
+	local objPath="$1"
 
-  local fixed
+	local fixed
 
-  printf '%s\n' "$objPath"
+	printf '%s\n' "$objPath"
 
-  while read -r rescHier storeHost filePath
-  do
-    fixed=
+	while read -r rescHier storeHost filePath
+	do
+		fixed=
 
-    local coordResc="${rescHier%%;*}"
+		local coordResc="${rescHier%%;*}"
 
-    local fixCmd
-    fixCmd=$(FIX_CMD "$objPath" "$coordResc" "$filePath")
+		local fixCmd
+		fixCmd=$(FIX_CMD "$objPath" "$coordResc" "$filePath")
 
-    if EXEC_ON_RS "$storeHost" "$fixCmd"
-    then
-      fixed="$objPath"
-    fi
-  done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
+		if EXEC_ON_RS "$storeHost" "$fixCmd"
+		then
+			fixed="$objPath"
+		fi
+	done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
 
-  if [[ -z "${fixed-}" ]]
-  then
-    printf 'ERROR: failed to fix %s\n' "$objPath" >&2
-  fi
+	if [[ -z "${fixed-}" ]]
+	then
+		printf 'ERROR: failed to fix %s\n' "$objPath" >&2
+	fi
 }
 export -f FIX
 
 
 if ! opts=$(getopt --name "$ExecName" --options hJ:v --longoptions help,jobs:,version -- "$@")
 then
-  printf '\n' >&2
-  show_help >&2
-  exit 1
+	printf '\n' >&2
+	show_help >&2
+	exit 1
 fi
 
 eval set -- "$opts"
 
 while true
 do
-  case "$1" in
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -J|--jobs)
-      readonly Jobs="$2"
-      shift 2
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      show_help >&2
-      exit 1
-      ;;
-  esac
+	case "$1" in
+		-h|--help)
+			show_help
+			exit 0
+			;;
+		-J|--jobs)
+			readonly Jobs="$2"
+			shift 2
+			;;
+		-v|--version)
+			show_version
+			exit 0
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			show_help >&2
+			exit 1
+			;;
+	esac
 done
 
 export EXEC_DIR
@@ -145,9 +145,9 @@ EXEC_DIR=$(dirname "$ExecPath")
 
 if [ -n "$Jobs" ]
 then
-  readonly JobsOpt="-j$Jobs"
+	readonly JobsOpt="-j$Jobs"
 else
-  readonly JobsOpt=
+	readonly JobsOpt=
 fi
 
 parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" FIX > /dev/null
