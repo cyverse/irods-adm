@@ -159,13 +159,13 @@ mk_report() {
 	psql --quiet ICAT \
 <<EOSQL
 \\pset footer off
-$(inject_debug_stmt \\timing on)
+$(inject_debug_stmt '\timing on')
 $(inject_debug_quiet off)
 
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 
-$(inject_debug_msg Gathering unreplicated data)
+$(inject_debug_msg 'Gathering unreplicated data')
 
 CREATE TEMPORARY TABLE unreplicated_data(id) ON COMMIT DROP AS
 SELECT data_id FROM r_data_main
@@ -176,7 +176,7 @@ HAVING COUNT(*) = 1;
 CREATE INDEX idx_unreplicated_data_id ON unreplicated_data(id);
 
 
-$(inject_debug_msg Creating storage to root resource mapping)
+$(inject_debug_msg 'Creating storage to root resource mapping')
 
 CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
 WITH RECURSIVE child_mapping AS (
@@ -194,7 +194,7 @@ SELECT id, name, root FROM child_mapping WHERE storage;
 CREATE INDEX idx_storage_root_mapping_storage_id ON storage_root_mapping(storage_id);
 
 
-$(inject_debug_msg Gathering unreplicated replicas)
+$(inject_debug_msg 'Gathering unreplicated replicas')
 
 CREATE TEMPORARY TABLE unreplicated_replicas(root_resc, store_resc, size) ON COMMIT DROP AS
 SELECT s.root_name, s.storage_name, d.data_size
@@ -209,7 +209,7 @@ CREATE INDEX idx_unreplicated_replicas_store_resc ON unreplicated_replicas(store
 \\echo
 
 $(inject_debug_newline)
-$(inject_set_title Unreplicated in Storage Resources)
+$(inject_set_title 'Unreplicated in Storage Resources')
 SELECT
 	store_resc                                     AS "Storage Resource",
 	COUNT(*)                                       AS "Count",
@@ -220,7 +220,7 @@ ORDER BY store_resc;
 
 
 $(inject_debug_newline)
-$(inject_set_title Unreplicated in Root Resources)
+$(inject_set_title 'Unreplicated in Root Resources')
 SELECT
 	root_resc                                      AS "Root Resource",
 	COUNT(*)                                       AS "Count",
