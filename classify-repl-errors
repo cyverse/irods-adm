@@ -66,8 +66,7 @@ declare -a TempFiles
 
 main() {
 	local opts
-	if ! opts="$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")"
-	then
+	if ! opts="$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")"; then
  		show_help >&2
 		return 1
 	fi
@@ -77,8 +76,7 @@ main() {
 	local help
 	local version
 
-	while true
-	do
+	while true; do
 		case "$1" in
 			-h|--help)
 				help=help
@@ -99,20 +97,17 @@ main() {
 		esac
 	done
 
-	if [[ -n "${help-}" ]]
-	then
+	if [[ -n "${help-}" ]]; then
 		show_help
 		return 0
 	fi
 
-	if [[ -n "${version-}" ]]
-	then
+	if [[ -n "${version-}" ]]; then
 		printf '%s\n' "$VERSION"
 		return 0
 	fi
 
-	if [[ "$#" -lt 1 ]]
-	then
+	if [[ "$#" -lt 1 ]]; then
 		show_help >&2
 		return 1
 	fi
@@ -125,8 +120,7 @@ main() {
 
 
 remove_temp_files() {
-	if [[ "${#TempFiles[@]}" -gt 0 ]]
-	then
+	if [[ "${#TempFiles[@]}" -gt 0 ]]; then
 		rm --force "${TempFiles[@]}"
 	fi
 }
@@ -189,8 +183,7 @@ classify_errors() {
 
 	display_error_count 'unclassified errors' "$unclassifiedErrCnt" "$errCnt"
 
-	if [[ "$unclassifiedErrCnt" -gt 0 ]]
-	then
+	if [[ "$unclassifiedErrCnt" -gt 0 ]]; then
 		mv "$errorsFile" "$logBase".unclassified_errors
 	fi
 }
@@ -308,8 +301,7 @@ split_out_class() {
 	local classifiedErrors
 	classifiedErrors="$(sed --quiet "/$classifier/p" <<< "$errors")"
 
-	if [[ -n "$classifiedErrors" ]]
-	then
+	if [[ -n "$classifiedErrors" ]]; then
 		comm -2 -3 <(echo "$errors") <(echo "$classifiedErrors") > "$errorsFile"
 		#shellcheck disable=SC2001
 		sed "s/$classifier/$substitution/" <<< "$classifiedErrors" >> "$classFile"
