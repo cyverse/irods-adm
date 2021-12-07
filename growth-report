@@ -1,13 +1,5 @@
 #!/bin/bash
 
-set -e
-
-readonly DEFAULT_HOST=localhost
-readonly DEFAULT_PORT=5432
-
-readonly ExecName=$(basename "$0")
-
-
 print_help()
 {
   cat << EOF
@@ -33,6 +25,13 @@ Options:
 EOF
 }
 
+
+set -e
+
+readonly DEFAULT_HOST=localhost
+readonly DEFAULT_PORT=5432
+
+readonly ExecName=$(basename "$0")
 
 readonly Opts=$(getopt --name "$ExecName" \
                        --options f:hH:l:p: \
