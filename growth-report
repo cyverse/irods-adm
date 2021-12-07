@@ -20,6 +20,8 @@ Options:
  -l, --last-year  <last_year>   the last year in the report
  -p, --port <port>              connect to the ICAT's DBMS listening on TCP port
                                 <port>, default '$DEFAULT_PORT'
+ -U, --user <user>              authorize the DBMS connection as user USER 
+                                instead of the default
 
  -h, --help  display help text and exit
 EOF
@@ -28,14 +30,16 @@ EOF
 
 set -e
 
+export PGUSER
+
 readonly DEFAULT_HOST=localhost
 readonly DEFAULT_PORT=5432
 
 readonly ExecName=$(basename "$0")
 
 readonly Opts=$(getopt --name "$ExecName" \
-                       --options f:hH:l:p: \
-                       --longoptions first-year:,help,host:,last-year:,port: \
+                       --options f:hH:l:p:U: \
+                       --longoptions first-year:,help,host:,last-year:,port:user, \
                        -- \
                        "$@")
 
@@ -70,6 +74,10 @@ do
       ;;
     -p|--port)
       readonly Port="$2"
+      shift 2
+      ;;
+    -U|--user)
+      PGUSER="$2"
       shift 2
       ;;
     --)
@@ -109,8 +117,7 @@ else
   readonly CreateFilter=TRUE
 fi
 
-psql --no-align --tuples-only --field-separator , --host "$Host" --port "$Port" ICAT icat_reader \
-<<SQL
+psql --no-align --tuples-only --field-separator , --host "$Host" --port "$Port" ICAT <<SQL
 \\timing on
 
 BEGIN;
