@@ -9,7 +9,7 @@ Usage:
  $ExecName [options]
 
 This program acts like the iCommand ips -v, but it resolves the client IP
-addresses on the other side of an HAProxy server.
+addresses on the other side of an HAProxy server include their ports.
 
 Options:
   -h, --help     show help and exit
@@ -211,7 +211,7 @@ BEGIN {
   source = "";
   svrPort = "";
 
-  patsplit(\$5, terms, "[^=:]+");
+  patsplit(\$5, terms, "[^=]+");
 
   if (terms[2] != "unix") {
     source = terms[2];
