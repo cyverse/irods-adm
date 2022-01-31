@@ -88,28 +88,23 @@ main() {
 		[until]=''
 		[version]='' )
 
-  if ! resolve_opts optMap "$@"
-	then
+	if ! resolve_opts optMap "$@"; then
 		show_help >&2
 		return 1
 	fi
 
-  if [[ -n "${optMap[help]}" ]]
-	then
+	if [[ -n "${optMap[help]}" ]]; then
 		show_help
 		return 0
 	fi
 
-  if [[ -n "${optMap[version]}" ]]
-	then
+	if [[ -n "${optMap[version]}" ]]; then
 		printf '%s\n' "$VERSION"
 		return 0
 	fi
 
-	if [[ -n "${optMap[multiplier]}" ]]
-	then
-		if ! [[ "${optMap[multiplier]}" =~ ^[1-9][0-9]* ]]
-		then
+	if [[ -n "${optMap[multiplier]}" ]]; then
+		if ! [[ "${optMap[multiplier]}" =~ ^[1-9][0-9]* ]]; then
 			printf 'The multiplier must be a positive number. The given value was %s.\n' \
 			    "${optMap[multiplier]}" \
 				>&2
@@ -118,8 +113,7 @@ main() {
 		fi
 	fi
 
-	if [[ -n "${optMap[dest-resc]}" && "${optMap[src-resc]}" == "${optMap[dest-resc]}" ]]
-	then
+	if [[ -n "${optMap[dest-resc]}" && "${optMap[src-resc]}" == "${optMap[dest-resc]}" ]]; then
 		printf 'The destination resource, %s, cannot be the same as the source resource, %s.\n' \
 		    "${optMap[dest-resc]}" "${optMap[src-resc]}" \
 			>&2
@@ -128,10 +122,8 @@ main() {
 	fi
 
 	local untilTS
-	if [[ -n "${optMap[until]}" ]]
-	then
-		if ! untilTS=$(date --date="${optMap[until]}" '+%s')
-		then
+	if [[ -n "${optMap[until]}" ]]; then
+		if ! untilTS="$(date --date="${optMap[until]}" '+%s')"; then
 			printf '"%s" is not a valid date format\n' "${optMap[until]}"
 			return 1
 		fi
@@ -145,20 +137,17 @@ main() {
 
 	trap 'finish "$?" '"'$objList'" EXIT
 
-	if ! iadmin lz &> /dev/null
-	then
+	if ! iadmin lz &> /dev/null; then
 		printf "aren't authenticated as a rodsadmin user\n" >&2
 		return 1
 	fi
 
-	if ! psql ICAT <<<'' &> /dev/null
-	then
+	if ! psql ICAT <<<'' &> /dev/null; then
 		printf "aren't able to connect to the ICAT DB without a password\n" >&2
 		return 1
 	fi
 
-	if ! CHECK_TIME "${untilTS-}"
-	then
+	if ! CHECK_TIME "${untilTS-}"; then
 	 printf 'Stop time is in the past\n' >&2
 	 return 1
 	fi
@@ -180,15 +169,13 @@ resolve_opts() {
 	shift
 
 	local opts
-	if ! opts="$(format_opts "$@")"
-	then
+	if ! opts="$(format_opts "$@")"; then
 		return 1
 	fi
 
 	eval set -- "$opts"
 
-	while true
-	do
+	while true; do
 		case "$1" in
 			-A|--age)
 				eval "$mapVar""[age]='$2'"
@@ -270,19 +257,16 @@ replicate() {
 	maxCreateTime="$(date --date "$maxCreateDate" '+%s')"
 
 	local resCond
-	if [[ -n "$srcResc" ]]
-	then
+	if [[ -n "$srcResc" ]]; then
 		resCond="$(mk_resc_cond "$srcResc")"
-	elif [[ -n "$destResc" ]]
-	then
+	elif [[ -n "$destResc" ]]; then
 		resCond="$(mk_resc_cond "$destResc")"
 	else
 		resCond=TRUE
 	fi
 
 	local baseCond
-	if [[ -n "$baseColl" ]]
-	then
+	if [[ -n "$baseColl" ]]; then
 		baseCond="c.coll_name = '$baseColl' OR c.coll_name LIKE '$baseColl/%'"
 	else
 		baseCond=TRUE
@@ -301,10 +285,8 @@ replicate() {
 	tot="$(count < "$objList")"
 	printf '%d data objects to replicate\n' "$tot" >&2
 
-	if [[ "$tot" -gt 0 ]]
-	then
-		if [[ "$maxThreads" -gt 0 ]]
-		then
+	if [[ "$tot" -gt 0 ]]; then
+		if [[ "$maxThreads" -gt 0 ]]; then
 			local cnt=0
 
 			# Small non-zero byte files
@@ -312,36 +294,31 @@ replicate() {
 				select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 16 200 0 1 "$untilTS" \
 			  		< "$objList" )"    # 16 1-threaded transfers
 
-      	if [[ "$maxThreads" -ge 2 ]]
-			then
+      	if [[ "$maxThreads" -ge 2 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 8 100 1 2 "$untilTS" \
 				  		< "$objList" )"  # 8 2-threaded
       	fi
 
-			if [[ "$maxThreads" -ge 3 ]]
-      	then
+			if [[ "$maxThreads" -ge 3 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 6 50 2 3 "$untilTS" \
 						< "$objList" )"  # 6 3-threaded
 			fi
 
-			if [[ "$maxThreads" -ge 5 ]]
-      	then
+			if [[ "$maxThreads" -ge 5 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 4 20 3 5 "$untilTS" \
 						< "$objList" )"  # 4 4--5-threaded
 			fi
 
-			if [[ "$maxThreads" -ge 7 ]]
-			then
+			if [[ "$maxThreads" -ge 7 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 3 10 5 7 "$untilTS" \
 						< "$objList" )"  # 3 6--7-threaded
 			fi
 
-			if [[ "$maxThreads" -ge 15 ]]
-			then
+			if [[ "$maxThreads" -ge 15 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 2 5 7 15 "$untilTS" \
 						< "$objList" )"  # 2 8--15-threaded
@@ -354,8 +331,7 @@ replicate() {
 			local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (16 - 1) ))
 
 			# transfer remaining files not in last Cohort
-			if (( minSize < lastCohortMinSz ))
-			then
+			if (( minSize < lastCohortMinSz )); then
 				cnt="$(\
 					select_cohort_by_size \
 							"$cnt" \
@@ -414,8 +390,7 @@ finish() {
 	rm --force "$objList"
 	eval "exec 1>&$LOG $LOG>&-"
 
-	if [[ "$exitCode" -eq "$TIMEDOUT" ]]
-	then
+	if [[ "$exitCode" -eq "$TIMEDOUT" ]]; then
 		printf 'out of time\n' >&2
 		exit 0
 	fi
@@ -427,8 +402,7 @@ finish() {
 count() {
 	local tot=0
 
-	while read -r -d ''
-	do
+	while read -r -d ''; do
 		((tot++))
 	done
 
@@ -440,30 +414,24 @@ partition() {
 	local minSizeB="$1"
 
 	local maxSizeB=
-	if [[ "$#" -ge 2 ]]
-	then
+	if [[ "$#" -ge 2 ]]; then
 		maxSizeB="$2"
 	fi
 
 	local size
-	if [[ -n "$maxSizeB" ]]
-	then
-		while IFS= read -r -d ''
-		do
+	if [[ -n "$maxSizeB" ]]; then
+		while IFS= read -r -d ''; do
 			size="${REPLY%% *}"
 
-			if [[ $size -ge $minSizeB && $size -lt $maxSizeB ]]
-			then
+			if [[ $size -ge $minSizeB && $size -lt $maxSizeB ]]; then
 				printf '%s\0' "${REPLY#* }"
 			fi
 		done
 	else
-		while IFS= read -r -d ''
-		do
+		while IFS= read -r -d ''; do
 			size="${REPLY%% *}"
 
-			if [[ $size -ge $minSizeB ]]
-			then
+			if [[ $size -ge $minSizeB ]]; then
 				printf '%s\0' "${REPLY#* }"
 			fi
 		done
@@ -526,10 +494,8 @@ track_prog() {
 
 	printf '%s' "$msg" >&2
 
-	while read -r
-	do
-		if [[ "$REPLY" != 'cliReconnManager: '* ]]
-		then
+	while read -r; do
+		if [[ "$REPLY" != 'cliReconnManager: '* ]]; then
 			((subCnt++))
 			((cnt++))
 			printf '\r%*s\r' ${#msg} '' >&2
@@ -557,27 +523,23 @@ select_cohort() {
 	local maxThreads="$9"
 	local untilTS="${10}"
 
-	if ! CHECK_TIME "$untilTS"
-	then
+	if ! CHECK_TIME "$untilTS"; then
 		return "$TIMEDOUT"
 	fi
 
 	local maxSizeB maxSizeMiB minSizeB minSizeMiB
-	if [[ "$maxThreads" -eq -1 ]]
-	then
+	if [[ "$maxThreads" -eq -1 ]]; then
 		maxThreads=0
 		minSizeMiB=0
 		minSizeB=0
 		maxSizeMiB=
 		maxSizeB=
-	elif [[ "$maxThreads" -eq 0 ]]
-	then
+	elif [[ "$maxThreads" -eq 0 ]]; then
 		minSizeMiB=0
 		minSizeB=0
 		maxSizeMiB=0
 		maxSizeB=1
-	elif [[ "$minThreads" -eq 0 ]]
-	then
+	elif [[ "$minThreads" -eq 0 ]]; then
 		minSizeMiB=0
 		minSizeB=1
 		maxSizeMiB="$(threads_to_MB "$maxThreads")"
@@ -592,8 +554,7 @@ select_cohort() {
 	local cohortList
 	cohortList="$(mktemp)"
 
-	if [[ -n "$maxSizeB" ]]
-	then
+	if [[ -n "$maxSizeB" ]]; then
 		partition "$minSizeB" "$maxSizeB"
 	else
 		partition "$minSizeB"
@@ -602,22 +563,18 @@ select_cohort() {
 	local subTotal
 	subTotal="$(count <"$cohortList")"
 
-	if [[ "$minSizeMiB" -le 0 ]] && [[ -z "$maxSizeMiB" ]]
-	then
+	if [[ "$minSizeMiB" -le 0 ]] && [[ -z "$maxSizeMiB" ]]; then
 		printf 'Replicating %s files\n' "$subTotal"
-	elif [[ "$minSizeMiB" -le 0 ]] && [[ "$maxSizeMiB" -le 0 ]]
-	then
+	elif [[ "$minSizeMiB" -le 0 ]] && [[ "$maxSizeMiB" -le 0 ]]; then
 		printf 'Replicating %s files with size 0 MiB\n' "$subTotal"
-	elif [[ "$minSizeMiB" -le 0 ]]
-	then
+	elif [[ "$minSizeMiB" -le 0 ]]; then
 		printf 'Replicating %s files with size in (0, %s) MiB\n' "$subTotal" "$maxSizeMiB"
 	else
 		printf 'Replicating %s files with size in [%s, %s) MiB\n' \
 			"$subTotal" "$minSizeMiB" "$maxSizeMiB"
 	fi >&2
 
-	if [[ "$subTotal" -gt 0 ]]
-	then
+	if [[ "$subTotal" -gt 0 ]]; then
 		maxProcs=$((maxProcs * procMult))
 
 		parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
@@ -647,15 +604,13 @@ select_cohort_by_size() {
 	local minSizeMiB="$8"
 
 	local maxSizeMiB=
-	if [[ "$#" -ge 9 ]]
-	then
+	if [[ "$#" -ge 9 ]]; then
 		maxSizeMiB="$9"
 	fi
 
 	local maxProcs=1
 
-	if ! CHECK_TIME "$untilTS"
-	then
+	if ! CHECK_TIME "$untilTS"; then
 		return "$TIMEDOUT"
 	fi
 
@@ -665,8 +620,7 @@ select_cohort_by_size() {
 	local cohortList
 	cohortList="$(mktemp)"
 
-	if [[ -n "$maxSizeMiB" ]]
-	then
+	if [[ -n "$maxSizeMiB" ]]; then
 		local maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
 		partition "$minSizeB" "$maxSizeB"
 	else
@@ -676,8 +630,7 @@ select_cohort_by_size() {
 	local subTotal
 	subTotal="$(count < "$cohortList")"
 
-	if [[ -n "$maxSizeMiB" ]]
-	then
+	if [[ -n "$maxSizeMiB" ]]; then
 		printf 'Replicating %s files with size in [%s, %s) MiB\n' \
 				"$subTotal" "$minSizeMiB" "$maxSizeMiB" \
 			>&2
@@ -685,8 +638,7 @@ select_cohort_by_size() {
 		printf 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
 	fi
 
-	if [[ "$subTotal" -gt 0 ]]
-	then
+	if [[ "$subTotal" -gt 0 ]]; then
 		maxProcs=$((maxProcs * procMult))
 
 		parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
@@ -723,14 +675,12 @@ REPL_BATCH() {
 
 	local replArgs=(-B -M -T -v -N "$maxThreads")
 
-	if [[ -n "$destResc" ]]
-	then
+	if [[ -n "$destResc" ]]; then
 		replArgs+=(-R "$destResc")
 	fi
 
 	# XXX - irepl -S doesn't work in 4.2.8, but it's fixed in 4.2.9
-	#if [[ -n "$srcResc" ]]
-	#then
+	#if [[ -n "$srcResc" ]]; then
    #	replArgs+=(-S "$srcResc")
 	#fi
 
@@ -743,8 +693,7 @@ REPL_BATCH() {
 	# error message. It is probably at 113, but we should confirm. Once this is
 	# confirmed, if this status is returned, this function	should wait for a bit
 	# and try again.
-	if [[ "$replStatus" -ne 0 ]]
-	then
+	if [[ "$replStatus" -ne 0 ]]; then
 		printf 'repl: irepl exited with status %d\n' "$replStatus" >&2
 	fi
 
@@ -756,8 +705,7 @@ export -f REPL_BATCH
 CHECK_TIME() {
 	local untilTS="$1"
 
-	if [[ -n "$untilTS" ]] && [[ "$(date '+%s')" -ge "$untilTS" ]]
-	then
+	if [[ -n "$untilTS" ]] && [[ "$(date '+%s')" -ge "$untilTS" ]]; then
 		return "$TIMEDOUT"
 	fi
 }
