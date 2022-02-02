@@ -119,30 +119,11 @@ main() {
 
 	if [[ -n "${help-}" ]]; then
 		show_help
-		return 0
-	fi
-
-	if [[ -n "${version-}" ]]; then
+	elif [[ -n "${version-}" ]]; then
 		printf '%s\n' "$VERSION"
-		return 0
+	else
+		fix "$age"
 	fi
-
-	local cutoffTime
-	cutoffTime="$(date --iso-8601 --date "$age days ago")"
-
-	check_existing_instance
-
-	local fixLog
-	fixLog="$(mktemp)"
-
-	readonly ErrorLog="$(mktemp)"
-	
-	# shellcheck disable=SC2064
-	trap "rm --force '$fixLog' '$ErrorLog'" EXIT
-
-	trap 'if [[ "${FUNCNAME[0]}" != main ]]; then return; fi' SIGINT SIGTERM
-	display_problems "$cutoffTime" | strip_noise | fix_problems > "$fixLog" 2> "$ErrorLog" || true
-	generate_report "$cutoffTime" "$fixLog" "$ErrorLog"
 }
 
 
@@ -157,6 +138,35 @@ format_opts() {
 		--longoptions age:,db-user:,dbms-host:,dbms-port:,debug,help,version \
 		--options A:dH:hP:U:v \
 		-- "$@"
+}
+
+
+# performs any needed fixes and genertes the report
+# Arguments:
+#  age  how many days old a collection or data object must be before it will be 
+#       considered
+# Output:
+#  the reports
+fix() {
+	local age="$1"
+
+	local cutoffTime
+	cutoffTime="$(date --iso-8601 --date "$age days ago")"
+
+	check_existing_instance
+
+	local fixLog
+	fixLog="$(mktemp)"
+
+	local errorLog
+	errorLog="$(mktemp)"
+	
+	# shellcheck disable=SC2064
+	trap "rm --force '$fixLog' '$errorLog'" EXIT
+
+	trap 'if [[ "${FUNCNAME[0]}" != main ]]; then return; fi' SIGINT SIGTERM
+	display_problems "$cutoffTime" | strip_noise | fix_problems > "$fixLog" 2> "$errorLog" || true
+	generate_report "$cutoffTime" "$fixLog" "$errorLog"
 }
 
 
