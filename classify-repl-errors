@@ -150,6 +150,7 @@ filter_errors () {
 	/connectToRhost: readVersion to .* failed, msg=/d
 	/^cliReconnManager: .*, status = -305111/d
 	/^replUtil: invalid repl objType 0 for /d
+	/^_rcConnect: connectToRhost timed out, retrying/d
 	p
 }
 EOF
