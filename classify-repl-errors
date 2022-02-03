@@ -146,11 +146,11 @@ process_input() {
 filter_errors () {
 	sed --quiet --file - <(cat) <<'EOF'
 /.*ERROR: [^\[].*$/ {
-  s/.*ERROR: \([^\[].*$\)/\1/
-  /connectToRhost: readVersion to .* failed, msg=/d
-  /^cliReconnManager: .*, status = -305111/d
-  /^replUtil: invalid repl objType 0 for /d
-  p
+	s/.*ERROR: \([^\[].*$\)/\1/
+	/connectToRhost: readVersion to .* failed, msg=/d
+	/^cliReconnManager: .*, status = -305111/d
+	/^replUtil: invalid repl objType 0 for /d
+	p
 }
 EOF
 }
