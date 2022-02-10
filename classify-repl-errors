@@ -151,6 +151,7 @@ filter_errors () {
 	/^cliReconnManager: .*, status = -305111/d
 	/^replUtil: invalid repl objType 0 for /d
 	/^_rcConnect: connectToRhost timed out, retrying/d
+	/^_rcConnect: connectToRhost error, server on .* is probably down status = -115000 SYS_SOCK_READ_TIMEDOUT/d
 	p
 }
 EOF
