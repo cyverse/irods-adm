@@ -65,6 +65,7 @@ readonly MAX_FIX_LOG_SIZE=16777216
 
 declare DEBUG
 
+declare -a TempFiles
 
 main() {
 	local opts
@@ -155,14 +156,13 @@ fix() {
 
 	check_existing_instance
 
-	local fixLog
-	fixLog="$(mktemp)"
+	trap 'rm --force "${TempFiles[@]}"' EXIT
 
-	local errorLog
-	errorLog="$(mktemp)"
-	
-	# shellcheck disable=SC2064
-	trap "rm --force '$fixLog' '$errorLog'" EXIT
+	TempFiles+=( "$(mktemp)" )
+	local fixLog="${TempFiles[-1]}"
+
+	TempFiles+=( "$(mktemp)" )
+	local errorLog="${TempFiles[-1]}"
 
 	trap 'if [[ "${FUNCNAME[0]}" != main ]]; then return; fi' SIGINT SIGTERM
 	display_problems "$cutoffTime" | strip_noise | fix_problems > "$fixLog" 2> "$errorLog" || true
