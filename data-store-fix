@@ -193,79 +193,6 @@ check_existing_instance() {
 }
 
 
-generate_report() {
-	local cutoffTime="$1"
-	local fixLog="$2"
-	local errLog="$3"
-
-	printf '\t%s DATA STORE REPAIR REPORT\n\n\n' "$cutoffTime"
-	printf 'ITEMIZED REPAIR ATTEMPTS\n\n'
-
-	local fixLogSize
-	fixLogSize="$(stat --format '%s' "$fixLog")"
-
-	if (( fixLogSize > MAX_FIX_LOG_SIZE )); then
-		local reportHost
-		reportHost="$(hostname --fqdn)"
-
-		local reportLog=/tmp/"$EXEC_NAME"@"$cutoffTime".log
-		mv "$fixLog" "$reportLog"
-
-		printf '\n'
-		printf 'The itemized lists of attempted repairs is too large to send by email. '
-		printf 'It may be found at %s:%s\n' "$reportHost" "$reportLog"
-	else
-		cat "$fixLog"
-	fi
-
-	printf '\n\nREPAIR ATTEMPT FAILURES\n\n'
-
-	if [[ -s "$errLog" ]]; then
-		cat "$errLog"
-	else
-		printf 'All problems were fixed.\n'
-	fi
-}
-
-
-inject_debug_stmt() {
-	local stmt="$*"
-
-	if [[ -n "${DEBUG-}" ]]; then
-		printf '%s\n' "$stmt"
-	fi
-}
-
-
-inject_debug_newline() {
-	inject_debug_stmt "\\echo ''"
-}
-
-
-inject_debug_msg() {
-	local msg="$*"
-
-	inject_debug_newline
-	inject_debug_stmt "\\echo '$msg'"
-}
-
-
-inject_set_title() {
-	local title="$*"
-
-	inject_debug_quiet on
-	printf $'\pset title \'%s\'\n' "$title"
-	inject_debug_quiet off
-}
-
-
-inject_debug_quiet() {
-	local state="$1"
-
-	printf $'\\set QUIET %s\n' "$state"
-}
-
-
 display_problems() {
 	local cutoffTime="$1"
 
@@ -383,6 +310,151 @@ EOF
 }
 
 
+inject_debug_msg() {
+	local msg="$*"
+
+	inject_debug_newline
+	inject_debug_stmt "\\echo '$msg'"
+}
+
+
+inject_debug_newline() {
+	inject_debug_stmt "\\echo ''"
+}
+
+
+inject_debug_stmt() {
+	local stmt="$*"
+
+	if [[ -n "${DEBUG-}" ]]; then
+		printf '%s\n' "$stmt"
+	fi
+}
+
+
+inject_set_title() {
+	local title="$*"
+
+	inject_debug_quiet on
+	printf $'\pset title \'%s\'\n' "$title"
+	inject_debug_quiet off
+}
+
+
+inject_debug_quiet() {
+	local state="$1"
+
+	printf $'\\set QUIET %s\n' "$state"
+}
+
+
+fix_problems() {
+	while IFS= read -r; do
+		printf '%s\n' "$REPLY"
+
+		case "$REPLY" in
+			*"$COLL_TABLE_TITLE")
+				fix_collection_problems
+				;;
+			*"$DATA_TABLE_TITLE")
+				fix_object_problems
+				;;
+			*)
+				;;
+		esac
+	done
+}
+
+
+fix_collection_problems() {
+	pass_hdr_thru
+
+	CollCnt=0
+
+	trap \
+		$'
+			if [[ "${FUNCNAME[0]-}" == fix_collection_problems ]]; then 
+				printf \'(%d rows)\' "$CollCnt"
+			fi ' \
+		EXIT RETURN
+
+	local permIssue
+	local uuidCnt
+	local owner
+	local createTime
+	local collField
+	while IFS='|' read -r permIssue uuidCnt owner createTime collField; do
+		if [ -z "$collField" ]; then
+			break
+		fi
+
+		local escColl
+		escColl="$(trim "$collField")"
+
+		local coll
+		coll="$(unescape "$escColl")"
+
+		if ! permIssue="$(process_perm_issue "$permIssue" "$coll")"; then
+			continue
+		fi
+
+		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" coll "$coll")"; then
+			continue
+		fi
+
+		printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
+		: $(( CollCnt++ ))
+	done
+}
+
+
+fix_object_problems() {
+	pass_hdr_thru
+
+	ObjCnt=0
+
+	trap \
+		$'
+			if [[ "${FUNCNAME[0]-}" == fix_object_problems ]]; then 
+				printf \'(%d rows)\' "$ObjCnt"; 
+			fi' \
+		EXIT RETURN
+
+	local permIssue missingChksum uuidCnt owner replField createTime objField
+	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField; do
+		if [ -z "$objField" ]; then
+			break
+		fi
+
+		local escObj
+		escObj="$(trim "$objField")"
+
+		local obj
+		obj="$(unescape "$escObj")"
+
+		local repl
+		repl="$(trim "$replField")"
+
+		if ! permIssue="$(process_perm_issue "$permIssue" "$obj")"; then
+			continue
+		fi
+
+		if ! missingChksum="$(process_chksum_issue "$missingChksum" "$repl" "$obj")"; then
+			continue
+		fi
+
+		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" obj "$obj")"; then
+			continue
+		fi
+
+		printf '%s|%s|%s|%s|%s|%s|%s\n' \
+			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
+
+		: $(( ObjCnt++ ))	
+	done
+}
+
+
 pass_hdr_thru() {
 	while read -r; do
 		printf '%s\n' "$REPLY"
@@ -429,6 +501,34 @@ unescape() {
 	done
 
 	printf '%s' "$entity"
+}
+
+
+process_chksum_issue() {
+	local issue="$1"
+	local repl="$2"
+	local obj="$3"
+
+	if [ "${issue// /}" = t ]; then
+		local err retCode
+		err="$(ichksum --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
+		retCode="$?"
+
+		if [[ "$err" =~ 'does not exist' ]]; then
+			printf '%s' "${issue/%  /👻 }"
+		elif [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]; then
+			printf '%s' "${issue/%  /✓ }"
+		else
+			if [[ -n "$err" ]]; then
+				echo "$err" >&2
+			fi
+
+			printf '%s' "${issue/%  /✗ }"
+			printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
+		fi
+	else
+		printf '%s' "$issue"
+	fi
 }
 
 
@@ -603,138 +703,38 @@ EOF
 }
 
 
-process_chksum_issue() {
-	local issue="$1"
-	local repl="$2"
-	local obj="$3"
+generate_report() {
+	local cutoffTime="$1"
+	local fixLog="$2"
+	local errLog="$3"
 
-	if [ "${issue// /}" = t ]; then
-		local err retCode
-		err="$(ichksum --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
-		retCode="$?"
+	printf '\t%s DATA STORE REPAIR REPORT\n\n\n' "$cutoffTime"
+	printf 'ITEMIZED REPAIR ATTEMPTS\n\n'
 
-		if [[ "$err" =~ 'does not exist' ]]; then
-			printf '%s' "${issue/%  /👻 }"
-		elif [[ "$retCode" -eq 0 ]] && [[ -z "$err" ]]; then
-			printf '%s' "${issue/%  /✓ }"
-		else
-			if [[ -n "$err" ]]; then
-				echo "$err" >&2
-			fi
+	local fixLogSize
+	fixLogSize="$(stat --format '%s' "$fixLog")"
 
-			printf '%s' "${issue/%  /✗ }"
-			printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
-		fi
+	if (( fixLogSize > MAX_FIX_LOG_SIZE )); then
+		local reportHost
+		reportHost="$(hostname --fqdn)"
+
+		local reportLog=/tmp/"$EXEC_NAME"@"$cutoffTime".log
+		mv "$fixLog" "$reportLog"
+
+		printf '\n'
+		printf 'The itemized lists of attempted repairs is too large to send by email. '
+		printf 'It may be found at %s:%s\n' "$reportHost" "$reportLog"
 	else
-		printf '%s' "$issue"
+		cat "$fixLog"
 	fi
-}
 
+	printf '\n\nREPAIR ATTEMPT FAILURES\n\n'
 
-fix_collection_problems() {
-	pass_hdr_thru
-
-	CollCnt=0
-
-	trap \
-		$'
-			if [[ "${FUNCNAME[0]-}" == fix_collection_problems ]]; then 
-				printf \'(%d rows)\' "$CollCnt"
-			fi ' \
-		EXIT RETURN
-
-	local permIssue
-	local uuidCnt
-	local owner
-	local createTime
-	local collField
-	while IFS='|' read -r permIssue uuidCnt owner createTime collField; do
-		if [ -z "$collField" ]; then
-			break
-		fi
-
-		local escColl
-		escColl="$(trim "$collField")"
-
-		local coll
-		coll="$(unescape "$escColl")"
-
-		if ! permIssue="$(process_perm_issue "$permIssue" "$coll")"; then
-			continue
-		fi
-
-		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" coll "$coll")"; then
-			continue
-		fi
-
-		printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
-		: $(( CollCnt++ ))
-	done
-}
-
-
-fix_object_problems() {
-	pass_hdr_thru
-
-	ObjCnt=0
-
-	trap \
-		$'
-			if [[ "${FUNCNAME[0]-}" == fix_object_problems ]]; then 
-				printf \'(%d rows)\' "$ObjCnt"; 
-			fi' \
-		EXIT RETURN
-
-	local permIssue missingChksum uuidCnt owner replField createTime objField
-	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField; do
-		if [ -z "$objField" ]; then
-			break
-		fi
-
-		local escObj
-		escObj="$(trim "$objField")"
-
-		local obj
-		obj="$(unescape "$escObj")"
-
-		local repl
-		repl="$(trim "$replField")"
-
-		if ! permIssue="$(process_perm_issue "$permIssue" "$obj")"; then
-			continue
-		fi
-
-		if ! missingChksum="$(process_chksum_issue "$missingChksum" "$repl" "$obj")"; then
-			continue
-		fi
-
-		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" obj "$obj")"; then
-			continue
-		fi
-
-		printf '%s|%s|%s|%s|%s|%s|%s\n' \
-			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
-
-		: $(( ObjCnt++ ))	
-	done
-}
-
-
-fix_problems() {
-	while IFS= read -r; do
-		printf '%s\n' "$REPLY"
-
-		case "$REPLY" in
-			*"$COLL_TABLE_TITLE")
-				fix_collection_problems
-				;;
-			*"$DATA_TABLE_TITLE")
-				fix_object_problems
-				;;
-			*)
-				;;
-		esac
-	done
+	if [[ -s "$errLog" ]]; then
+		cat "$errLog"
+	else
+		printf 'All problems were fixed.\n'
+	fi
 }
 
 
