@@ -65,7 +65,11 @@ readonly MAX_FIX_LOG_SIZE=16777216
 
 declare DEBUG
 
+declare -i CollCnt=0
+declare -i ObjCnt=0
+
 declare -a TempFiles
+
 
 main() {
 	local opts
@@ -153,7 +157,7 @@ fix() {
 
 	check_existing_instance
 
-	trap 'rm --force "${TempFiles[@]}"' EXIT
+	trap rm_temp_files EXIT
 
 	TempFiles+=( "$(mktemp)" )
 	local problems="${TempFiles[-1]}"
@@ -369,14 +373,8 @@ fix_problems() {
 fix_collection_problems() {
 	pass_hdr_thru
 
-	CollCnt=0
-
-	trap \
-		$'
-			if [[ "${FUNCNAME[0]-}" == fix_collection_problems ]]; then 
-				printf \'(%d rows)\' "$CollCnt"
-			fi ' \
-		EXIT RETURN
+	trap 'complete_fix_coll "${FUNCNAME[0]-}"; rm_temp_files' EXIT
+	trap 'complete_fix_coll "${FUNCNAME[0]-}"' RETURN
 
 	local permIssue
 	local uuidCnt
@@ -408,17 +406,20 @@ fix_collection_problems() {
 }
 
 
+complete_fix_coll() {
+	local funcName="$1"
+
+	if [[ "$funcName" == fix_collection_problems ]]; then 
+		printf '(%d collections)' "$CollCnt"
+	fi
+}
+
+
 fix_object_problems() {
 	pass_hdr_thru
 
-	ObjCnt=0
-
-	trap \
-		$'
-			if [[ "${FUNCNAME[0]-}" == fix_object_problems ]]; then 
-				printf \'(%d rows)\' "$ObjCnt"; 
-			fi' \
-		EXIT RETURN
+	trap 'complete_fix_objs "${FUNCNAME[0]-}"; rm_temp_files' EXIT
+	trap 'complete_fix_objs "${FUNCNAME[0]-}"' RETURN
 
 	local permIssue missingChksum uuidCnt owner replField createTime objField
 	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField; do
@@ -452,6 +453,15 @@ fix_object_problems() {
 
 		: $(( ObjCnt++ ))	
 	done
+}
+
+
+complete_fix_objs() {
+	local funcName="$1"
+
+	if [[ "$funcName" == fix_object_problems ]]; then 
+		printf '(%d data objects)' "$ObjCnt"
+	fi
 }
 
 
@@ -752,6 +762,11 @@ strip_noise() {
 			esac
 		fi
 	done
+}
+
+
+rm_temp_files() {
+	rm --force "${TempFiles[@]}"
 }
 
 
