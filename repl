@@ -16,28 +16,29 @@ standard out.
 This works with iRODS 4.2.8 or later.
 
 Options:
- -A, --age AGE                how many days old a data object must be to be
-                              replicated, default: 1
- -C, --collection COLLECTION  only replicate the data objects in this collection
- -h, --help                   show help and exit
- -H, --host HOST              connect to the ICAT's DBMS on the host HOST
-                              instead of the PostgreSQL default
- -N, --max-threads MAX        sets the maximum number of threads for parallel
-                              replication to MAX; if MAX is 0 replication will
-                              be streaming.
- -M, --multiplier MULTIPLIER  a multiplier on the number of processes to run at
-                              once, default: 1
- -P, --port PORT              connect to the ICAT's DBMS listening on TCP port
-                              PORT instead of the PostgreSQL default
- -R, --dest-resc DEST-RESC    replicate data objects to resource DEST-RESC
-                              instead of default replication resource
- -S, --src-resc SRC-RESC      only replicate the data objects with a file on the
-                              resource SRC-RESC
- -u, --until STOP-TIME        the time to stop replication in a format
-                              understandable by \`date\`
- -U, --user USER              authorize the DBMS connection as user USER instead
-                              of the default
- -v, --verison                show version and exit
+ -A, --age AGE                   how many days old a data object must be to be
+                                 replicated, default: 1
+ -C, --collection COLLECTION     only replicate the data objects in this 
+                                 collection
+ -h, --help                      show help and exit
+ -H, --host HOST                 connect to the ICAT's DBMS on the host HOST
+                                 instead of the PostgreSQL default
+ -N, --max-transfer-threads MAX  sets the maximum number of threads for parallel
+                                 replication to MAX; if MAX is 0 replication 
+                                 will be streaming.
+ -M, --multiplier MULTIPLIER     a multiplier on the number of processes to run 
+                                 at once, default: 1
+ -P, --port PORT                 connect to the ICAT's DBMS listening on TCP 
+                                 port PORT instead of the PostgreSQL default
+ -R, --dest-resc DEST-RESC       replicate data objects to resource DEST-RESC
+                                 instead of default replication resource
+ -S, --src-resc SRC-RESC         only replicate the data objects with a file on 
+                                 the resource SRC-RESC
+ -u, --until STOP-TIME           the time to stop replication in a format
+                                 understandable by \`date\`
+ -U, --user USER                 authorize the DBMS connection as user USER 
+                                 instead of the default
+ -v, --verison                   show version and exit
 
 Environment Variables:
  PGHOST  the default PostgreSQL host
@@ -68,7 +69,7 @@ export PGHOST PGPORT PGUSER
 export TIMEDOUT=3
 
 readonly DEFAULT_AGE=1
-readonly DEFAULT_MAX_THREADS=16
+readonly DEFAULT_MAX_TRANSFER_THREADS=3
 readonly DEFAULT_PROC_MULT=1
 readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly LOG=3
@@ -81,7 +82,7 @@ main() {
 		[collection]=''
 		[dest-resc]=''
 		[help]=''
-		[max-threads]="$DEFAULT_MAX_THREADS"
+		[max-transfer-threads]="$DEFAULT_MAX_TRANSFER_THREADS"
 		[multiplier]="$DEFAULT_PROC_MULT"
 		[src-resc]=''
 		[until]=''
@@ -99,7 +100,7 @@ main() {
 	else
 		replicate \
 			"${optMap[age]}"  \
-			"${optMap[max-threads]}" \
+			"${optMap[max-transfer-threads]}" \
 			"${optMap[multiplier]}" \
 			"${optMap[collection]}" \
 			"${optMap[src-resc]}" \
@@ -142,8 +143,8 @@ resolve_opts() {
 				eval "$mapVar""[multiplier]='$2'"
 				shift 2
 				;;
-			-N|--max-threads)
-				eval "$mapVar""[max-threads]='$2'"
+			-N|--max-transfer-threads)
+				eval "$mapVar""[max-transfer-threads]='$2'"
 				shift 2
 				;;
 			-P|--port)
@@ -185,7 +186,7 @@ resolve_opts() {
 
 replicate() {
 	local age="$1"
-	local maxThreads="$2"
+	local maxTransThreads="$2"
 	local procMult="$3"
 	local baseColl="$4"
 	local srcResc="$5"
@@ -278,7 +279,7 @@ replicate() {
 	printf '%d data objects to replicate\n' "$tot" >&2
 
 	if [[ "$tot" -gt 0 ]]; then
-		if [[ "$maxThreads" -gt 0 ]]; then
+		if [[ "$maxTransThreads" -gt 0 ]]; then
 			local cnt=0
 
 			# Small non-zero byte files
@@ -286,31 +287,31 @@ replicate() {
 				select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 16 200 0 1 "$untilTS" \
 			  		< "$objList" )"    # 16 1-threaded transfers
 
-      	if [[ "$maxThreads" -ge 2 ]]; then
+      	if [[ "$maxTransThreads" -ge 2 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 8 100 1 2 "$untilTS" \
 				  		< "$objList" )"  # 8 2-threaded
       	fi
 
-			if [[ "$maxThreads" -ge 3 ]]; then
+			if [[ "$maxTransThreads" -ge 3 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 6 50 2 3 "$untilTS" \
 						< "$objList" )"  # 6 3-threaded
 			fi
 
-			if [[ "$maxThreads" -ge 5 ]]; then
+			if [[ "$maxTransThreads" -ge 5 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 4 20 3 5 "$untilTS" \
 						< "$objList" )"  # 4 4--5-threaded
 			fi
 
-			if [[ "$maxThreads" -ge 7 ]]; then
+			if [[ "$maxTransThreads" -ge 7 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 3 10 5 7 "$untilTS" \
 						< "$objList" )"  # 3 6--7-threaded
 			fi
 
-			if [[ "$maxThreads" -ge 15 ]]; then
+			if [[ "$maxTransThreads" -ge 15 ]]; then
 				cnt="$(\
 					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 2 5 7 15 "$untilTS" \
 						< "$objList" )"  # 2 8--15-threaded
@@ -318,7 +319,7 @@ replicate() {
 
 			# Large file transfers
 			local minSize
-			minSize="$(threads_to_MB "$maxThreads")"
+			minSize="$(threads_to_MB "$maxTransThreads")"
 
 			local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (16 - 1) ))
 
@@ -331,7 +332,7 @@ replicate() {
 							"$srcResc" \
 							"$destResc" \
 							"$procMult" \
-							"$maxThreads" \
+							"$maxTransThreads" \
 							"$untilTS" \
 							"$minSize" \
 							"$lastCohortMinSz" \
@@ -346,7 +347,7 @@ replicate() {
 						"$srcResc" \
 						"$destResc" \
 						"$procMult" \
-						"$maxThreads" \
+						"$maxTransThreads" \
 						"$untilTS" \
 						"$lastCohortMinSz" \
 					< "$objList" )"
@@ -366,8 +367,18 @@ replicate() {
 
 format_opts() {
 	local longOpts=(
-		age: collection: help host: max-threads: multiplier: port: dest-resc: src-resc: until: user:
-		version)
+		age: 
+		collection: 
+		help 
+		host: 
+		max-transfer-threads: 
+		multiplier: 
+		port: 
+		dest-resc: 
+		src-resc: 
+		until: 
+		user:
+		version )
 
 	local longOptsStr
 	longOptsStr="$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)"
@@ -511,8 +522,8 @@ select_cohort() {
 	local procMult="$5"
 	local maxProcs="$6"
 	local maxArgs="$7"
-	local minThreads="$8"
-	local maxThreads="$9"
+	local minTransThreads="$8"
+	local maxTransThreads="$9"
 	local untilTS="${10}"
 
 	if ! CHECK_TIME "$untilTS"; then
@@ -520,26 +531,26 @@ select_cohort() {
 	fi
 
 	local maxSizeB maxSizeMiB minSizeB minSizeMiB
-	if [[ "$maxThreads" -eq -1 ]]; then
-		maxThreads=0
+	if [[ "$maxTransThreads" -eq -1 ]]; then
+		maxTransThreads=0
 		minSizeMiB=0
 		minSizeB=0
 		maxSizeMiB=
 		maxSizeB=
-	elif [[ "$maxThreads" -eq 0 ]]; then
+	elif [[ "$maxTransThreads" -eq 0 ]]; then
 		minSizeMiB=0
 		minSizeB=0
 		maxSizeMiB=0
 		maxSizeB=1
-	elif [[ "$minThreads" -eq 0 ]]; then
+	elif [[ "$minTransThreads" -eq 0 ]]; then
 		minSizeMiB=0
 		minSizeB=1
-		maxSizeMiB="$(threads_to_MB "$maxThreads")"
+		maxSizeMiB="$(threads_to_MB "$maxTransThreads")"
 		maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
 	else
-		minSizeMiB="$(threads_to_MB "$minThreads")"
+		minSizeMiB="$(threads_to_MB "$minTransThreads")"
 		minSizeB=$((minSizeMiB * ((1024 ** 2))))
-		maxSizeMiB="$(threads_to_MB "$maxThreads")"
+		maxSizeMiB="$(threads_to_MB "$maxTransThreads")"
 		maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
 	fi
 
@@ -570,7 +581,7 @@ select_cohort() {
 		maxProcs=$((maxProcs * procMult))
 
 		parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
-					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxThreads'" "'$untilTS'" \
+					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxTransThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$LOG" \
 			| tee >(cat >&"$LOG") \
@@ -591,7 +602,7 @@ select_cohort_by_size() {
 	local srcResc="$3"
 	local destResc="$4"
 	local procMult="$5"
-	local maxThreads="$6"
+	local maxTransThreads="$6"
 	local untilTS="$7"
 	local minSizeMiB="$8"
 
@@ -634,7 +645,7 @@ select_cohort_by_size() {
 		maxProcs=$((maxProcs * procMult))
 
 		parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
-					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxThreads'" "'$untilTS'" \
+					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxTransThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$LOG" \
 			| tee >(cat >&"$LOG") \
@@ -659,13 +670,13 @@ REPL_BATCH() {
 
 	local srcResc="$1"
 	local destResc="$2"
-	local maxThreads="$3"
+	local maxTransThreads="$3"
 	local untilTS="$4"
 	shift 4
 
 	CHECK_TIME "$untilTS"
 
-	local replArgs=(-B -M -T -v -N "$maxThreads")
+	local replArgs=(-B -M -T -v -N "$maxTransThreads")
 
 	if [[ -n "$destResc" ]]; then
 		replArgs+=(-R "$destResc")
