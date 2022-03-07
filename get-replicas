@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 show_help()
 {
@@ -18,13 +18,12 @@ Options:
  -v, --version  show version and exit
 
 Summary:
-For each replica of the data object, it returns the resource hierarchy path to
-the storage resource holding the file, the host name of the resource server
-serving the storage resource, and the path to the file. For each replica, it
+For each replica of the data object, size, resource hierarchy, the host name of 
+the resource server serving the storage resource, and the path to the file. It 
 writes this information to standard out with the following format with one line
 per replica.
 
-<resource hierarchy> <resource server> <file>
+<size> <resource hierarchy> <resource server> <file>
 
 Prerequisites:
  1) The data object may not have a carriage return in its path.
@@ -33,7 +32,7 @@ EOF
 }
 
 
-set -e
+set -o errexit
 
 readonly EXEC_NAME=$(basename "$0")
 readonly VERSION=1
@@ -100,10 +99,11 @@ ask_irods()
   objName=$(basename "$OBJ_PATH")
 
   local resp
-  resp=$(iquest --no-page \
-                '%s %s %s' \
-                "select DATA_ID, DATA_RESC_HIER, DATA_PATH
-                 where COLL_NAME = '$collPath' and DATA_NAME = '$objName'")
+  resp="$(\
+    iquest --no-page \
+      '%s %s %s %s' \
+      "select DATA_ID, DATA_SIZE, DATA_RESC_HIER, DATA_PATH
+        where COLL_NAME = '$collPath' and DATA_NAME = '$objName'" )"
   local ec="$?"
   if [ "$ec" -ne 0 ] || [ "$resp" = 'CAT_NO_ROWS_FOUND: Nothing was found matching your query' ]
   then
@@ -114,7 +114,7 @@ ask_irods()
 }
 
 
-while read -r rescHier filePath
+while read -r size rescHier filePath
 do
   storeResc="${rescHier##*;}"
 
@@ -122,6 +122,6 @@ do
   then
     printf 'Failed to retrieve location for resource %s\n' "$storeResc" >&2
   else
-    printf '%s %s %s\n' "$rescHier" "$storeHost" "$filePath"
+    printf '%s %s %s %s\n' "$size" "$rescHier" "$storeHost" "$filePath"
   fi
 done < <(ask_irods)

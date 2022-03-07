@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 show_help() {
 	cat <<EOF
@@ -40,12 +40,17 @@ show_version() {
 }
 
 
-EXEC_ON_RS() {
-	local rs="$1"
-	local cmd="$2"
+FIX() {
+	local objPath="$1"
 
-	#shellcheck disable=SC2087
-	ssh -q -t "$rs" <<EOSSH
+	set -o errexit -o nounset -o pipefail
+
+	exec_on_rs() {
+		local rs="$1"
+		local cmd="$2"
+
+		#shellcheck disable=SC2087
+		ssh -q -t "$rs" <<EOSSH >&2
 if [[ "\$USER" = irods ]]
 then
 	$cmd
@@ -55,99 +60,137 @@ $cmd
 EOSUDO
 fi
 EOSSH
-}
-export -f EXEC_ON_RS
+	}
 
+	get_icat_size() {
+		local collPath="$1"
+		local objName="$2"
+		local rescHier="$3"
+		query_icat \
+			'%s' \
+			"select DATA_SIZE 
+				where COLL_NAME = '$collPath' 
+					and DATA_NAME = '$objName' 
+					and DATA_RESC_HIER = '$rescHier'"
+	}
 
-FIX_CMD() {
-	local obj="$1"
-	local resc="$2"
-	local file="$3"
+	query_icat() {
+		local fmt="$1"
+		local query="$2"
 
-	cat <<EOCMD
-readonly TmpFile='$file'.tmp
+		# NB: Due to a bug in iRODS, 
+		#     https://github.com/irods/irods_client_icommands/issues/281,
+		#     horizontal tabs in the query need to be replaced by spaces
+		query="${query//$'\t'/ }"
 
-mv --no-clobber '$file' "\$TmpFile" && \\
-	touch '$file' && \\
-	(irsync -K -s -v -R '$resc' "\$TmpFile" i:'$obj'; mv "\$TmpFile" '$file')
-EOCMD
-}
-export -f FIX_CMD
+		iquest "$fmt" "$query" | sed '/CAT_NO_ROWS_FOUND: /d'
+	}
 
+	mk_physical_size_cmd() {
+		local filePath="$1"
 
-FIX() {
-	local objPath="$1"
+		cat <<CMD
+stat --format '%s' "$filePath"
+CMD
+	}
 
 	local fixed
 
 	printf '%s\n' "$objPath"
 
-	while read -r rescHier storeHost filePath
+	local collPath objName
+	collPath="$(dirname "$objPath")"
+	objName="$(basename "$objPath")"
+
+	local phyicalSize rescHier storeHost filePath
+	while read -r physicalSize rescHier storeHost filePath
 	do
 		fixed=
 
+		local icatSize
+		if ! icatSize="$(get_icat_size "$collPath" "$objName" "$rescHier")"; then
+			contine
+		fi
+
 		local coordResc="${rescHier%%;*}"
 
-		local fixCmd
-		fixCmd=$(FIX_CMD "$objPath" "$coordResc" "$filePath")
-
-		if EXEC_ON_RS "$storeHost" "$fixCmd"
-		then
-			fixed="$objPath"
+		local sizeCmd
+		if ! sizeCmd="$(mk_physical_size_cmd "$filePath")"; then
+			return 1
 		fi
-	done < <(cd "$EXEC_DIR" && ./get-replicas "$objPath")
+
+		local size
+		if ! size="$(exec_on_rs "$storeHost" "$sizeCmd")"
+		then
+			break
+		fi
+
+		if ! iadmin modrepl logical_path "$objPath" resource_hierarchy "$rescHier" DATA_SIZE "$size"
+		then
+			break
+		fi
+
+		fixed="$objPath"
+	done < <("$EXEC_DIR"/get-replicas "$objPath") >&2
 
 	if [[ -z "${fixed-}" ]]
 	then
 		printf 'ERROR: failed to fix %s\n' "$objPath" >&2
+		exit 1
 	fi
 }
 export -f FIX
 
 
-if ! opts=$(getopt --name "$ExecName" --options hJ:v --longoptions help,jobs:,version -- "$@")
-then
-	printf '\n' >&2
-	show_help >&2
-	exit 1
-fi
+main() {
+	if ! opts=$(getopt --name "$ExecName" --options hJ:v --longoptions help,jobs:,version -- "$@")
+	then
+		printf '\n' >&2
+		show_help >&2
+		exit 1
+	fi
 
-eval set -- "$opts"
+	eval set -- "$opts"
 
-while true
-do
-	case "$1" in
-		-h|--help)
-			show_help
-			exit 0
-			;;
-		-J|--jobs)
-			readonly Jobs="$2"
-			shift 2
-			;;
-		-v|--version)
-			show_version
-			exit 0
-			;;
-		--)
-			shift
-			break
-			;;
-		*)
-			show_help >&2
-			exit 1
-			;;
-	esac
-done
+	local jobs
+	while true
+	do
+		case "$1" in
+			-h|--help)
+				show_help
+				exit 0
+				;;
+			-J|--jobs)
+				jobs="$2"
+				shift 2
+				;;
+			-v|--version)
+				show_version
+				exit 0
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				show_help >&2
+				exit 1
+				;;
+		esac
+	done
 
-export EXEC_DIR
-EXEC_DIR=$(dirname "$ExecPath")
+	export EXEC_DIR
+	EXEC_DIR=$(dirname "$ExecPath")
 
-if [ -n "$Jobs" ]
-then
-	readonly JobsOpt="-j$Jobs"
-else
-	readonly JobsOpt=
-fi
+	if [ -n "${jobs-}" ]
+	then
+		readonly JobsOpt=-j"$jobs"
+	else
+		readonly JobsOpt=
+	fi
 
-parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" FIX > /dev/null
+	parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" FIX > /dev/null
+}
+
+
+main "$@"
