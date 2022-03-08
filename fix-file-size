@@ -101,16 +101,11 @@ FIX() {
 		local cmd="$2"
 
 		#shellcheck disable=SC2087
-		ssh -q -t "$rs" <<EOSSH >&2
-if [[ "\$USER" = irods ]]
-then
-	$cmd
-else
-	sudo -i -u irods <<'EOSUDO'
+		ssh -q -t "$rs" \
+			'if [[ "$USER" == irods ]]; then $cmd; else sudo -i -u irods <<EOSUDO
 $cmd
 EOSUDO
-fi
-EOSSH
+fi'
 	}
 
 	get_icat_size() {
