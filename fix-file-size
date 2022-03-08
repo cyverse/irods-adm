@@ -102,34 +102,10 @@ FIX() {
 
 		#shellcheck disable=SC2087
 		ssh -q -t "$rs" \
-			'if [[ "$USER" == irods ]]; then $cmd; else sudo -i -u irods <<EOSUDO
+			"if [[ "\$USER" == irods ]]; then $cmd; else sudo -i -u irods <<'EOSUDO'
 $cmd
 EOSUDO
-fi'
-	}
-
-	get_icat_size() {
-		local collPath="$1"
-		local objName="$2"
-		local rescHier="$3"
-		query_icat \
-			'%s' \
-			"select DATA_SIZE 
-				where COLL_NAME = '$collPath' 
-					and DATA_NAME = '$objName' 
-					and DATA_RESC_HIER = '$rescHier'"
-	}
-
-	query_icat() {
-		local fmt="$1"
-		local query="$2"
-
-		# NB: Due to a bug in iRODS, 
-		#     https://github.com/irods/irods_client_icommands/issues/281,
-		#     horizontal tabs in the query need to be replaced by spaces
-		query="${query//$'\t'/ }"
-
-		iquest "$fmt" "$query" | sed '/CAT_NO_ROWS_FOUND: /d'
+fi"
 	}
 
 	mk_physical_size_cmd() {
@@ -148,15 +124,10 @@ CMD
 	collPath="$(dirname "$objPath")"
 	objName="$(basename "$objPath")"
 
-	local phyicalSize rescHier storeHost filePath
-	while read -r physicalSize rescHier storeHost filePath
+	local icatSize rescHier storeHost filePath
+	while read -r icatSize rescHier storeHost filePath
 	do
 		fixed=
-
-		local icatSize
-		if ! icatSize="$(get_icat_size "$collPath" "$objName" "$rescHier")"; then
-			contine
-		fi
 
 		local coordResc="${rescHier%%;*}"
 
@@ -171,9 +142,13 @@ CMD
 			break
 		fi
 
-		if ! iadmin modrepl logical_path "$objPath" resource_hierarchy "$rescHier" DATA_SIZE "$size"
+		if (( size != icatSize ))
 		then
-			break
+			if ! \
+				iadmin modrepl logical_path "$objPath" resource_hierarchy "$rescHier" DATA_SIZE "$size"
+			then
+				break
+			fi
 		fi
 
 		fixed="$objPath"
