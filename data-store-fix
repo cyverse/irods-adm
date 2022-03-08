@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 show_help() {
 	cat <<EOF
@@ -61,7 +61,7 @@ readonly COLL_TABLE_TITLE='Collection Repair Attempts'
 readonly DATA_TABLE_TITLE='Data Object Repair Attempts'
 readonly DEFAULT_AGE=0
 readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
-readonly MAX_FIX_LOG_SIZE=16777216
+readonly MAX_LOG_SIZE=12582912  # 12 MiB
 
 declare DEBUG
 
@@ -724,7 +724,7 @@ generate_report() {
 	local fixLogSize
 	fixLogSize="$(stat --format '%s' "$fixLog")"
 
-	if (( fixLogSize > MAX_FIX_LOG_SIZE )); then
+	if (( fixLogSize > MAX_LOG_SIZE )); then
 		local reportHost
 		reportHost="$(hostname --fqdn)"
 
@@ -740,7 +740,20 @@ generate_report() {
 
 	printf '\n\nREPAIR ATTEMPT FAILURES\n\n'
 
-	if [[ -s "$errLog" ]]; then
+	local errLogSize
+	errLogSize="$(stat --format '%s' "$errLog")"
+
+	if (( errLogSize > MAX_LOG_SIZE )); then
+		local reportHost
+		reportHost="$(hostname --fqdn)"
+
+		local reportErr=/tmp/"$EXEC_NAME"@"$cutoffTime".err
+		mv "$errLog" "$reportErr"
+
+		printf '\n'
+		printf 'The repair attempt failure log is too large to send by email. '
+		printf 'It may be found at %s:%s\n' "$reportHost" "$reportErr"
+	elif (( errLogSize > 0 )); then
 		cat "$errLog"
 	else
 		printf 'All problems were fixed.\n'
