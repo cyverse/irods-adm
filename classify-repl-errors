@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 show_help() {
 	cat <<EOF
@@ -196,22 +196,11 @@ classify_repl_errors() {
 	local totErrCnt="$2"
 	local logBase="$3"
 
-	local bcCnt
-	bcCnt="$(split_out_broken_conn_errs "$errorsFile" "$logBase")"
-
 	local sCLECnt
 	sCLECnt="$(split_out_repl_class "$errorsFile" -27000 SYS_COPY_LEN_ERR "$logBase".short_file)"
 
-	local sSRTCnt
-	sSRTCnt="$(\
-		split_out_repl_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$logBase".timeout )"
-
-	local nCnt uSCTCnt uSCECnt 
-	uSCTCnt="$(
-		split_out_repl_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$logBase".network )"	
-	uSCECnt="$(split_out_repl_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$logBase".network)"
-
-	local nCnt=$(( uSCTCnt + uSCECnt ))
+	local ncCnt
+	ncCnt="$(split_out_conn_errs "$errorsFile" "$logBase".network)"
 
 	local uCMCnt
 	uCMCnt="$(\
@@ -241,13 +230,11 @@ classify_repl_errors() {
 		mv "$errorsFile" "$logBase".unclassified_repl_errors
 	fi
 
-	display_error_count 'broken connections' "$bcCnt" "$totErrCnt"
 	display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
 	display_error_count 'file open errors' "$uFOEMissingCnt" "$totErrCnt"
 	display_error_count 'filesystem errors' "$uFOEFSErrCnt" "$totErrCnt"
+	display_error_count 'network connection issues' "$ncCnt" "$totErrCnt"
 	display_error_count 'short files' "$sCLECnt" "$totErrCnt"
-	display_error_count 'network connection issues' "$nCnt" "$totErrCnt"
-	display_error_count timeouts "$sSRTCnt" "$totErrCnt"
 	display_error_count 'unclassified replication errors' "$unclassifiedReplErrCnt" "$totErrCnt"
 }
 
@@ -263,21 +250,23 @@ display_error_count() {
 
 split_out_broken_conn_errs() {
 	local errorsFile="$1"
-	local logBase="$2"
+	local classFile="$2"
 
-	local shrlCnt
-	shrlCnt="$(\
-		split_out_repl_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$logBase".broken_conn )"
+	local cnt=0
 
-	local ssrCnt
-	ssrCnt+="$(\
+	cnt+="$(split_out_repl_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$classFile")"
+	cnt+="$(split_out_repl_class "errorsFile" -38000 SYS_AGENT_INIT_ERR "$classFile")"
+	cnt+="$(split_out_repl_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$classFile")"
+	cnt+="$(\
 		split_out_repl_class \
 			"$errorsFile" \
 			-116104 \
 			'SYS_SOCK_READ_ERR, Connection reset by peer' \
-			"$logBase".broken_conn )"
+			"$classFile" )"
+	cnt+="$(split_out_repl_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$classFile")"
+	cnt+="$(split_out_repl_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$classFile")"
 
-	echo $(( shrlCnt + ssrCnt ))
+	echo "$cnt"
 }
 
 
