@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+#TODO document replication algorithm in help
 
 show_help() {
 	cat <<EOF
@@ -73,6 +75,8 @@ readonly DEFAULT_MAX_TRANSFER_THREADS=3
 readonly DEFAULT_PROC_MULT=1
 readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly LOG=3
+readonly MAX_DATA_OBJS_PER_IREPL=1000
+readonly MAX_THREADS=16
 readonly TRANSFER_BUF_SZ=100
 
 
@@ -278,52 +282,38 @@ replicate() {
 	tot="$(count < "$objList")"
 	printf '%d data objects to replicate\n' "$tot" >&2
 
+	local maxIreplArgs maxProcs
+
 	if [[ "$tot" -gt 0 ]]; then
 		if [[ "$maxTransThreads" -gt 0 ]]; then
+			# threaded transfers
 			local cnt=0
 
-			# Small non-zero byte files
-			cnt="$(\
-				select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 16 200 0 1 "$untilTS" \
-			  		< "$objList" )"    # 16 1-threaded transfers
+			local threadsPerDataObj
+			for (( threadsPerDataObj=1; threadsPerDataObj<maxTransThreads; threadsPerDataObj++ )); do
+				maxProcs="$(max_procs "$threadsPerDataObj" "$procMult")"
+				maxIreplArgs="$(max_args_per_irepl "$threadsPerDataObj")"
 
-      	if [[ "$maxTransThreads" -ge 2 ]]; then
 				cnt="$(\
-					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 8 100 1 2 "$untilTS" \
-				  		< "$objList" )"  # 8 2-threaded
-      	fi
-
-			if [[ "$maxTransThreads" -ge 3 ]]; then
-				cnt="$(\
-					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 6 50 2 3 "$untilTS" \
-						< "$objList" )"  # 6 3-threaded
-			fi
-
-			if [[ "$maxTransThreads" -ge 5 ]]; then
-				cnt="$(\
-					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 4 20 3 5 "$untilTS" \
-						< "$objList" )"  # 4 4--5-threaded
-			fi
-
-			if [[ "$maxTransThreads" -ge 7 ]]; then
-				cnt="$(\
-					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 3 10 5 7 "$untilTS" \
-						< "$objList" )"  # 3 6--7-threaded
-			fi
-
-			if [[ "$maxTransThreads" -ge 15 ]]; then
-				cnt="$(\
-					select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 2 5 7 15 "$untilTS" \
-						< "$objList" )"  # 2 8--15-threaded
-			fi
+					select_cohort \
+							"$cnt" \
+							"$tot" \
+							"$srcResc" \
+							"$destResc" \
+							"$maxProcs" \
+							"$maxIreplArgs" \
+							"$threadsPerDataObj" \
+							"$untilTS" \
+						< "$objList" )"
+			done
 
 			# Large file transfers
 			local minSize
 			minSize="$(threads_to_MB "$maxTransThreads")"
 
-			local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (16 - 1) ))
+			local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (MAX_THREADS - 1) ))
 
-			# transfer remaining files not in last Cohort
+ 			# still small enough that they wouldn't default to using MAX_THREADS			
 			if (( minSize < lastCohortMinSz )); then
 				cnt="$(\
 					select_cohort_by_size \
@@ -339,7 +329,7 @@ replicate() {
 						< "$objList" )" 
 			fi
 
-			# last cohort transfers
+			# transfer files that would default to using MAX_THREADS
 			cnt="$(\
 				select_cohort_by_size \
 						"$cnt" \
@@ -353,15 +343,30 @@ replicate() {
 					< "$objList" )"
 
 			# zero byte files
+			maxProcs=$(( MAX_THREADS * procMult ))
+			maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 2)"
+
 			cnt="$(\
-				select_cohort "$cnt" "$tot" "$srcResc" "$destResc" "$procMult" 8 100 0 0 "$untilTS" \
-					< "$objList" )"  # 8 1-threaded transfers
+				select_cohort \
+						"$cnt" "$tot" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" 0 "$untilTS" \
+					< "$objList" )"
 		else
-			select_cohort 0 "$tot" "$srcResc" "$destResc" "$procMult" 16 2 -1 -1 "$untilTS" \
+			# streaming replication
+			maxProcs=$(( MAX_THREADS * procMult ))
+			maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 100)"
+
+			select_cohort 0 "$tot" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" -1 "$untilTS" \
 				< "$objList" \
 				> /dev/null
 		fi
 	fi
+}
+
+
+max_args_per_irepl() {
+	local threadsPerDataObj="$1"
+
+	div_ceil "$MAX_DATA_OBJS_PER_IREPL" $(( threadsPerDataObj * threadsPerDataObj ))
 }
 
 
@@ -463,7 +468,7 @@ d.resc_id IN (
 			FROM r_resc_main 
 			WHERE resc_name = '$resc'
 		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root 
-			FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent )
+			FROM r_resc_main AS r JOIN child_mapping AS m ON m.id = r.resc_parent::BIGINT )
 	SELECT id FROM child_mapping WHERE storage )
 SQL
 }
@@ -519,38 +524,31 @@ select_cohort() {
 	local tot="$2"
 	local srcResc="$3"
 	local destResc="$4"
-	local procMult="$5"
-	local maxProcs="$6"
-	local maxArgs="$7"
-	local minTransThreads="$8"
-	local maxTransThreads="$9"
-	local untilTS="${10}"
+	local maxProcs="$5"
+	local maxArgs="$6"
+	local transThreads="$7"
+	local untilTS="$8"
 
 	if ! CHECK_TIME "$untilTS"; then
 		return "$TIMEDOUT"
 	fi
 
 	local maxSizeB maxSizeMiB minSizeB minSizeMiB
-	if [[ "$maxTransThreads" -eq -1 ]]; then
-		maxTransThreads=0
+	if [[ "$transThreads" -eq -1 ]]; then
+		transThreads=0
 		minSizeMiB=0
 		minSizeB=0
 		maxSizeMiB=
 		maxSizeB=
-	elif [[ "$maxTransThreads" -eq 0 ]]; then
+	elif [[ "$transThreads" -eq 0 ]]; then
 		minSizeMiB=0
 		minSizeB=0
 		maxSizeMiB=0
 		maxSizeB=1
-	elif [[ "$minTransThreads" -eq 0 ]]; then
-		minSizeMiB=0
-		minSizeB=1
-		maxSizeMiB="$(threads_to_MB "$maxTransThreads")"
-		maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
 	else
-		minSizeMiB="$(threads_to_MB "$minTransThreads")"
+		minSizeMiB="$(threads_to_MB $(( transThreads - 1 )))"
 		minSizeB=$((minSizeMiB * ((1024 ** 2))))
-		maxSizeMiB="$(threads_to_MB "$maxTransThreads")"
+		maxSizeMiB="$(threads_to_MB "$transThreads")"
 		maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
 	fi
 
@@ -578,10 +576,8 @@ select_cohort() {
 	fi >&2
 
 	if [[ "$subTotal" -gt 0 ]]; then
-		maxProcs=$((maxProcs * procMult))
-
 		parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
-					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxTransThreads'" "'$untilTS'" \
+					REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$LOG" \
 			| tee >(cat >&"$LOG") \
@@ -611,7 +607,8 @@ select_cohort_by_size() {
 		maxSizeMiB="$9"
 	fi
 
-	local maxProcs=1
+	local maxProcs
+	maxProcs="$(max_procs "$maxTransThreads" "$procMult")"
 
 	if ! CHECK_TIME "$untilTS"; then
 		return "$TIMEDOUT"
@@ -642,8 +639,6 @@ select_cohort_by_size() {
 	fi
 
 	if [[ "$subTotal" -gt 0 ]]; then
-		maxProcs=$((maxProcs * procMult))
-
 		parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
 					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxTransThreads'" "'$untilTS'" \
 				< "$cohortList" \
@@ -658,8 +653,24 @@ select_cohort_by_size() {
 }
 
 
+max_procs() {
+	local threadsPerDataObj="$1"
+	local procMult="$2"
+
+	div_ceil $(( MAX_THREADS * procMult )) "$threadsPerDataObj"
+}
+
+
+div_ceil() {
+	local numerator="$1"
+	local denominator="$2"
+
+	echo $(( 1 + (numerator - 1) / denominator ))
+}
+
+
 threads_to_MB() {
-  local threads="$1"
+	local threads="$1"
 
 	echo $(( threads * TRANSFER_BUF_SZ ))
 }
