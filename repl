@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-#TODO document replication algorithm in help
-
 show_help() {
 	cat <<EOF
 
@@ -15,7 +13,26 @@ replicates objects to the DEST-RESC if a replica doesn't already exist there. It
 writes progress to standard error and all messages, error or otherwise, to
 standard out.
 
-This works with iRODS 4.2.8 or later.
+For streaming replication, the number of concurrent irepl calls will 
+approximately be MULTIPLIER*16 with at most 10 data objects being replicated per 
+call.
+
+For threaded replication, the data objects are broken into cohorts based on the
+number of threads iRODS will use to perform the transfer. Objects of size zero
+and those with size at least 1600 MiB are handled separately. For a cohort 
+whose members will be transfered using N threads, the number of concurrent irepl
+calls will be approximately MULTIPLIER*16/N with approximately 1000/N^2 objects
+being replicated per call.
+
+For data objects that have a size of at least 1600 MiB, the number of concurrent
+irepl calls will approximately be MULTIPLIER*MAX with one object being 
+replicated per call.
+
+A data object with size zero could either be empty or could still be in the 
+process of being created. Size zero data objects are handled last to allow for
+any in-flight data to finish being written to storage. The number of concurrent
+irepl calls will approximately be MULTIPLIER*16 with 500 objects being 
+replicated per call.
 
 Options:
  -A, --age AGE                   how many days old a data object must be to be
@@ -52,8 +69,9 @@ The program echos the output of the underlying \`irepl -v\` calls to stdout. It
 writes overall progress to stderr in way suitable for display on a terminal. 
 
 Prerequisites:
- 1) The user must be initialized with iRODS as an admin user.
- 2) The user must be able to connect to the ICAT DB without providing a
+ 1) iRODS 4.2.8 or later
+ 2) The user must be initialized with iRODS as an admin user.
+ 3) The user must be able to connect to the ICAT DB without providing a
     password.
 
 © 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
@@ -313,6 +331,8 @@ replicate() {
 
 			local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (MAX_THREADS - 1) ))
 
+			maxIreplArgs="$(max_args_per_irepl "$maxTransThreads")"
+
  			# still small enough that they wouldn't default to using MAX_THREADS			
 			if (( minSize < lastCohortMinSz )); then
 				cnt="$(\
@@ -323,6 +343,7 @@ replicate() {
 							"$destResc" \
 							"$procMult" \
 							"$maxTransThreads" \
+							"$maxIreplArgs" \
 							"$untilTS" \
 							"$minSize" \
 							"$lastCohortMinSz" \
@@ -330,6 +351,7 @@ replicate() {
 			fi
 
 			# transfer files that would default to using MAX_THREADS
+			maxIreplArgs=1
 			cnt="$(\
 				select_cohort_by_size \
 						"$cnt" \
@@ -338,6 +360,7 @@ replicate() {
 						"$destResc" \
 						"$procMult" \
 						"$maxTransThreads" \
+						"$maxIreplArgs" \
 						"$untilTS" \
 						"$lastCohortMinSz" \
 					< "$objList" )"
@@ -470,7 +493,9 @@ d.resc_id IN (
 		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root 
 			FROM r_resc_main AS r 
 				JOIN child_mapping AS m 
-					ON m.id = CASE WHEN r.resc_parent = '' THEN NULL ELSE r.resc_parent::BIGINT END )
+					ON m.id = CASE WHEN r.resc_parent::TEXT = '' 
+						THEN NULL 
+						ELSE r.resc_parent::BIGINT END )
 	SELECT id FROM child_mapping WHERE storage )
 SQL
 }
@@ -567,14 +592,11 @@ select_cohort() {
 	subTotal="$(count <"$cohortList")"
 
 	if [[ "$minSizeMiB" -le 0 ]] && [[ -z "$maxSizeMiB" ]]; then
-		printf 'Replicating %s files\n' "$subTotal"
-	elif [[ "$minSizeMiB" -le 0 ]] && [[ "$maxSizeMiB" -le 0 ]]; then
-		printf 'Replicating %s files with size 0 MiB\n' "$subTotal"
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
 	elif [[ "$minSizeMiB" -le 0 ]]; then
-		printf 'Replicating %s files with size in (0, %s) MiB\n' "$subTotal" "$maxSizeMiB"
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
 	else
-		printf 'Replicating %s files with size in [%s, %s) MiB\n' \
-			"$subTotal" "$minSizeMiB" "$maxSizeMiB"
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
 	fi >&2
 
 	if [[ "$subTotal" -gt 0 ]]; then
@@ -601,12 +623,13 @@ select_cohort_by_size() {
 	local destResc="$4"
 	local procMult="$5"
 	local maxTransThreads="$6"
-	local untilTS="$7"
-	local minSizeMiB="$8"
+	local maxArgs="$7"
+	local untilTS="$8"
+	local minSizeMiB="$9"
 
 	local maxSizeMiB=
-	if [[ "$#" -ge 9 ]]; then
-		maxSizeMiB="$9"
+	if [[ "$#" -ge 10 ]]; then
+		maxSizeMiB="${10}"
 	fi
 
 	local maxProcs
@@ -632,16 +655,10 @@ select_cohort_by_size() {
 	local subTotal
 	subTotal="$(count < "$cohortList")"
 
-	if [[ -n "$maxSizeMiB" ]]; then
-		printf 'Replicating %s files with size in [%s, %s) MiB\n' \
-				"$subTotal" "$minSizeMiB" "$maxSizeMiB" \
-			>&2
-	else
-		printf 'Replicating %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
-	fi
+	disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin >&2
 
 	if [[ "$subTotal" -gt 0 ]]; then
-		parallel --no-notice --null --halt 2 --max-args 2 --max-procs "$maxProcs" \
+		parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
 					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxTransThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$LOG" \
@@ -652,6 +669,48 @@ select_cohort_by_size() {
 	fi
 
 	rm --force "$cohortList"
+}
+
+
+disp_cohort_info() {
+	local cohortSize="$1"
+	local maxProcs="$2"
+	local maxArgs="$3"
+	local minObjSizeMiB="$4"
+	local maxObjSizeMiB="$5"
+
+	local includeMin=''
+	if (( $# >= 6 )); then
+		includeMin="$6"
+	fi
+
+	if [[ -z "$minSizeMiB" ]] || (( ${minSizeMiB-0} < 0 )); then
+		minSizeMiB=0
+	fi
+
+	local objSizeInfo
+	if [[ -z "$maxObjSizeMiB" ]]; then
+		if [[ -n "$includeMin" ]]; then
+			if (( minObjSizeMiB == 0 )); then
+				objSizeInfo=''
+			else
+				printf -v objSizeInfo 'with size >= %s MiB' "$minObjSizeMiB"
+			fi
+		else
+			printf -v objSizeInfo 'with size > %s MiB' "$minObjSizeMiB"
+		fi
+	elif (( minObjSizeMiB < maxObjSizeMiB )); then
+		if [[ -n "$includeMin" ]]; then
+			printf -v objSizeInfo 'with size in [%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
+		else
+			printf -v objSizeInfo 'with size in (%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
+		fi
+	else
+		printf -v objSizeInfo 'with size %s MiB' "$minObjSizeMiB"
+	fi
+
+	printf 'Replicating %s files %s (%s procs, %s objects/proc)\n' \
+		"$cohortSize" "$objSizeInfo" "$maxProcs" "$maxArgs"
 }
 
 
