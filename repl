@@ -468,7 +468,9 @@ d.resc_id IN (
 			FROM r_resc_main 
 			WHERE resc_name = '$resc'
 		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root 
-			FROM r_resc_main AS r JOIN child_mapping AS m ON m.id = r.resc_parent::BIGINT )
+			FROM r_resc_main AS r 
+				JOIN child_mapping AS m 
+					ON m.id = CASE WHEN r.resc_parent = '' THEN NULL ELSE r.resc_parent::BIGINT END )
 	SELECT id FROM child_mapping WHERE storage )
 SQL
 }
