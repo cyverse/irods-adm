@@ -19,12 +19,12 @@ call.
 
 For threaded replication, the data objects are broken into cohorts based on the
 number of threads iRODS will use to perform the transfer. Objects of size zero
-and those with size at least 1600 MiB are handled separately. For a cohort 
+and those with size at least 1500 MiB are handled separately. For a cohort 
 whose members will be transfered using N threads, the number of concurrent irepl
 calls will be approximately MULTIPLIER*16/N with approximately 1000/N^2 objects
 being replicated per call.
 
-For data objects that have a size of at least 1600 MiB, the number of concurrent
+For data objects that have a size of at least 1500 MiB, the number of concurrent
 irepl calls will approximately be MULTIPLIER*MAX with one object being 
 replicated per call.
 
