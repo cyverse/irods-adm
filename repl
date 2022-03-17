@@ -206,6 +206,27 @@ resolve_opts() {
 }
 
 
+format_opts() {
+	local longOpts=(
+		age: 
+		collection: 
+		help 
+		host: 
+		max-transfer-threads: 
+		multiplier: 
+		port: 
+		dest-resc: 
+		src-resc: 
+		until: 
+		user:
+		version )
+
+	local longOptsStr
+	longOptsStr="$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)"
+	getopt --name "$EXEC_NAME" --longoptions "$longOptsStr" --options A:C:hH:M:N:P:R:S:u:U:v -- "$@"
+}
+
+
 replicate() {
 	local age="$1"
 	local maxTransThreads="$2"
@@ -386,34 +407,6 @@ replicate() {
 }
 
 
-max_args_per_irepl() {
-	local threadsPerDataObj="$1"
-
-	div_ceil "$MAX_DATA_OBJS_PER_IREPL" $(( threadsPerDataObj * threadsPerDataObj ))
-}
-
-
-format_opts() {
-	local longOpts=(
-		age: 
-		collection: 
-		help 
-		host: 
-		max-transfer-threads: 
-		multiplier: 
-		port: 
-		dest-resc: 
-		src-resc: 
-		until: 
-		user:
-		version )
-
-	local longOptsStr
-	longOptsStr="$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)"
-	getopt --name "$EXEC_NAME" --longoptions "$longOptsStr" --options A:C:hH:M:N:P:R:S:u:U:v -- "$@"
-}
-
-
 finish() {
 	local exitCode="$1"
 	local objList="$2"
@@ -430,54 +423,26 @@ finish() {
 }
 
 
-count() {
-	local tot=0
+max_args_per_irepl() {
+	local threadsPerDataObj="$1"
 
-	while read -r -d ''; do
-		((tot++))
-	done
-
-	echo "$tot"
+	div_ceil "$MAX_DATA_OBJS_PER_IREPL" $(( threadsPerDataObj * threadsPerDataObj ))
 }
 
 
-partition() {
-	local minSizeB="$1"
+mk_repl_query() {
+	local maxTime="$1"
+	local baseCond="$2"
+	local resCond="$3"
 
-	local maxSizeB=
-	if [[ "$#" -ge 2 ]]; then
-		maxSizeB="$2"
-	fi
-
-	local size
-	if [[ -n "$maxSizeB" ]]; then
-		while IFS= read -r -d ''; do
-			size="${REPLY%% *}"
-
-			if [[ $size -ge $minSizeB && $size -lt $maxSizeB ]]; then
-				printf '%s\0' "${REPLY#* }"
-			fi
-		done
-	else
-		while IFS= read -r -d ''; do
-			size="${REPLY%% *}"
-
-			if [[ $size -ge $minSizeB ]]; then
-				printf '%s\0' "${REPLY#* }"
-			fi
-		done
-	fi
-}
-
-
-mk_prog_msg() {
-	local count="$1"
-	local total="$2"
-	local subCount="$3"
-	local subTotal="$4"
-
-	printf 'cohort: %0*d/%d, all: %0*d/%d' \
-		${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
+	cat <<EOSQL
+SELECT d.data_size, c.coll_name || '/' || d.data_name
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
+	AND d.create_ts < '0$maxTime'
+	AND ($baseCond)
+	AND ($resCond)
+EOSQL
 }
 
 
@@ -498,51 +463,6 @@ d.resc_id IN (
 						ELSE r.resc_parent::BIGINT END )
 	SELECT id FROM child_mapping WHERE storage )
 SQL
-}
-
-
-mk_repl_query() {
-	local maxTime="$1"
-	local baseCond="$2"
-	local resCond="$3"
-
-	cat <<EOSQL
-SELECT d.data_size, c.coll_name || '/' || d.data_name
-FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
-	AND d.create_ts < '0$maxTime'
-	AND ($baseCond)
-	AND ($resCond)
-EOSQL
-}
-
-
-track_prog() {
-	local cnt="$1"
-	local tot="$2"
-	local subTot="$3"
-
-	local subCnt=0
-
-	local msg
-	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
-
-	printf '%s' "$msg" >&2
-
-	while read -r; do
-		if [[ "$REPLY" != 'cliReconnManager: '* ]]; then
-			((subCnt++))
-			((cnt++))
-			printf '\r%*s\r' ${#msg} '' >&2
-			msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
-			printf '%s' "$msg" >&2
-		fi
-	done
-
-	printf '\r%*s\r' ${#msg} '' >&2
-	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
-	printf '%s\n' "$msg" >&2
-	printf '%s' "$cnt"
 }
 
 
@@ -614,8 +534,7 @@ select_cohort() {
 }
 
 
-# This is intended for large files. irepl will be run on at most two files at a
-# time.
+# This is intended for large files.
 select_cohort_by_size() {
 	local cnt="$1"
 	local tot="$2"
@@ -669,6 +588,17 @@ select_cohort_by_size() {
 	fi
 
 	rm --force "$cohortList"
+}
+
+
+count() {
+	local tot=0
+
+	while read -r -d ''; do
+		((tot++))
+	done
+
+	echo "$tot"
 }
 
 
@@ -730,10 +660,79 @@ div_ceil() {
 }
 
 
+partition() {
+	local minSizeB="$1"
+
+	local maxSizeB=
+	if [[ "$#" -ge 2 ]]; then
+		maxSizeB="$2"
+	fi
+
+	local size
+	if [[ -n "$maxSizeB" ]]; then
+		while IFS= read -r -d ''; do
+			size="${REPLY%% *}"
+
+			if [[ $size -ge $minSizeB && $size -lt $maxSizeB ]]; then
+				printf '%s\0' "${REPLY#* }"
+			fi
+		done
+	else
+		while IFS= read -r -d ''; do
+			size="${REPLY%% *}"
+
+			if [[ $size -ge $minSizeB ]]; then
+				printf '%s\0' "${REPLY#* }"
+			fi
+		done
+	fi
+}
+
+
 threads_to_MB() {
 	local threads="$1"
 
 	echo $(( threads * TRANSFER_BUF_SZ ))
+}
+
+
+track_prog() {
+	local cnt="$1"
+	local tot="$2"
+	local subTot="$3"
+
+	local subCnt=0
+
+	local msg
+	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+
+	printf '%s' "$msg" >&2
+
+	while read -r; do
+		if [[ "$REPLY" != 'cliReconnManager: '* ]]; then
+			((subCnt++))
+			((cnt++))
+			printf '\r%*s\r' ${#msg} '' >&2
+			msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+			printf '%s' "$msg" >&2
+		fi
+	done
+
+	printf '\r%*s\r' ${#msg} '' >&2
+	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+	printf '%s\n' "$msg" >&2
+	printf '%s' "$cnt"
+}
+
+
+mk_prog_msg() {
+	local count="$1"
+	local total="$2"
+	local subCount="$3"
+	local subTotal="$4"
+
+	printf 'cohort: %0*d/%d, all: %0*d/%d' \
+		${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
 }
 
 
