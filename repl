@@ -31,8 +31,8 @@ replicated per call.
 A data object with size zero could either be empty or could still be in the 
 process of being created. Size zero data objects are handled last to allow for
 any in-flight data to finish being written to storage. The number of concurrent
-irepl calls will approximately be MULTIPLIER*16 with 500 objects being 
-replicated per call.
+irepl calls will approximately be MULTIPLIER*8 with 500 objects being replicated 
+per call.
 
 Options:
  -A, --age AGE                   how many days old a data object must be to be
@@ -388,7 +388,7 @@ replicate() {
 					< "$objList" )"
 
 			# zero byte files
-			maxProcs=$(( MAX_THREADS * procMult ))
+			maxProcs="$(div_ceil $(( MAX_THREADS * procMult )) 2)"
 			maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 2)"
 
 			cnt="$(\
