@@ -267,7 +267,7 @@ replicate() {
 	local objList
 	objList="$(mktemp)"
 
-	trap 'finish "$?" '"'$objList'" EXIT
+	trap 'finish $? '"'$objList'" EXIT
 
 	if ! iadmin lz &> /dev/null; then
 		printf "aren't authenticated as a rodsadmin user\n" >&2
@@ -373,6 +373,7 @@ replicate() {
 
 			# transfer files that would default to using MAX_THREADS
 			maxIreplArgs=1
+
 			cnt="$(\
 				select_cohort_by_size \
 						"$cnt" \
@@ -494,9 +495,9 @@ select_cohort() {
 		maxSizeB=1
 	else
 		minSizeMiB="$(threads_to_MB $(( transThreads - 1 )))"
-		minSizeB=$((minSizeMiB * ((1024 ** 2))))
+		minSizeB=$(( minSizeMiB * 1024 ** 2 ))
 		maxSizeMiB="$(threads_to_MB "$transThreads")"
-		maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
+		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
 	fi
 
 	local cohortList
@@ -511,7 +512,7 @@ select_cohort() {
 	local subTotal
 	subTotal="$(count <"$cohortList")"
 
-	if [[ "$minSizeMiB" -le 0 ]] && [[ -z "$maxSizeMiB" ]]; then
+	if [[ "$minSizeMiB" -le 0 && -z "$maxSizeMiB" ]]; then
 		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
 	elif [[ "$minSizeMiB" -le 0 ]]; then
 		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
@@ -547,7 +548,7 @@ select_cohort_by_size() {
 	local minSizeMiB="$9"
 
 	local maxSizeMiB=
-	if [[ "$#" -ge 10 ]]; then
+	if [[ $# -ge 10 ]]; then
 		maxSizeMiB="${10}"
 	fi
 
@@ -558,14 +559,14 @@ select_cohort_by_size() {
 		return "$TIMEDOUT"
 	fi
 
-	local minSizeB=$((minSizeMiB * 1024 ** 2))
-	local maxSizeB=$((maxSizeMiB * 1024 ** 2))
+	local minSizeB=$(( minSizeMiB * 1024 ** 2 ))
+	local maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
 
 	local cohortList
 	cohortList="$(mktemp)"
 
 	if [[ -n "$maxSizeMiB" ]]; then
-		local maxSizeB=$((maxSizeMiB * ((1024 ** 2))))
+		local maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
 		partition "$minSizeB" "$maxSizeB"
 	else
 		partition "$minSizeB"
@@ -595,7 +596,7 @@ count() {
 	local tot=0
 
 	while read -r -d ''; do
-		((tot++))
+		: $(( tot++ ))
 	done
 
 	echo "$tot"
@@ -664,7 +665,7 @@ partition() {
 	local minSizeB="$1"
 
 	local maxSizeB=
-	if [[ "$#" -ge 2 ]]; then
+	if [[ $# -ge 2 ]]; then
 		maxSizeB="$2"
 	fi
 
@@ -673,7 +674,7 @@ partition() {
 		while IFS= read -r -d ''; do
 			size="${REPLY%% *}"
 
-			if [[ $size -ge $minSizeB && $size -lt $maxSizeB ]]; then
+			if [[ "$size" -ge "$minSizeB" && "$size" -lt "$maxSizeB" ]]; then
 				printf '%s\0' "${REPLY#* }"
 			fi
 		done
@@ -681,7 +682,7 @@ partition() {
 		while IFS= read -r -d ''; do
 			size="${REPLY%% *}"
 
-			if [[ $size -ge $minSizeB ]]; then
+			if [[ "$size" -ge "$minSizeB" ]]; then
 				printf '%s\0' "${REPLY#* }"
 			fi
 		done
@@ -710,8 +711,8 @@ track_prog() {
 
 	while read -r; do
 		if [[ "$REPLY" != 'cliReconnManager: '* ]]; then
-			((subCnt++))
-			((cnt++))
+			: $(( subCnt++ ))
+			: $(( cnt++ ))
 			printf '\r%*s\r' ${#msg} '' >&2
 			msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
 			printf '%s' "$msg" >&2
@@ -759,13 +760,13 @@ REPL_BATCH() {
 	#fi
 
 	local replStatus=0
-	irepl "${replArgs[@]}" "$@" || replStatus="$?"
+	irepl "${replArgs[@]}" "$@" || replStatus=$?
 
 	# TODO: Trying to figure out the irepl error code for when irepl logs a
 	# '_rcConnect: connectToRhost error, server on data.cyverse.org:1247 is
 	# probably down status = -305113 USER_SOCK_CONNECT_ERR, No route to host'
-	# error message. It is probably at 113, but we should confirm. Once this is
-	# confirmed, if this status is returned, this function	should wait for a bit
+	# error message. It is probably a 113, but we should confirm. Once this is
+	# confirmed, if this status is returned, this function should wait for a bit
 	# and try again.
 	if [[ "$replStatus" -ne 0 ]]; then
 		printf 'repl: irepl exited with status %d\n' "$replStatus" >&2
@@ -777,9 +778,11 @@ export -f REPL_BATCH
 
 
 CHECK_TIME() {
+	set -o errexit -o nounset -o pipefail
+
 	local untilTS="$1"
 
-	if [[ -n "$untilTS" ]] && [[ "$(date '+%s')" -ge "$untilTS" ]]; then
+	if [[ -n "$untilTS" && "$(date '+%s')" -ge "$untilTS" ]]; then
 		return "$TIMEDOUT"
 	fi
 }
