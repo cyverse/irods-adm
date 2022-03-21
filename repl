@@ -255,6 +255,11 @@ replicate() {
 			printf '"%s" is not a valid date format\n' "$until"
 			return 1
 		fi
+
+		if ! CHECK_TIME "$untilTS"; then
+			printf 'Stop time is in the past\n' >&2
+			return 1
+		fi
 	fi
 
 	# Redirect stdout to FD 3 to use as a logging channel
@@ -273,11 +278,6 @@ replicate() {
 	if ! psql ICAT <<<'' &> /dev/null; then
 		printf "aren't able to connect to the ICAT DB without a password\n" >&2
 		return 1
-	fi
-
-	if ! CHECK_TIME "$untilTS"; then
-	 printf 'Stop time is in the past\n' >&2
-	 return 1
 	fi
 
 	printf 'Retrieving data objects to replicate...\n' >&2
