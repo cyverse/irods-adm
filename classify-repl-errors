@@ -120,7 +120,7 @@ main() {
 
 
 remove_temp_files() {
-	if [[ "${#TempFiles[@]}" -gt 0 ]]; then
+	if (( ${#TempFiles[@]} > 0 )); then
 		rm --force "${TempFiles[@]}"
 	fi
 }
@@ -185,7 +185,7 @@ classify_errors() {
 
 	display_error_count 'unclassified errors' "$unclassifiedErrCnt" "$errCnt"
 
-	if [[ "$unclassifiedErrCnt" -gt 0 ]]; then
+	if (( unclassifiedErrCnt > 0 )); then
 		mv "$errorsFile" "$logBase".unclassified_errors
 	fi
 }
