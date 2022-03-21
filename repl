@@ -236,13 +236,9 @@ replicate() {
 	local destResc="$6"
 	local until="$7"
 
-	if [[ -n "$procMult" ]]; then
-		if ! [[ "$procMult" =~ ^[1-9][0-9]* ]]; then
-			printf 'The multiplier must be a positive number. The given value was %s.\n' "$procMult" \
-				>&2
-
-			return 1
-		fi
+	if [[ -n "$procMult" ]] && ! [[ "$procMult" =~ ^[1-9][0-9]* ]]; then
+		printf 'The multiplier must be a positive number. The given value was %s.\n' "$procMult" >&2
+		return 1
 	fi
 
 	if [[ -n "$destResc" && "$srcResc" == "$destResc" ]]; then
@@ -253,7 +249,7 @@ replicate() {
 		return 1
 	fi
 
-	local untilTS=
+	local untilTS=''
 	if [[ -n "$until" ]]; then
 		if ! untilTS="$(date --date="$until" '+%s')"; then
 			printf '"%s" is not a valid date format\n' "$until"
