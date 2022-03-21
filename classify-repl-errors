@@ -31,8 +31,8 @@ cause \`irepl\` problems.
 CLASS-BASE.chksum_mismatches holds the paths to data objects with checksums that
 differ from the checksums of their respective physical files.
 
-CLASS-BASE.fs_errors holds the paths to data objects where are a issues with the
-file systems hold the objects' physical files.
+CLASS-BASE.fs_errors holds the paths to data objects where there are issues with 
+the file systems holding the objects' physical files.
 
 CLASS-BASE.missing_replicas holds the paths to data objects that are missing 
 their physical files.
@@ -42,6 +42,9 @@ issues prevented replication.
 
 CLASS-BASE.short_file holds the paths to data objects having sizes larger than
 their respective physical files' sizes.
+
+CLASS-BASE.write holds the paths to data objects where the replica failed to be
+written to destination resource server.
 
 CLASS-BASE.unclassified_repl_errors holds the log messages for replication
 related errors that couldn't be classified.
@@ -223,6 +226,14 @@ classify_repl_errors() {
 			'UNIX_FILE_OPEN_ERR, Structure needs cleaning' \
 			"$logBase".fs_errors )"
 
+	local ufwErrCnt
+	ufwErrCnt="$(\
+		split_out_repl_class \
+		"$errorsFile" \
+		-513002 \
+		'UNIX_FILE_WRITE_ERR, No such file or directory' \
+		"$logBase".write )"
+
 	local unclassifiedReplErrCnt
 	unclassifiedReplErrCnt="$(wc --lines < "$errorsFile")"
 
@@ -235,6 +246,7 @@ classify_repl_errors() {
 	display_error_count 'filesystem errors' "$uFOEFSErrCnt" "$totErrCnt"
 	display_error_count 'network connection issues' "$ncCnt" "$totErrCnt"
 	display_error_count 'short files' "$sCLECnt" "$totErrCnt"
+	display_error_count 'write failures' "$ufwErrCnt" "$totErrCnt"
 	display_error_count 'unclassified replication errors' "$unclassifiedReplErrCnt" "$totErrCnt"
 }
 
