@@ -344,7 +344,7 @@ replicate() {
 
 			# Large file transfers
 			local minSize
-			minSize="$(threads_to_MB "$maxTransThreads")"
+			minSize="$(threads_to_min_MiB "$maxTransThreads")"
 
 			local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (MAX_THREADS - 1) ))
 
@@ -490,9 +490,9 @@ select_cohort() {
 		maxSizeMiB=0
 		maxSizeB=1
 	else
-		minSizeMiB="$(threads_to_MB $(( transThreads - 1 )))"
+		minSizeMiB="$(threads_to_min_MiB "$transThreads")"
 		minSizeB=$(( minSizeMiB * 1024 ** 2 ))
-		maxSizeMiB="$(threads_to_MB "$transThreads")"
+		maxSizeMiB="$(threads_to_min_MiB $(( transThreads + 1 )))"
 		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
 	fi
 
@@ -686,10 +686,10 @@ partition() {
 }
 
 
-threads_to_MB() {
+threads_to_min_MiB() {
 	local threads="$1"
 
-	echo $(( threads * TRANSFER_BUF_SZ ))
+	echo $(( (threads - 1) * TRANSFER_BUF_SZ ))
 }
 
 
