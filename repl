@@ -262,14 +262,6 @@ replicate() {
 		fi
 	fi
 
-	# Redirect stdout to FD 3 to use as a logging channel
-	eval "exec $LOG>&1"
-
-	local objList
-	objList="$(mktemp)"
-
-	trap 'finish $? '"'$objList'" EXIT
-
 	if ! iadmin lz &> /dev/null; then
 		printf "aren't authenticated as a rodsadmin user\n" >&2
 		return 1
@@ -279,6 +271,14 @@ replicate() {
 		printf "aren't able to connect to the ICAT DB without a password\n" >&2
 		return 1
 	fi
+
+	# Redirect stdout to FD 3 to use as a logging channel
+	eval "exec $LOG>&1"
+
+	local objList
+	objList="$(mktemp)"
+
+	trap 'finish $? '"'$objList'" EXIT
 
 	printf 'Retrieving data objects to replicate...\n' >&2
 
