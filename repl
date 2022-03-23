@@ -39,6 +39,7 @@ Options:
                                  replicated, default: 1
  -C, --collection COLLECTION     only replicate the data objects in this 
                                  collection
+ -d, --debug                     don't clean up temp files
  -h, --help                      show help and exit
  -H, --host HOST                 connect to the ICAT's DBMS on the host HOST
                                  instead of the PostgreSQL default
@@ -74,13 +75,13 @@ Prerequisites:
  3) The user must be able to connect to the ICAT DB without providing a
     password.
 
-© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+© 2022, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
 EOF
 }
 
 
-readonly VERSION=7
+readonly VERSION=8
 
 set -o errexit -o nounset -o pipefail
 
@@ -96,6 +97,8 @@ readonly LOG=3
 readonly MAX_DATA_OBJS_PER_IREPL=1000
 readonly MAX_THREADS=16
 readonly TRANSFER_BUF_SZ=100
+
+declare DEBUG=''
 
 
 main() {
@@ -153,6 +156,10 @@ resolve_opts() {
 				eval "$mapVar""[collection]='$2'"
 				shift 2
 				;;
+			-d|--debug)
+				readonly DEBUG=debug
+				shift 1
+				;;
 			-h|--help)
 				eval "$mapVar"'[help]=help'
 				shift 1
@@ -209,7 +216,8 @@ resolve_opts() {
 format_opts() {
 	local longOpts=(
 		age: 
-		collection: 
+		collection:
+		debug
 		help 
 		host: 
 		max-transfer-threads: 
@@ -223,7 +231,7 @@ format_opts() {
 
 	local longOptsStr
 	longOptsStr="$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)"
-	getopt --name "$EXEC_NAME" --longoptions "$longOptsStr" --options A:C:hH:M:N:P:R:S:u:U:v -- "$@"
+	getopt --name "$EXEC_NAME" --longoptions "$longOptsStr" --options A:dC:hH:M:N:P:R:S:u:U:v -- "$@"
 }
 
 
@@ -312,6 +320,10 @@ replicate() {
 			--command "$replQuery" --field-separator ' ' \
 			ICAT \
 		> "$objList"
+
+	if [[ -n "$DEBUG" ]]; then
+		printf 'DEBUG: object list in %s\n' "$objList" >&2
+	fi
 
 	local tot
 	tot="$(count < "$objList")"
@@ -408,7 +420,10 @@ finish() {
 	local exitCode="$1"
 	local objList="$2"
 
-	rm --force "$objList"
+	if [[ -z "$DEBUG" ]]; then
+		rm --force "$objList"
+	fi
+
 	eval "exec 1>&$LOG $LOG>&-"
 
 	if [[ "$exitCode" -eq "$TIMEDOUT" ]]; then
