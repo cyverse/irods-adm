@@ -159,7 +159,7 @@ fix() {
 
 	trap rm_temp_files EXIT
 
-	TempFiles+=( "$(mktemp)" )
+	TempFiles+=("$(mktemp)")
 	local problems="${TempFiles[-1]}"
 
 	local cutoffTime
@@ -169,10 +169,10 @@ fix() {
 
 	trap 'if [[ "${FUNCNAME[0]-}" != main ]]; then return; fi' SIGINT SIGTERM
 
-	TempFiles+=( "$(mktemp)" )
+	TempFiles+=("$(mktemp)")
 	local fixLog="${TempFiles[-1]}"
 
-	TempFiles+=( "$(mktemp)" )
+	TempFiles+=("$(mktemp)")
 	local errorLog="${TempFiles[-1]}"
 
 	fix_problems < "$problems" > "$fixLog" 2> "$errorLog" || true
