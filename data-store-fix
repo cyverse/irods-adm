@@ -1,4 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/bash
+# XXX pidof that is installed from sysvinit-tools-2.88 doesn't detect scripts
+#     launched using env. After switching our admin servers to Ubuntu, we
+#     can revert this workaround
+##!/usr/bin/env bash
+# XXX ^^^
+
 
 show_help() {
 	cat <<EOF
