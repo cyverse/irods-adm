@@ -331,8 +331,8 @@ replicate() {
 
 	local maxIreplArgs maxProcs
 
-	if [[ "$tot" -gt 0 ]]; then
-		if [[ "$maxTransThreads" -gt 0 ]]; then
+	if (( tot > 0 )); then
+		if (( maxTransThreads > 0 )); then
 			# threaded transfers
 			local cnt=0
 
@@ -426,7 +426,7 @@ finish() {
 
 	eval "exec 1>&$LOG $LOG>&-"
 
-	if [[ "$exitCode" -eq "$TIMEDOUT" ]]; then
+	if (( exitCode == TIMEDOUT )); then
 		printf 'out of time\n' >&2
 		exit 0
 	fi
@@ -493,13 +493,13 @@ select_cohort() {
 	fi
 
 	local maxSizeB maxSizeMiB minSizeB minSizeMiB
-	if [[ "$transThreads" -eq -1 ]]; then
+	if (( transThreads == -1 )); then
 		transThreads=0
 		minSizeMiB=0
 		minSizeB=0
 		maxSizeMiB=
 		maxSizeB=
-	elif [[ "$transThreads" -eq 0 ]]; then
+	elif (( transThreads == 0 )); then
 		minSizeMiB=0
 		minSizeB=0
 		maxSizeMiB=0
@@ -523,15 +523,15 @@ select_cohort() {
 	local subTotal
 	subTotal="$(count <"$cohortList")"
 
-	if [[ "$minSizeMiB" -le 0 && -z "$maxSizeMiB" ]]; then
+	if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
 		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
-	elif [[ "$minSizeMiB" -le 0 ]]; then
+	elif (( minSizeMiB <= 0 )); then
 		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
 	else
 		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
 	fi >&2
 
-	if [[ "$subTotal" -gt 0 ]]; then
+	if (( subTotal > 0 )); then
 		parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
 					REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
 				< "$cohortList" \
@@ -559,7 +559,7 @@ select_cohort_by_size() {
 	local minSizeMiB="$9"
 
 	local maxSizeMiB=
-	if [[ $# -ge 10 ]]; then
+	if (( $# >= 10 )); then
 		maxSizeMiB="${10}"
 	fi
 
@@ -588,7 +588,7 @@ select_cohort_by_size() {
 
 	disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin >&2
 
-	if [[ "$subTotal" -gt 0 ]]; then
+	if (( subTotal > 0 )); then
 		parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
 					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxTransThreads'" "'$untilTS'" \
 				< "$cohortList" \
@@ -676,7 +676,7 @@ partition() {
 	local minSizeB="$1"
 
 	local maxSizeB=
-	if [[ $# -ge 2 ]]; then
+	if (( $# >= 2 )); then
 		maxSizeB="$2"
 	fi
 
@@ -685,7 +685,7 @@ partition() {
 		while IFS= read -r -d ''; do
 			size="${REPLY%% *}"
 
-			if [[ "$size" -ge "$minSizeB" && "$size" -lt "$maxSizeB" ]]; then
+			if (( size >= minSizeB && size < maxSizeB )); then
 				printf '%s\0' "${REPLY#* }"
 			fi
 		done
@@ -693,7 +693,7 @@ partition() {
 		while IFS= read -r -d ''; do
 			size="${REPLY%% *}"
 
-			if [[ "$size" -ge "$minSizeB" ]]; then
+			if (( size >= minSizeB )); then
 				printf '%s\0' "${REPLY#* }"
 			fi
 		done
@@ -773,7 +773,7 @@ REPL_BATCH() {
 	local replStatus=0
 	irepl "${replArgs[@]}" "$@" || replStatus=$?
 
-	if [[ "$replStatus" -ne 0 ]]; then
+	if (( replStatus != 0 )); then
 		printf 'repl: irepl exited with status %d\n' "$replStatus" >&2
 	fi
 
@@ -787,7 +787,7 @@ CHECK_TIME() {
 
 	local untilTS="$1"
 
-	if [[ -n "$untilTS" && "$(date '+%s')" -ge "$untilTS" ]]; then
+	if [[ -n "$untilTS" ]] && (( $(date '+%s') >= untilTS )); then
 		return "$TIMEDOUT"
 	fi
 }
