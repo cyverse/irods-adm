@@ -100,12 +100,13 @@ FIX() {
 		local rs="$1"
 		local cmd="$2"
 
-		#shellcheck disable=SC2087
-		ssh -q -t "$rs" \
-			"if [[ "\$USER" == irods ]]; then $cmd; else sudo -i -u irods <<'EOSUDO'
+		local superCmd="if [[ "\$USER" == irods ]]; then $cmd; else sudo -i -u irods <<'EOSUDO'
 $cmd
 EOSUDO
 fi"
+
+		#shellcheck disable=SC2087
+		ssh -q -t "$rs" "$superCmd" < /dev/null
 	}
 
 	mk_physical_size_cmd() {
