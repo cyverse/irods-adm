@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 show_help() {
 	cat <<EOF
@@ -227,9 +227,11 @@ readonly CLASS_BASE="$1"
 
 export ERR_LOG="$CLASS_BASE".errors
 
-if [ -n "$JOBS" ]
+ParallelOpts=( --eta --no-notice --null --max-args=1 )
+
+if [ -n "${JOBS-}" ]
 then
-	readonly JOBS_OPT="-j$JOBS"
+	ParallelOpts+=( --jobs="$JOBS" )
 fi
 
-parallel --eta --no-notice --null --max-args 1 "$JOBS_OPT" CHECK_OBJ "${RESC-}" | log
+parallel "${ParallelOpts[@]}" CHECK_OBJ "${RESC-}" | log
