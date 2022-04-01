@@ -244,41 +244,12 @@ replicate() {
 	local destResc="$6"
 	local until="$7"
 
-	if [[ -n "$procMult" ]] && ! [[ "$procMult" =~ ^[1-9][0-9]* ]]; then
-		printf 'The multiplier must be a positive number. The given value was %s.\n' "$procMult" >&2
+	local untilTS
+	if ! untilTS="$(compute_until_timestamp "$until")"; then
 		return 1
 	fi
 
-	if [[ -n "$destResc" && "$srcResc" == "$destResc" ]]; then
-		printf 'The destination resource, %s, cannot be the same as the source resource, %s.\n' \
-		    "$destResc" "$srcResc" \
-			>&2
-
-		return 1
-	fi
-
-	local untilTS=''
-	if [[ -n "$until" ]]; then
-		if ! untilTS="$(date --date="$until" '+%s')"; then
-			printf '"%s" is not a valid date format\n' "$until"
-			return 1
-		fi
-
-		if ! CHECK_TIME "$untilTS"; then
-			printf 'Stop time is in the past\n' >&2
-			return 1
-		fi
-	fi
-
-	if ! iadmin lz &> /dev/null; then
-		printf "aren't authenticated as a rodsadmin user\n" >&2
-		return 1
-	fi
-
-	if ! psql ICAT <<<'' &> /dev/null; then
-		printf "aren't able to connect to the ICAT DB without a password\n" >&2
-		return 1
-	fi
+	validate_repl_conds "$procMult" "$srcResc" "$destResc" "$untilTS"
 
 	# Redirect stdout to FD 3 to use as a logging channel
 	eval "exec $LOG>&1"
@@ -432,6 +403,18 @@ finish() {
 	fi
 
 	exit "$exitCode"
+}
+
+
+compute_until_timestamp() {
+	local until="$1"
+
+	if [[ -n "$until" ]]; then
+		if ! date --date="$until" '+%s'; then
+			printf 'until "%s" is not a valid date format\n' "$until" >&2
+			return 1
+		fi
+	fi
 }
 
 
@@ -600,6 +583,42 @@ select_cohort_by_size() {
 	fi
 
 	rm --force "$cohortList"
+}
+
+
+validate_repl_conds() {
+	local procMult="$1"
+	local srcResc="$2"
+	local destResc="$3"
+	local untilTS="$4"
+
+	if [[ -n "$procMult" ]] && ! [[ "$procMult" =~ ^[1-9][0-9]* ]]; then
+		printf 'The multiplier must be a positive number. The given value was %s.\n' "$procMult" >&2
+		return 1
+	fi
+
+	if [[ -n "$destResc" && "$srcResc" == "$destResc" ]]; then
+		printf 'The destination resource, %s, cannot be the same as the source resource, %s.\n' \
+		    "$destResc" "$srcResc" \
+			>&2
+
+		return 1
+	fi
+
+	if ! CHECK_TIME "$untilTS"; then
+		printf 'Stop time is in the past\n' >&2
+		return 1
+	fi
+
+	if ! iadmin lz &> /dev/null; then
+		printf "aren't authenticated as a rodsadmin user\n" >&2
+		return 1
+	fi
+
+	if ! psql ICAT <<<'' &> /dev/null; then
+		printf "aren't able to connect to the ICAT DB without a password\n" >&2
+		return 1
+	fi
 }
 
 
