@@ -152,6 +152,7 @@ filter_errors () {
 	s/.*ERROR: \([^\[].*$\)/\1/
 	/connectToRhost: readVersion to .* failed, msg=/d
 	/^cliReconnManager: .*, status = -305111/d
+	/^cliReconnManager: readReconMsg to host [^ ]\+ failed, status = -4000/d
 	/^replUtil: invalid repl objType 0 for /d
 	/^_rcConnect: connectToRhost timed out, retrying/d
 	/^_rcConnect: connectToRhost error, server on .* is probably down status = -115000 SYS_SOCK_READ_TIMEDOUT/d
