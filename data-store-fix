@@ -192,6 +192,7 @@ check_existing_instance() {
 		pidofExec=/sbin/pidof
 	fi
 
+	local pid
 	for pid in $("$pidofExec" -x "$EXEC_NAME"); do
 		if [ "$pid" -ne $$ ]; then
 			printf "\n%s already running at PID %s\n" "$EXEC_NAME" "$pid" 1>&2
