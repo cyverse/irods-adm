@@ -229,7 +229,7 @@ WHERE u.user_name = 'rodsadmin'
 	AND a.access_type_id = (
 		SELECT token_id
 		FROM r_tokn_main
-		WHERE token_namespace = 'access_type' AND token_name = 'own');
+		WHERE token_namespace = 'access_type' AND token_name = 'own' );
 CREATE INDEX idx_owned_by_rodsadmin ON owned_by_rodsadmin (object_id);
 
 $(inject_debug_msg creating coll_perm_probs)
@@ -246,7 +246,8 @@ SELECT DISTINCT data_id
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 WHERE c.coll_name LIKE '/$zone/%'
 	AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
-	AND d.create_ts < '$cutoffTS';
+	AND d.create_ts < '$cutoffTS'
+	AND d.data_is_dirty <= 1;
 CREATE INDEX idx_data_perm_probs ON data_perm_probs(data_id);
 
 $(inject_debug_msg creating uuid_attrs)
@@ -270,7 +271,7 @@ $(inject_debug_msg creating data_uuid_probs)
 CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count) AS
 SELECT DISTINCT d.data_id, COUNT(u.object_id)
 FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
-WHERE d.create_ts < '$cutoffTS'
+WHERE d.create_ts < '$cutoffTS' AND d.data_is_dirty <= 1
 GROUP BY d.data_id, d.data_repl_num
 	-- data_repl_num prevents counting uuids for multiple repls in a single count
 HAVING COUNT(u.object_id) != 1;
@@ -281,7 +282,9 @@ $(inject_debug_msg creating data_checksum_probs)
 CREATE TEMPORARY TABLE data_chksum_probs AS
 SELECT DISTINCT data_id
 FROM r_data_main
-WHERE create_ts < '$cutoffTS' AND (data_checksum IS NULL OR data_checksum = '');
+WHERE create_ts < '$cutoffTS' 
+	AND data_is_dirty <= 1 
+	AND (data_checksum IS NULL OR data_checksum = '');
 
 $(inject_debug_newline)
 $(inject_set_title "$COLL_TABLE_TITLE")
@@ -317,7 +320,7 @@ WHERE c.coll_name LIKE '/$zone/%'
 	AND d.data_id IN (
 		SELECT * FROM data_perm_probs
 		UNION SELECT data_id FROM data_uuid_probs
-		UNION SELECT data_id FROM data_chksum_probs)
+		UNION SELECT data_id FROM data_chksum_probs )
 ORDER BY d.create_ts;
 
 $(inject_debug_newline)
