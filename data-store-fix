@@ -14,8 +14,8 @@ $EXEC_NAME version $VERSION
 Usage:
  $EXEC_NAME -h|--help
  $EXEC_NAME -v|--version
- $EXEC_NAME [-d|--debug | (-A|--age) AGE | (-U|--db-user) DB-USER |
-    (-H|--dbms-host) DBMS-HOST | (-P|--dbms-port) DBMS-PORT]...
+ $EXEC_NAME [-d|--debug | (-U|--db-user) DB-USER | (-H|--dbms-host) DBMS-HOST 
+	 | (-P|--dbms-port) DBMS-PORT]...
 
 This program fixes the following three common problems that happen when an 
 upload fails.
@@ -32,8 +32,6 @@ to fix the problem. If the program wasn't able to, the error encountered while
 attempting the fix will be included at the bottom of the relevant report.
 
 Options:
- -A, --age AGE              how many days old a collection or data object must
-                            be before it will be considered, default is 0
  -U, --db-user DB-USER      the account used to authorized the connection to the
                             ICAT database
  -H, --dbms-host DBMS-HOST  the domain name or IP address of the server hosting
@@ -51,13 +49,13 @@ Environment Variables:
  PGUSER  provides the default value for the account used to authorize the 
          connection, default is the user executing this program.
 
-© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+© 2022, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
 EOF
 }
 
 
-readonly VERSION=5
+readonly VERSION=6
 
 set -o errexit -o nounset -o pipefail
 
@@ -65,7 +63,6 @@ export PGHOST PGPORT PGUSER
 
 readonly COLL_TABLE_TITLE='Collection Repair Attempts'
 readonly DATA_TABLE_TITLE='Data Object Repair Attempts'
-readonly DEFAULT_AGE=0
 readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly MAX_LOG_SIZE=12582912  # 12 MiB
 
@@ -86,15 +83,9 @@ main() {
 
 	eval set -- "$opts"
 
-	local age="$DEFAULT_AGE"
-
 	local help version
 	while true; do
 		case "$1" in
-			-A|--age)
-				age="$2"
-				shift 2
-				;;
 			-U|--db-user)
 				PGUSER="$2"
 				shift 2
@@ -133,7 +124,7 @@ main() {
 	elif [[ -n "${version-}" ]]; then
 		printf '%s\n' "$VERSION"
 	else
-		fix "$age"
+		fix
 	fi
 }
 
@@ -146,22 +137,20 @@ main() {
 format_opts() {
 	getopt \
 		--name "$EXEC_NAME" \
-		--longoptions age:,db-user:,dbms-host:,dbms-port:,debug,help,version \
-		--options A:dH:hP:U:v \
+		--longoptions db-user:,dbms-host:,dbms-port:,debug,help,version \
+		--options dH:hP:U:v \
 		-- "$@"
 }
 
 
 # performs any needed fixes and genertes the report
-# Arguments:
-#  age  how many days old a collection or data object must be before it will be 
-#       considered
 # Output:
 #  the reports
 fix() {
-	local age="$1"
-
 	check_existing_instance
+
+	local reportTime
+	reportTime="$(date --iso-8601=seconds)"
 
 	trap rm_temp_files EXIT
 
@@ -174,10 +163,7 @@ fix() {
 		return 1
 	fi
 
-	local cutoffTime
-	cutoffTime="$(date --iso-8601 --date "$age days ago")"
-
-	display_problems "$zone" "$cutoffTime" | strip_noise > "$problems"
+	display_problems "$zone" | strip_noise > "$problems"
 
 	trap 'if [[ "${FUNCNAME[0]-}" != main ]]; then return; fi' SIGINT SIGTERM
 
@@ -188,7 +174,7 @@ fix() {
 	local errorLog="${TempFiles[-1]}"
 
 	fix_problems < "$problems" > "$fixLog" 2> "$errorLog" || true
-	generate_report "$cutoffTime" "$fixLog" "$errorLog"
+	generate_report "$reportTime" "$fixLog" "$errorLog"
 }
 
 
@@ -211,10 +197,6 @@ check_existing_instance() {
 
 display_problems() {
 	local zone="$1"
-	local cutoffTime="$2"
-
-	local cutoffTS
-	cutoffTS="$(date --date="$cutoffTime" '+0%s')"
 
 	psql ICAT <<EOF
 $(inject_debug_stmt '\timing on')
@@ -237,7 +219,7 @@ CREATE TEMPORARY TABLE coll_perm_probs AS
 SELECT coll_id
 FROM r_coll_main AS c
 WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
-	AND c.coll_name LIKE '/$zone/%/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS';
+	AND c.coll_name LIKE '/$zone/%/%' AND c.coll_type != 'linkPoint';
 CREATE INDEX idx_coll_perm_probs ON coll_perm_probs(coll_id);
 
 $(inject_debug_msg creating data_perm_probs)
@@ -246,7 +228,6 @@ SELECT DISTINCT data_id
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 WHERE c.coll_name LIKE '/$zone/%'
 	AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
-	AND d.create_ts < '$cutoffTS'
 	AND d.data_is_dirty <= 1;
 CREATE INDEX idx_data_perm_probs ON data_perm_probs(data_id);
 
@@ -261,7 +242,7 @@ $(inject_debug_msg creating coll_uuid_probs)
 CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count) AS
 SELECT c.coll_id, COUNT(u.object_id)
 FROM r_coll_main AS c LEFT JOIN uuid_attrs AS u ON u.object_id = c.coll_id
-WHERE c.coll_name LIKE '/$zone/%' AND c.coll_type != 'linkPoint' AND c.create_ts < '$cutoffTS'
+WHERE c.coll_name LIKE '/$zone/%' AND c.coll_type != 'linkPoint'
 GROUP BY c.coll_id
 HAVING COUNT(u.object_id) != 1;
 CREATE INDEX idx_coll_uuid_probs ON coll_uuid_probs (coll_id);
@@ -271,7 +252,7 @@ $(inject_debug_msg creating data_uuid_probs)
 CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count) AS
 SELECT DISTINCT d.data_id, COUNT(u.object_id)
 FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
-WHERE d.create_ts < '$cutoffTS' AND d.data_is_dirty <= 1
+WHERE d.data_is_dirty <= 1
 GROUP BY d.data_id, d.data_repl_num
 	-- data_repl_num prevents counting uuids for multiple repls in a single count
 HAVING COUNT(u.object_id) != 1;
@@ -281,10 +262,8 @@ CREATE INDEX idx_data_uuid_probs ON data_uuid_probs(data_id);
 $(inject_debug_msg creating data_checksum_probs)
 CREATE TEMPORARY TABLE data_chksum_probs AS
 SELECT DISTINCT data_id
-FROM r_data_main
-WHERE create_ts < '$cutoffTS' 
-	AND data_is_dirty <= 1 
-	AND (data_checksum IS NULL OR data_checksum = '');
+FROM r_data_main 
+WHERE data_is_dirty <= 1 AND (data_checksum IS NULL OR data_checksum = '');
 
 $(inject_debug_newline)
 $(inject_set_title "$COLL_TABLE_TITLE")
@@ -299,7 +278,6 @@ FROM r_coll_main AS c
 WHERE coll_id IN (SELECT * FROM coll_perm_probs UNION SELECT coll_id FROM coll_uuid_probs)
 	AND coll_name LIKE '/$zone/%'
 	AND coll_type != 'linkPoint'
-	AND create_ts < '$cutoffTS'
 ORDER BY create_ts;
 
 \echo ''
@@ -316,7 +294,6 @@ SELECT
 		AS "Data Object"
 FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
 WHERE c.coll_name LIKE '/$zone/%'
-	AND d.create_ts < '$cutoffTS'
 	AND d.data_id IN (
 		SELECT * FROM data_perm_probs
 		UNION SELECT data_id FROM data_uuid_probs
