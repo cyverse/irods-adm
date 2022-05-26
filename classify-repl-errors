@@ -266,17 +266,22 @@ split_out_conn_errs() {
 
 	local cnt=0
 
-	cnt+="$(split_out_repl_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$classFile")"
-	cnt+="$(split_out_repl_class "$errorsFile" -38000 SYS_AGENT_INIT_ERR "$classFile")"
-	cnt+="$(split_out_repl_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$classFile")"
-	cnt+="$(\
-		split_out_repl_class \
-			"$errorsFile" \
-			-116104 \
-			'SYS_SOCK_READ_ERR, Connection reset by peer' \
-			"$classFile" )"
-	cnt+="$(split_out_repl_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$classFile")"
-	cnt+="$(split_out_repl_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$classFile")"
+	: $(( cnt += $(split_out_repl_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$classFile") ))
+	: $(( cnt += $(split_out_repl_class "$errorsFile" -38000 SYS_AGENT_INIT_ERR "$classFile") ))
+	: $(( cnt += $(split_out_repl_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$classFile") ))
+	
+	local ssreCnt
+	ssreCnt = "$(split_out_repl_class \
+		"$errorsFile" \
+		-116104 \
+		'SYS_SOCK_READ_ERR, Connection reset by peer' \
+		"$classFile" )"
+	: $(( cnt += ssreCnt ))
+
+	: $(( cnt += $(split_out_repl_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$classFile") ))
+	
+	: $(( cnt \
+		+= $(split_out_repl_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$classFile") ))
 
 	echo "$cnt"
 }
