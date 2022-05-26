@@ -76,8 +76,7 @@ main() {
 
 	eval set -- "$opts"
 
-	local help
-	local version
+	local help version
 
 	while true; do
 		case "$1" in
