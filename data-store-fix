@@ -32,8 +32,9 @@ to fix the problem. If the program wasn't able to, the error encountered while
 attempting the fix will be included at the bottom of the relevant report.
 
 Options:
+ -D, --db-name DB-NAME      the name of the catalog database
  -U, --db-user DB-USER      the account used to authorized the connection to the
-                            ICAT database
+                            DB
  -H, --dbms-host DBMS-HOST  the domain name or IP address of the server hosting
                             the PostgreSQL DBMS containing the DB
  -P, --dbms-port DBMS-PORT  the TCP port the DBMS listens on
@@ -43,11 +44,14 @@ Options:
  -v, --version              show version and exit
 
 Environment Variables:
- PGHOST  provides the default value for the DBMS host, default is "localhost"
- PGPORT  provides the default value for the TCP port the DBMS listens on, 
-         default is 5432
- PGUSER  provides the default value for the account used to authorize the 
-         connection, default is the user executing this program.
+ PGDATABASE  provides the default value for the catalog DB name, default is 
+             "ICAT"
+ PGHOST      provides the default value for the DBMS host, default is 
+             "localhost"
+ PGPORT      provides the default value for the TCP port the DBMS listens on, 
+             default is 5432
+ PGUSER      provides the default value for the account used to authorize the 
+             connection, default is the user executing this program.
 
 © 2022, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
@@ -59,10 +63,11 @@ readonly VERSION=6
 
 set -o errexit -o nounset -o pipefail
 
-export PGHOST PGPORT PGUSER
+export PGDATABASE PGHOST PGPORT PGUSER
 
 readonly COLL_TABLE_TITLE='Collection Repair Attempts'
 readonly DATA_TABLE_TITLE='Data Object Repair Attempts'
+readonly DEFAULT_DB=ICAT
 readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly MAX_LOG_SIZE=12582912  # 12 MiB
 
@@ -86,6 +91,10 @@ main() {
 	local help version
 	while true; do
 		case "$1" in
+			-D|--db-name)
+				PGDATABASE="$2"
+				shift 2
+				;;
 			-U|--db-user)
 				PGUSER="$2"
 				shift 2
@@ -119,6 +128,10 @@ main() {
 
 	readonly DEBUG
 
+	if [[ -z "${PGDATABASE-}" ]]; then
+		PGDATABASE="$DEFAULT_DB"
+	fi
+
 	if [[ -n "${help-}" ]]; then
 		show_help
 	elif [[ -n "${version-}" ]]; then
@@ -137,8 +150,8 @@ main() {
 format_opts() {
 	getopt \
 		--name "$EXEC_NAME" \
-		--longoptions db-user:,dbms-host:,dbms-port:,debug,help,version \
-		--options dH:hP:U:v \
+		--longoptions db-name:,db-user:,dbms-host:,dbms-port:,debug,help,version \
+		--options D:dH:hP:U:v \
 		-- "$@"
 }
 
@@ -198,7 +211,7 @@ check_existing_instance() {
 display_problems() {
 	local zone="$1"
 
-	psql ICAT <<EOF
+	psql <<EOF
 $(inject_debug_stmt '\timing on')
 $(inject_debug_newline)
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
