@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 readonly ExecName=$(basename "$0")
 readonly Version=1
@@ -31,37 +31,55 @@ show_version()
 
 set -e
 
-if ! opts=$(getopt --name "$ExecName" --options hv --longoptions help,version -- "$@")
-then
-  show_help >&2
-  exit 1
-fi
+main()
+{
+  if ! opts=$(getopt --name "$ExecName" --options hv --longoptions help,version -- "$@")
+  then
+    show_help >&2
+    exit 1
+  fi
 
-eval set -- "$opts"
+  eval set -- "$opts"
 
-while true
-do
-  case "$1" in
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      show_help >&2
-      exit 1
-      ;;
-  esac
-done
+  while true
+  do
+    case "$1" in
+      -h|--help)
+        show_help
+        exit 0
+        ;;
+      -v|--version)
+        show_version
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        show_help >&2
+        exit 1
+        ;;
+    esac
+  done
 
-iquest \
-    '%s %s' \
-    "SELECT ORDER(RESC_CREATE_TIME), RESC_NAME \
-     WHERE RESC_PARENT = '' AND RESC_CLASS_NAME != 'bundle'"
+  iquest \
+      '%s %s' \
+      "SELECT RESC_LOC, ORDER(RESC_CREATE_TIME) \
+       WHERE RESC_TYPE_NAME = 'unixfilesystem' AND RESC_CLASS_NAME != 'bundle'" \
+    | convert_create_times
+}
+
+
+convert_create_times()
+{
+  local createTS host
+  while read -r host createTS; do
+    local createTime
+    createTime="$(date --iso-8601 --date=@"$createTS")"
+    printf '%s\t%s\n' "$createTime" "$host"
+  done
+}
+
+
+main "$@"
