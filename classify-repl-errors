@@ -52,7 +52,7 @@ related errors that couldn't be classified.
 CLASS-BASE.unclassified_errors holds the full log messages for errors that
 couldn't be classified at all.
 
-© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+© 2022, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
 EOF
 }
@@ -269,6 +269,8 @@ split_out_conn_errs() {
 	: $(( cnt += $(split_out_repl_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$classFile") ))
 	: $(( cnt += $(split_out_repl_class "$errorsFile" -38000 SYS_AGENT_INIT_ERR "$classFile") ))
 	: $(( cnt += $(split_out_repl_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$classFile") ))
+	: $(( cnt += $(split_out_repl_class \
+		"$errorsFile" -116110 'SYS_SOCK_READ_ERR, Connection timed out' "$classFile" ) ))
 	
 	local ssreCnt
 	ssreCnt="$(split_out_repl_class \
