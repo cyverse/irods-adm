@@ -398,7 +398,7 @@ inject_debug_quiet() {
 existing_instance() {
 	local pidofExec
 	pidofExec="$(command -v pidof)"
-	"${pidofExec:-/sbin/pidof}" -q -o %PPID -x "$EXEC_NAME"
+	"${pidofExec:-/sbin/pidof}" -x -o%PPID "$EXEC_NAME" > /dev/null
 }
 
 
