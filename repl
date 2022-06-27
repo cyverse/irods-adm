@@ -794,7 +794,7 @@ REPL_BATCH() {
 	#fi
 
 	local replStatus=0
-	irepl "${replArgs[@]}" "$@" || replStatus=$?
+	stdbuf --error=L irepl "${replArgs[@]}" "$@" || replStatus=$?
 
 	if (( replStatus != 0 )); then
 		printf 'repl: irepl exited with status %d\n' "$replStatus" >&2
