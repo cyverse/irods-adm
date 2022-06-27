@@ -261,11 +261,8 @@ replicate() {
 
 	printf 'Retrieving data objects to replicate...\n' >&2
 
-	local maxCreateDate
-	maxCreateDate="$(date --iso-8601 --date "$age days ago")"
-
 	local maxCreateTime
-	maxCreateTime="$(date --date "$maxCreateDate" '+%s')"
+	maxCreateTime="$(date --date="$(date --iso-8601 --date="$age days ago")" '+%s')"
 
 	local resCond
 	if [[ -n "$srcResc" ]]; then
