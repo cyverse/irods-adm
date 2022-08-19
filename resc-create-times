@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-readonly ExecName=$(basename "$0")
+ExecName=$(basename "$0")
+readonly ExecName
+
 readonly Version=1
 
 
