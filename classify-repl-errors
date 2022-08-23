@@ -28,6 +28,9 @@ error that occurred. Here's a breakdown of what each output file holds.
 CLASS-BASE.src_path_errors holds the paths to data objects that have paths that
 cause \`irepl\` problems.
 
+CLASS-BASE.catalog_errors holds the paths to data objects that failed to 
+replicate because of DBMS related issue.
+
 CLASS-BASE.chksum_mismatches holds the paths to data objects with checksums that
 differ from the checksums of their respective physical files.
 
@@ -52,7 +55,7 @@ related errors that couldn't be classified.
 CLASS-BASE.unclassified_errors holds the full log messages for errors that
 couldn't be classified at all.
 
-© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+© 2022, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
 EOF
 }
@@ -62,7 +65,8 @@ readonly VERSION=4
 
 set -o errexit -o nounset -o pipefail
 
-readonly EXEC_NAME="$(basename "$(readlink --canonicalize "$0")")"
+EXEC_NAME="$(basename "$(readlink --canonicalize "$0")")"
+readonly EXEC_NAME
 
 declare -a TempFiles
 
@@ -234,6 +238,9 @@ classify_repl_errors() {
 		'UNIX_FILE_WRITE_ERR, No such file or directory' \
 		"$logBase".write )"
 
+	local catErrCnt
+	catErrCnt="$(split_out_repl_class "$errorsFile" -806000 CAT_SQL_ERR "$logBase".catalog_errors)"
+
 	local unclassifiedReplErrCnt
 	unclassifiedReplErrCnt="$(wc --lines < "$errorsFile")"
 
@@ -241,7 +248,8 @@ classify_repl_errors() {
 		mv "$errorsFile" "$logBase".unclassified_repl_errors
 	fi
 
-	display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
+	display_error_count 'catalog errors' "$catErrCnt" "$totErrCnt"
+ 	display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
 	display_error_count 'file open errors' "$uFOEMissingCnt" "$totErrCnt"
 	display_error_count 'filesystem errors' "$uFOEFSErrCnt" "$totErrCnt"
 	display_error_count 'network connection issues' "$ncCnt" "$totErrCnt"
