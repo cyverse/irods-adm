@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+#
+# This program lists all of the replicas that are stale and were last modified
+# before a certain day. It writes the list to stdout.
+#
+# Usage:
+#  get-stale-repls [CUTOFF-DATE]
+#
+# Parameters:
+#  CUTOFF-DATE  only replicas modified prior to this date will be listed. The 
+#               default is yesterday.
+#
+# Output:
+#  It outputs one replica record per line. A record has two space-separated 
+#  columns. The first column is the resource hierarchy storing the replica, and
+#  the second is the path to the corresponding data object.
+
+set -o errexit -o nounset -o pipefail
+
+readonly DEFAULT_CUTOFF_DATE=yesterday
+readonly MAX_STALE_SLICE=1000
+
+
+main() {
+	local cutoffDate="$DEFAULT_CUTOFF_DATE"
+	if (( $# >= 1 )); then
+		cutoffDate="$1"
+	fi
+		
+	local modTSCutoff
+	modTSCutoff="$(date --date "$cutoffDate" +0%s)"
+
+	local allStales 
+	readarray -t allStales < <(get_stales)
+
+	if [[ -z "${allStales[@]-}" ]]; then
+		return
+	fi
+
+	local oldStales
+	readarray -t oldStales < <(filter_old_stales "$modTSCutoff" "${allStales[@]}")
+
+	if [[ -z "${oldStales[@]-}" ]]; then
+		return
+	fi
+
+	map_resources "${oldStales[@]}"
+}
+
+
+filter_old_stales() {
+	local modCutoff="$1"; shift
+	local allStales=( "$@" )
+
+	local numStales=${#allStales[@]}
+	printf '%s stale replicas\n' "$numStales" >&2
+
+	local idx
+	for (( idx=0; idx<numStales; idx+=MAX_STALE_SLICE )); do
+	   local slice=MAX_STALE_SLICE
+		if (( numStales < idx + slice )); then
+			slice=$(( numStales - idx ))
+		fi
+			
+		printf 'processing %s - %s\n' $idx $(( idx + slice - 1 )) >&2
+		
+		local idList
+		idList="$(fmt_query_list "${allStales[@]:$idx:$slice}")"
+
+		quest \
+			%s \
+			"select DATA_ID
+				where DATA_REPL_STATUS = '1' 
+					and DATA_MODIFY_TIME < '$modCutoff' 
+					and DATA_ID in ($idList)"
+	done
+}
+
+
+get_stales() {
+	quest %s "select DATA_ID where DATA_REPL_STATUS = '0'" 
+}
+
+
+map_resources() {
+	local oldStales=( "$@" )
+
+	local numStales=${#oldStales[@]}
+	printf '%s old stale replicas\n' "$numStales" >&2
+
+	local idx
+	for (( idx=0; idx < numStales; idx+=MAX_STALE_SLICE )); do
+		local slice=MAX_STALE_SLICE
+		if (( numStales < idx + slice )); then
+			slice=$(( numStales - idx ))
+		fi
+
+		printf 'processing %s - %s\n' $idx $(( idx + slice - 1 )) >&2
+
+		local idList
+		idList="$(fmt_query_list "${oldStales[@]:$idx:$slice}")"
+
+		quest \
+			'%s %s/%s' \
+			"select DATA_RESC_HIER, COLL_NAME, DATA_NAME 
+				where DATA_REPL_STATUS = '0' and DATA_ID in ($idList)"
+	done
+}
+
+
+
+fmt_query_list() {
+	printf $'\'%s\'\n' "$@" | paste --serial --delimiter ,
+}
+
+
+quest() {
+	local fmtStr="$1"
+	local query="$2"
+
+	# Replace groups of tabs and spaces with a single space so that iquest can 
+	# parse the query.
+	query="$(sed 's/[[:blank:]]\+/ /' <<< "$query")"
+
+	iquest --no-page "$fmtStr" "$query" | sed '/^CAT_NO_ROWS_FOUND: /d'
+}
+
+
+main "$@" 
