@@ -60,6 +60,7 @@ license information, see https://cyverse.org/license.
 EOF
 }
 
+word
 
 readonly VERSION=4
 
@@ -223,12 +224,7 @@ classify_repl_errors() {
 			"$logBase".missing_replicas )"
 
    local uFOEFSErrCnt
-	uFOEFSErrCnt="$(\
-		split_out_repl_class \
-			"$errorsFile" \
-			-510117 \
-			'UNIX_FILE_OPEN_ERR, Structure needs cleaning' \
-			"$logBase".fs_errors )"
+	uFOEFSErrCnt="$(spilt_out_fs_errs "$errorsFile" "$logBase".fs_errors)"
 
 	local ufwErrCnt
 	ufwErrCnt="$(\
@@ -294,6 +290,30 @@ split_out_conn_errs() {
 		+= $(split_out_repl_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$classFile") ))
 
 	echo "$cnt"
+}
+
+
+split_out_fs_errs() {
+	local errorsFile="$1"
+	local classFile="$2"
+
+	local uFOEIOErrCnt
+	uFOEIOErrCnt="$(\
+		split_out_repl_class \
+			"$errorsFile" \
+			-510117 \
+			'UNIX_FILE_OPEN_ERR, Structure needs cleaning' \
+			"$classFile" )"
+
+	local uFOESNCErrCnt
+	uFOESNCErrCnt="$(\
+		split_out_repl_class \
+			"$errorsFile" \
+			-510117 \
+			'UNIX_FILE_OPEN_ERR, Structure needs cleaning' \
+			"$classFile" )"
+
+	echo $(( uFOEIOErrCnt + uFOESNCErrCnt ))
 }
 
 
