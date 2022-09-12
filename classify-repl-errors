@@ -60,14 +60,13 @@ license information, see https://cyverse.org/license.
 EOF
 }
 
-word
-
-readonly VERSION=4
 
 set -o errexit -o nounset -o pipefail
 
 EXEC_NAME="$(basename "$(readlink --canonicalize "$0")")"
 readonly EXEC_NAME
+
+readonly VERSION=5
 
 declare -a TempFiles
 
