@@ -33,14 +33,14 @@ main() {
 	local allStales 
 	readarray -t allStales < <(get_stales)
 
-	if [[ -z "${allStales[@]-}" ]]; then
+	if [[ -z "${allStales[*]-}" ]]; then
 		return
 	fi
 
 	local oldStales
 	readarray -t oldStales < <(filter_old_stales "$modTSCutoff" "${allStales[@]}")
 
-	if [[ -z "${oldStales[@]-}" ]]; then
+	if [[ -z "${oldStales[*]-}" ]]; then
 		return
 	fi
 
@@ -120,6 +120,7 @@ quest() {
 
 	# Replace groups of tabs and spaces with a single space so that iquest can 
 	# parse the query.
+	# shellcheck disable=SC2001
 	query="$(sed 's/[[:blank:]]\+/ /' <<< "$query")"
 
 	iquest --no-page "$fmtStr" "$query" | sed '/^CAT_NO_ROWS_FOUND: /d'
