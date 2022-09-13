@@ -223,7 +223,7 @@ classify_repl_errors() {
 			"$logBase".missing_replicas )"
 
    local uFOEFSErrCnt
-	uFOEFSErrCnt="$(spilt_out_fs_errs "$errorsFile" "$logBase".fs_errors)"
+	uFOEFSErrCnt="$(split_out_fs_errs "$errorsFile" "$logBase".fs_errors)"
 
 	local ufwErrCnt
 	ufwErrCnt="$(\
