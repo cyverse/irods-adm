@@ -301,7 +301,7 @@ split_out_fs_errs() {
 		split_out_repl_class \
 			"$errorsFile" \
 			-510005 \
-			'UNIX_FILE_OPEN_ERR, Input/output error' \
+			'UNIX_FILE_OPEN_ERR, Input\/output error' \
 			"$classFile" )"
 
 	local uFOESNCErrCnt
