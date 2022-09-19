@@ -300,8 +300,8 @@ split_out_fs_errs() {
 	uFOEIOErrCnt="$(\
 		split_out_repl_class \
 			"$errorsFile" \
-			-510117 \
-			'UNIX_FILE_OPEN_ERR, Structure needs cleaning' \
+			-510005 \
+			'UNIX_FILE_OPEN_ERR, Input/Output error' \
 			"$classFile" )"
 
 	local uFOESNCErrCnt
