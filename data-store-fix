@@ -679,7 +679,7 @@ get_meta_id_uuid_map() {
 	local imetaFlag="$2"
 
 	local query
-	if [[ "$imetaFlag" = -C ]]; then
+	if [[ "$imetaFlag" = '-C' ]]; then
 		query="$(mk_coll_uuid_query "$entityPath")"
 	else
 		query="$(mk_data_uuid_query "$(dirname "$entityPath")" "$(basename "$entityPath")")"
