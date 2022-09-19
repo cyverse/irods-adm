@@ -196,9 +196,8 @@ check_existing_instance() {
 
 	for pid in $("$pidofExec" -x "$EXEC_NAME"); do
 		if (( pid != $$ )); then
-			printf "\n%s already running at PID %s\n" "$EXEC_NAME" "$pid" 1>&2
-			printf "exiting\n\n" 1>&2
-			exit 1
+			printf "%s already running with PID %s\n" "$EXEC_NAME" "$pid" 1>&2
+			return 1
 		fi
 	done
 }
