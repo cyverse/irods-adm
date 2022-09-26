@@ -119,6 +119,7 @@ map_args() {
 
 	eval set -- "$opts"
 
+	local help ignore version
 	while true; do
 		case "$1" in
 			-D|--db-name)
@@ -342,6 +343,17 @@ ORDER BY d.create_ts;
 $(inject_debug_newline)
 ROLLBACK;
 EOF
+}
+
+inject_ignore_coll() {
+	local field="$1"
+	local coll="$2"
+
+	if [[ -n "$coll" ]]; then
+		printf $'%s NOT SIMILAR TO \'%s(/%%)?\'' "$field" "$coll"
+	else
+		printf 'TRUE'
+	fi
 }
 
 
