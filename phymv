@@ -80,13 +80,40 @@ count_unmovable()
   local baseCond="$1"
 
   psql --no-align --tuples-only ICAT  <<EOSQL
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+
+CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
+WITH RECURSIVE child_mapping AS (
+  SELECT 
+      resc_id AS id, 
+      resc_name AS name, 
+      (resc_net != 'EMPTY_RESC_HOST') AS storage, 
+      resc_name AS root 
+    FROM r_resc_main 
+    WHERE resc_parent = '' AND resc_name != 'bundleResc' 
+  UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root 
+    FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent ) 
+SELECT id, name, root FROM child_mapping WHERE storage;
+
+CREATE INDEX idx_storage_root_mapping_storage ON storage_root_mapping(root);
+
+
 SELECT COUNT(data_id)
   FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   WHERE d.data_id = ANY(ARRAY(
-      SELECT data_id FROM r_data_main WHERE resc_name = '$SrcResc'
-      INTERSECT SELECT data_id FROM r_data_main WHERE resc_name = '$DestResc'))
-    AND d.resc_name = '$SrcResc'
+      SELECT data_id 
+        FROM r_data_main 
+        WHERE resc_id IN (SELECT storage_id FROM storage_root_mapping WHERE root_name = '$SrcResc')
+      INTERSECT SELECT data_id 
+        FROM r_data_main 
+        WHERE resc_id IN (
+          SELECT storage_id FROM storage_root_mapping WHERE root_name = '$DestResc' )))
+    AND d.resc_id IN (SELECT storage_id FROM storage_root_mapping WHERE root_name = '$SrcResc')
     AND ($baseCond)
+
+
+ROLLBACK;
 EOSQL
 }
 
@@ -341,17 +368,39 @@ psql --no-align --quiet --tuples-only --record-separator-zero --field-separator 
 <<EOSQL > "$ObjectList"
 BEGIN;
 
+CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
+WITH RECURSIVE child_mapping AS (
+  SELECT 
+      resc_id AS id, 
+      resc_name AS name, 
+      (resc_net != 'EMPTY_RESC_HOST') AS storage, 
+      resc_name AS root 
+    FROM r_resc_main 
+    WHERE resc_parent = '' AND resc_name != 'bundleResc' 
+  UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root 
+    FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent ) 
+SELECT id, name, root FROM child_mapping WHERE storage;
+
+CREATE INDEX idx_storage_root_mapping_storage_id ON storage_root_mapping(storage_id);
+
+
 CREATE TEMPORARY TABLE src_data (id) AS
-SELECT data_id FROM r_data_main WHERE resc_name = '$SrcResc'
-EXCEPT SELECT data_id FROM r_data_main WHERE resc_name = '$DestResc';
+SELECT data_id 
+  FROM r_data_main 
+  WHERE resc_id IN (SELECT storage_id FROM storage_root_mapping WHERE root_name = '$SrcResc')
+EXCEPT SELECT data_id 
+  FROM r_data_main 
+  WHERE resc_id IN (SELECT storage_id FROM storage_root_mapping WHERE root_name = '$DestResc');
 
 CREATE INDEX src_data_idx ON src_data (id);
+
 
 SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d
   JOIN r_coll_main AS c ON c.coll_id = d.coll_id
   JOIN src_data AS s ON s.id = d.data_id
-WHERE d.resc_name = '$SrcResc' AND ($BaseCond);
+WHERE resc_id IN (SELECT storage_id FROM storage_root_mapping WHERE root_name = '$SrcResc')
+  AND ($BaseCond);
 
 ROLLBACK;
 EOSQL
