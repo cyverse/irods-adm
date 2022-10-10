@@ -227,6 +227,57 @@ fix() {
 }
 
 
+# uses PostgreSQL to display the problems in a human-readable format
+# Arguments
+#  zone - The iRODS zone being fixed
+#  ignoreColl - A path to a collection that should not be fixed.
+# Output:
+#  It generates the following output:
+#
+# ```
+#                   Collection Repair Attempts
+#  Permission Issue | UUID Count | Owner | Create Time | Collection
+# ------------------+------------+-------+-------------+------------
+# <broken-coll>
+# ...
+# <broken-coll>
+# (<#-broken-colls> collections)
+#
+#                                 Data Object Repair Attempts
+#  Permission Issue | Missing Checksum | UUID Count | Owner | Replica | Create Time | Data Object                                                                               
+# ------------------+------------------+------------+-------+---------+-------------+-------------
+# <broken-obj>
+# ...
+# <broken-obj>
+# (<#-broken-objs> data objects)
+# ```
+# 
+# <broken-coll> has the following form:
+#
+# ```
+# <perm-issue?> | <uuid-count> | <owner> | <create-time> | <path>
+# ```
+#
+# <broken-obj> has the following form:
+#
+# ```
+# <perm-issue?> | <missing-chksum?> | <uuid-count> | <owner> | <repl-num> | <create-time> | <path>
+# ```
+#
+# The entries in a <broken-coll> or <broken-obj> line are as follows:
+#
+# * <perm-issue?> is either `t` for true or `f` for false
+# * <missing-chksum?> is either `t` for true or `f` for false
+# * <uuid-count> is a non-negative integer
+# * <owner> has the form <username>#<zone> where <username> and <zone> are text
+# * <repl-num> is a non-negative integer
+# * <create-time> has the form `<date> <time>` where <date> has the form 
+#   YYYY-MM-DD and <time> has the form HH:mm:ssZZZ where ZZZ is the local time 
+#   zone offset from UTC.
+# * <path> is the absolute path to the collection or data object
+#
+# <#-broken-colls> and <#-broken-objs> are the number of collections and data 
+# objects, respectively, that need to be repaired.
 display_problems() {
 	local zone="$1"
 	local ignoreColl="$2"
