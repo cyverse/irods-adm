@@ -68,10 +68,12 @@ set -o errexit -o nounset -o pipefail
 
 export PGDATABASE PGHOST PGPORT PGUSER
 
+EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
+readonly EXEC_NAME
+
 readonly COLL_TABLE_TITLE='Collection Repair Attempts'
 readonly DATA_TABLE_TITLE='Data Object Repair Attempts'
 readonly DEFAULT_DB=ICAT
-readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly MAX_LOG_SIZE=12582912  # 12 MiB
 
 declare DEBUG
