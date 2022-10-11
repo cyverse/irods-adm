@@ -16,7 +16,7 @@ Usage:
  $EXEC_NAME -v|--version
  $EXEC_NAME [-d|--debug | (-D|--db-name) DB-NAME | (-U|--db-user) DB-USER 
     | (-H|--dbms-host) DBMS-HOST | (-P|--dbms-port) DBMS-PORT 
-	 | (-I|--ignore) IGNORE]...
+	 | (-I|--ignore) IGNORE] | (-S|--STAGE) STAGE-DIR
 
 This program fixes the following three common problems that happen when an 
 upload fails.
@@ -43,6 +43,9 @@ Options:
                             describing what it is doing
  -I, --ignore IGNORE        a path to a collection whose contents should not be
                             inspected for problems
+ -S, --stage STAGE-DIR      the name of a directory where used for staging the
+                            reports before writing them to stdout, default is 
+                            TMPDIR
  -h, --help                 show help and exit
  -v, --version              show version and exit
 
@@ -55,7 +58,8 @@ Environment Variables:
              default is 5432
  PGUSER      provides the default value for the account used to authorize the 
              connection, default is the user executing this program.
-
+ TMPDIR      the absolute path to the temporary directory, default is /tmp.
+ 
 © 2022, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
 EOF
@@ -66,15 +70,16 @@ readonly VERSION=7
 
 set -o errexit -o nounset -o pipefail
 
-export PGDATABASE PGHOST PGPORT PGUSER
-
-EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
-readonly EXEC_NAME
+export PGDATABASE PGHOST PGPORT PGUSER TMPDIR
 
 readonly COLL_TABLE_TITLE='Collection Repair Attempts'
 readonly DATA_TABLE_TITLE='Data Object Repair Attempts'
 readonly DEFAULT_DB=ICAT
+readonly DEFAULT_TMPDIR=/tmp
 readonly MAX_LOG_SIZE=12582912  # 12 MiB
+
+EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
+readonly EXEC_NAME
 
 declare DEBUG
 
@@ -152,6 +157,10 @@ map_args() {
 				eval "$mapVar""[ignore]='$2'"
 				shift 2
 				;;
+			-S|--stage)
+				TMPDIR="$2"
+				shift 2
+				;;
 			-v|--version)
 				eval "$mapVar""[version]=version"
 				shift
@@ -168,6 +177,10 @@ map_args() {
 	if [[ -z "${PGDATABASE-}" ]]; then
 		PGDATABASE="$DEFAULT_DB"
 	fi
+
+	if [[ -z "${TMPDIR-}" ]]; then
+		TMPDIR="$DEFAULT_TMPDIR"
+	fi
 }
 
 
@@ -179,8 +192,8 @@ map_args() {
 format_opts() {
 	getopt \
 		--name "$EXEC_NAME" \
-		--longoptions db-name:,db-user:,dbms-host:,dbms-port:,debug,help,ignore:,version \
-		--options D:dH:hI:P:U:v \
+		--longoptions db-name:,db-user:,dbms-host:,dbms-port:,debug,help,ignore:,stage:,version \
+		--options D:dH:hI:P:S:U:v \
 		-- "$@"
 }
 
@@ -843,7 +856,7 @@ generate_report() {
 		local reportHost
 		reportHost="$(hostname --fqdn)"
 
-		local reportLog=/tmp/"$EXEC_NAME"@"$cutoffTime".log
+		local reportLog="$TMPDIR"/"$EXEC_NAME"@"$cutoffTime".log
 		mv "$fixLog" "$reportLog"
 
 		printf '\n'
@@ -862,7 +875,7 @@ generate_report() {
 		local reportHost
 		reportHost="$(hostname --fqdn)"
 
-		local reportErr=/tmp/"$EXEC_NAME"@"$cutoffTime".err
+		local reportErr="$TMPDIR"/"$EXEC_NAME"@"$cutoffTime".err
 		mv "$errLog" "$reportErr"
 
 		printf '\n'
