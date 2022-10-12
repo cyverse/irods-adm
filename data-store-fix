@@ -115,6 +115,8 @@ main() {
 # Arguments:
 #  The first argument is the name of the associative array where the resolved.
 #  The remaining arguments hold the raw command line arguments to resolve.
+# Side Effects:
+#  DEBUG, PGDATABASE, PGHOST, PGPORT, PGUSER, and TMPDIR are set.
 map_args() {
 	local mapVar="$1"
 	shift
