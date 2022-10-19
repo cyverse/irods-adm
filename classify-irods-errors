@@ -277,19 +277,24 @@ split_out_conn_errs() {
 	: $(( cnt += $(split_out_tool_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$classFile") ))
 	: $(( cnt += $(split_out_tool_class "$errorsFile" -38000 SYS_AGENT_INIT_ERR "$classFile") ))
 	: $(( cnt += $(split_out_tool_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$classFile") ))
-	: $(( cnt += $(split_out_tool_class \
-		"$errorsFile" -116110 'SYS_SOCK_READ_ERR, Connection timed out' "$classFile" ) ))
+
+	local connTOCnt
+	connTOCnt="$(split_out_tool_class \
+		"$errorsFile" -116110 'SYS_SOCK_READ_ERR, Connection timed out' "$classFile" )"
+	: $(( cnt += connTOCnt ))
 	
-	local ssreCnt
-	ssreCnt="$(split_out_tool_class \
-		"$errorsFile" \
-		-116104 \
-		'SYS_SOCK_READ_ERR, Connection reset by peer' \
-		"$classFile" )"
-	: $(( cnt += ssreCnt ))
+	local connRstCnt
+	connRstCnt="$(split_out_tool_class \
+		"$errorsFile" -116104 'SYS_SOCK_READ_ERR, Connection reset by peer' "$classFile" )"
+	: $(( cnt += connRstCnt ))
 
 	: $(( cnt += $(split_out_tool_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$classFile") ))
 	
+	local connRefuseCnt
+	connRefuseCnt="$(split_out_tool_class \
+		"$errorsFile" -305111 'USER_SOCK_CONNECT_ERR, Connection refused' "$classFile" )"
+	: $(( cnt += connRefuseCnt ))
+
 	: $(( cnt \
 		+= $(split_out_tool_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$classFile") ))
 
