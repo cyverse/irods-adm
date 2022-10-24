@@ -8,8 +8,8 @@ $EXEC_NAME version $VERSION
 Usage:
  $EXEC_NAME [options] CLASS-BASE
 
-Reads the output of the \`phymv\` or \`repl\` command and groups the data 
-objects that failed to be handled into different files based on the error that 
+Reads the output of the \`phymv\` or \`repl\` command and groups the data
+objects that failed to be handled into different files based on the error that
 occurred.
 
 Parameters:
@@ -22,27 +22,27 @@ Options:
 
 Summary:
 
-The program reads the output of the \`phymv\` or \`repl\` command from standard 
-in. It groups the data objects that failed to be handled into different files 
-based on the error that occurred. Here's a breakdown of what each output file 
+The program reads the output of the \`phymv\` or \`repl\` command from standard
+in. It groups the data objects that failed to be handled into different files
+based on the error that occurred. Here's a breakdown of what each output file
 holds.
 
 CLASS-BASE.src_path_errors holds the paths to data objects that have paths that
 cause \`iphymv\` or \`irepl\` problems.
 
-CLASS-BASE.catalog_errors holds the paths to data objects that failed to be 
+CLASS-BASE.catalog_errors holds the paths to data objects that failed to be
 handled because of DBMS related issue.
 
 CLASS-BASE.chksum_mismatches holds the paths to data objects with checksums that
 differ from the checksums of their respective physical files.
 
-CLASS-BASE.fs_errors holds the paths to data objects where there are issues with 
+CLASS-BASE.fs_errors holds the paths to data objects where there are issues with
 the file systems holding the objects' physical files.
 
-CLASS-BASE.missing_replicas holds the paths to data objects that are missing 
+CLASS-BASE.missing_replicas holds the paths to data objects that are missing
 their physical files.
 
-CLASS-BASE.network holds the paths to data objects where network connection 
+CLASS-BASE.network holds the paths to data objects where network connection
 issues prevented the data object from being handled.
 
 CLASS-BASE.short_file holds the paths to data objects having sizes larger than
@@ -51,7 +51,7 @@ their respective physical files' sizes.
 CLASS-BASE.write holds the paths to data objects where the replica failed to be
 written to destination resource server.
 
-CLASS-BASE.unclassified_tool_errors holds the log messages for tool related 
+CLASS-BASE.unclassified_tool_errors holds the log messages for tool related
 errors that couldn't be classified.
 
 CLASS-BASE.unclassified_errors holds the full log messages for errors that
@@ -62,7 +62,6 @@ license information, see https://cyverse.org/license.
 EOF
 }
 
-
 readonly VERSION=6
 
 set -o errexit -o nounset -o pipefail
@@ -72,11 +71,10 @@ readonly EXEC_NAME
 
 declare -a TempFiles
 
-
 main() {
 	local opts
 	if ! opts="$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")"; then
- 		show_help >&2
+		show_help >&2
 		return 1
 	fi
 
@@ -86,22 +84,22 @@ main() {
 
 	while true; do
 		case "$1" in
-			-h|--help)
-				help=help
-				shift
-				;;
-			-v|--version)
-				version=version
-				shift
-				;;
-			--)
-				shift
-				break
-				;;
-			*)
-				show_help >&2
-				return 1
-				;;
+		-h | --help)
+			help=help
+			shift
+			;;
+		-v | --version)
+			version=version
+			shift
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			show_help >&2
+			return 1
+			;;
 		esac
 	done
 
@@ -126,13 +124,11 @@ main() {
 	process_input "$logBase"
 }
 
-
 remove_temp_files() {
-	if (( ${#TempFiles[@]} > 0 )); then
+	if ((${#TempFiles[@]} > 0)); then
 		rm --force "${TempFiles[@]}"
 	fi
 }
-
 
 process_input() {
 	local logBase="$1"
@@ -141,17 +137,16 @@ process_input() {
 	errorsFile="$(mktemp)"
 	TempFiles+=("$errorsFile")
 
-	filter_errors | sort > "$errorsFile"
+	filter_errors | sort >"$errorsFile"
 
 	local errCnt
-	errCnt="$(wc --lines < "$errorsFile")"
+	errCnt="$(wc --lines <"$errorsFile")"
 
 	display_error_count errors "$errCnt" "$errCnt"
 	classify_errors "$errorsFile" "$errCnt" "$logBase"
 }
 
-
-filter_errors () {
+filter_errors() {
 	sed --quiet --file - <(cat) <<'EOF'
 /.*ERROR: [^\[].*$/ {
 	s/.*ERROR: \([^\[].*$\)/\1/
@@ -166,7 +161,6 @@ filter_errors () {
 EOF
 }
 
-
 classify_errors() {
 	local errorsFile="$1"
 	local errCnt="$2"
@@ -175,7 +169,7 @@ classify_errors() {
 	local sPECnt
 	sPECnt="$(split_out_class \
 		"$errorsFile" \
-		'^replUtil: srcPath \(.*\) does not exist$' \
+		'^\(phymv\|repl\)Util: srcPath \(.*\) does not exist$' \
 		'\1' \
 		"$logBase".src_path_errors)"
 
@@ -186,22 +180,21 @@ classify_errors() {
 	TempFiles+=("$toolErrorsFile")
 
 	split_out_class \
-			"$errorsFile" '^\(phymv\|repl\)Util: \(phymv\|repl\) error for ' '' "$toolErrorsFile" \
-		> /dev/null
+		"$errorsFile" '^\(phymv\|repl\)Util: \(phymv\|repl\) error for ' '' "$toolErrorsFile" \
+		>/dev/null
 
 	sort --output "$toolErrorsFile" "$toolErrorsFile"
 	classify_tool_errors "$toolErrorsFile" "$errCnt" "$logBase"
 
 	local unclassifiedErrCnt
-	unclassifiedErrCnt="$(wc --lines < "$errorsFile")"
+	unclassifiedErrCnt="$(wc --lines <"$errorsFile")"
 
 	display_error_count 'unclassified errors' "$unclassifiedErrCnt" "$errCnt"
 
-	if (( unclassifiedErrCnt > 0 )); then
+	if ((unclassifiedErrCnt > 0)); then
 		mv "$errorsFile" "$logBase".unclassified_errors
 	fi
 }
-
 
 classify_tool_errors() {
 	local errorsFile="$1"
@@ -215,41 +208,44 @@ classify_tool_errors() {
 	ncCnt="$(split_out_conn_errs "$errorsFile" "$logBase".network)"
 
 	local uCMCnt
-	uCMCnt="$(\
+	uCMCnt="$(
 		split_out_tool_class \
-			"$errorsFile" -314000 USER_CHKSUM_MISMATCH "$logBase".chksum_mismatches )"
+			"$errorsFile" -314000 USER_CHKSUM_MISMATCH "$logBase".chksum_mismatches
+	)"
 
 	local uFOEMissingCnt
-	uFOEMissingCnt="$(\
+	uFOEMissingCnt="$(
 		split_out_tool_class \
 			"$errorsFile" \
 			-510002 \
 			'UNIX_FILE_OPEN_ERR, No such file or directory' \
-			"$logBase".missing_replicas )"
+			"$logBase".missing_replicas
+	)"
 
-   local uFOEFSErrCnt
+	local uFOEFSErrCnt
 	uFOEFSErrCnt="$(split_out_fs_errs "$errorsFile" "$logBase".fs_errors)"
 
 	local ufwErrCnt
-	ufwErrCnt="$(\
+	ufwErrCnt="$(
 		split_out_tool_class \
-		"$errorsFile" \
-		-513002 \
-		'UNIX_FILE_WRITE_ERR, No such file or directory' \
-		"$logBase".write )"
+			"$errorsFile" \
+			-513002 \
+			'UNIX_FILE_WRITE_ERR, No such file or directory' \
+			"$logBase".write
+	)"
 
 	local catErrCnt
 	catErrCnt="$(split_out_tool_class "$errorsFile" -806000 CAT_SQL_ERR "$logBase".catalog_errors)"
 
 	local unclassifiedToolErrCnt
-	unclassifiedToolErrCnt="$(wc --lines < "$errorsFile")"
+	unclassifiedToolErrCnt="$(wc --lines <"$errorsFile")"
 
-	if (( unclassifiedToolErrCnt > 0 )); then
+	if ((unclassifiedToolErrCnt > 0)); then
 		mv "$errorsFile" "$logBase".unclassified_tool_errors
 	fi
 
 	display_error_count 'catalog errors' "$catErrCnt" "$totErrCnt"
- 	display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
+	display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
 	display_error_count 'file open errors' "$uFOEMissingCnt" "$totErrCnt"
 	display_error_count 'filesystem errors' "$uFOEFSErrCnt" "$totErrCnt"
 	display_error_count 'network connection issues' "$ncCnt" "$totErrCnt"
@@ -257,7 +253,6 @@ classify_tool_errors() {
 	display_error_count 'write failures' "$ufwErrCnt" "$totErrCnt"
 	display_error_count 'unclassified tool errors' "$unclassifiedToolErrCnt" "$totErrCnt"
 }
-
 
 display_error_count() {
 	local label="$1"
@@ -267,64 +262,63 @@ display_error_count() {
 	printf '%*d %s\n' "${#total}" "$count" "$label"
 }
 
-
 split_out_conn_errs() {
 	local errorsFile="$1"
 	local classFile="$2"
 
 	local cnt=0
 
-	: $(( cnt += $(split_out_tool_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$classFile") ))
-	: $(( cnt += $(split_out_tool_class "$errorsFile" -38000 SYS_AGENT_INIT_ERR "$classFile") ))
-	: $(( cnt += $(split_out_tool_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$classFile") ))
+	: $((cnt += $(split_out_tool_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$classFile")))
+	: $((cnt += $(split_out_tool_class "$errorsFile" -38000 SYS_AGENT_INIT_ERR "$classFile")))
+	: $((cnt += $(split_out_tool_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$classFile")))
 
 	local connTOCnt
 	connTOCnt="$(split_out_tool_class \
-		"$errorsFile" -116110 'SYS_SOCK_READ_ERR, Connection timed out' "$classFile" )"
-	: $(( cnt += connTOCnt ))
-	
+		"$errorsFile" -116110 'SYS_SOCK_READ_ERR, Connection timed out' "$classFile")"
+	: $((cnt += connTOCnt))
+
 	local connRstCnt
 	connRstCnt="$(split_out_tool_class \
-		"$errorsFile" -116104 'SYS_SOCK_READ_ERR, Connection reset by peer' "$classFile" )"
-	: $(( cnt += connRstCnt ))
+		"$errorsFile" -116104 'SYS_SOCK_READ_ERR, Connection reset by peer' "$classFile")"
+	: $((cnt += connRstCnt))
 
-	: $(( cnt += $(split_out_tool_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$classFile") ))
-	
+	: $((cnt += $(split_out_tool_class "$errorsFile" -305101 USER_SOCK_CONNECT_ERR "$classFile")))
+
 	local connRefuseCnt
 	connRefuseCnt="$(split_out_tool_class \
-		"$errorsFile" -305111 'USER_SOCK_CONNECT_ERR, Connection refused' "$classFile" )"
-	: $(( cnt += connRefuseCnt ))
+		"$errorsFile" -305111 'USER_SOCK_CONNECT_ERR, Connection refused' "$classFile")"
+	: $((cnt += connRefuseCnt))
 
-	: $(( cnt \
-		+= $(split_out_tool_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$classFile") ))
+	: $((cnt += \
+	$(split_out_tool_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$classFile")))
 
 	echo "$cnt"
 }
-
 
 split_out_fs_errs() {
 	local errorsFile="$1"
 	local classFile="$2"
 
 	local uFOEIOErrCnt
-	uFOEIOErrCnt="$(\
+	uFOEIOErrCnt="$(
 		split_out_tool_class \
 			"$errorsFile" \
 			-510005 \
 			'UNIX_FILE_OPEN_ERR, Input\/output error' \
-			"$classFile" )"
+			"$classFile"
+	)"
 
 	local uFOESNCErrCnt
-	uFOESNCErrCnt="$(\
+	uFOESNCErrCnt="$(
 		split_out_tool_class \
 			"$errorsFile" \
 			-510117 \
 			'UNIX_FILE_OPEN_ERR, Structure needs cleaning' \
-			"$classFile" )"
+			"$classFile"
+	)"
 
-	echo $(( uFOEIOErrCnt + uFOESNCErrCnt ))
+	echo $((uFOEIOErrCnt + uFOESNCErrCnt))
 }
-
 
 split_out_tool_class() {
 	local errorsFile="$1"
@@ -334,7 +328,6 @@ split_out_tool_class() {
 
 	split_out_class "$errorsFile" ", status = $status status = $status $error\$" '' "$classFile"
 }
-
 
 split_out_class() {
 	local errorsFile="$1"
@@ -346,17 +339,16 @@ split_out_class() {
 	errors="$(cat "$errorsFile")"
 
 	local classifiedErrors
-	classifiedErrors="$(sed --quiet "/$classifier/p" <<< "$errors")"
+	classifiedErrors="$(sed --quiet "/$classifier/p" <<<"$errors")"
 
 	if [[ -n "$classifiedErrors" ]]; then
-		comm -2 -3 <(echo "$errors") <(echo "$classifiedErrors") > "$errorsFile"
+		comm -2 -3 <(echo "$errors") <(echo "$classifiedErrors") >"$errorsFile"
 		#shellcheck disable=SC2001
-		sed "s/$classifier/$substitution/" <<< "$classifiedErrors" >> "$classFile"
-		wc --lines <<< "$classifiedErrors"
+		sed "s/$classifier/$substitution/" <<<"$classifiedErrors" >>"$classFile"
+		wc --lines <<<"$classifiedErrors"
 	else
 		printf '0'
 	fi
 }
-
 
 main "$@"
