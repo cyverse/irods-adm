@@ -13,61 +13,61 @@ replicates objects to the DEST-RESC if a replica doesn't already exist there. It
 writes progress to standard error and all messages, error or otherwise, to
 standard out.
 
-For streaming replication, the number of concurrent irepl calls will 
-approximately be MULTIPLIER*16 with at most 10 data objects being replicated per 
+For streaming replication, the number of concurrent irepl calls will
+approximately be MULTIPLIER*16 with at most 10 data objects being replicated per
 call.
 
 For threaded replication, the data objects are broken into cohorts based on the
 number of threads iRODS will use to perform the transfer. Objects of size zero
-and those with size at least 1500 MiB are handled separately. For a cohort 
+and those with size at least 1500 MiB are handled separately. For a cohort
 whose members will be transfered using N threads, the number of concurrent irepl
 calls will be approximately MULTIPLIER*16/N with approximately 1000/N^2 objects
 being replicated per call.
 
 For data objects that have a size of at least 1500 MiB, the number of concurrent
-irepl calls will approximately be MULTIPLIER*MAX with one object being 
+irepl calls will approximately be MULTIPLIER*MAX with one object being
 replicated per call.
 
-A data object with size zero could either be empty or could still be in the 
+A data object with size zero could either be empty or could still be in the
 process of being created. Size zero data objects are handled last to allow for
 any in-flight data to finish being written to storage. The number of concurrent
-irepl calls will approximately be MULTIPLIER*8 with 500 objects being replicated 
+irepl calls will approximately be MULTIPLIER*8 with 500 objects being replicated
 per call.
 
 Options:
  -A, --age AGE                   how many days old a data object must be to be
                                  replicated, default: 1
- -C, --collection COLLECTION     only replicate the data objects in this 
+ -C, --collection COLLECTION     only replicate the data objects in this
                                  collection
  -d, --debug                     don't clean up temp files
  -h, --help                      show help and exit
  -H, --host HOST                 connect to the ICAT's DBMS on the host HOST
                                  instead of the PostgreSQL default
  -N, --max-transfer-threads MAX  sets the maximum number of threads for parallel
-                                 replication to MAX; if MAX is 0 replication 
+                                 replication to MAX; if MAX is 0 replication
                                  will be streaming.
- -M, --multiplier MULTIPLIER     a multiplier on the number of processes to run 
+ -M, --multiplier MULTIPLIER     a multiplier on the number of processes to run
                                  at once, default: 1
- -P, --port PORT                 connect to the ICAT's DBMS listening on TCP 
+ -P, --port PORT                 connect to the ICAT's DBMS listening on TCP
                                  port PORT instead of the PostgreSQL default
  -R, --dest-resc DEST-RESC       replicate data objects to resource DEST-RESC
                                  instead of default replication resource
- -S, --src-resc SRC-RESC         only replicate the data objects with a file on 
+ -S, --src-resc SRC-RESC         only replicate the data objects with a file on
                                  the resource SRC-RESC
  -u, --until STOP-TIME           the time to stop replication in a format
                                  understandable by \`date\`
- -U, --user USER                 authorize the DBMS connection as user USER 
+ -U, --user USER                 authorize the DBMS connection as user USER
                                  instead of the default
  -v, --verison                   show version and exit
 
 Environment Variables:
  PGHOST  the default PostgreSQL host
  PGPORT  the default PostgreSQL listening port
- PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection 
+ PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection
 
 Output:
 The program echos the output of the underlying \`irepl -v\` calls to stdout. It
-writes overall progress to stderr in way suitable for display on a terminal. 
+writes overall progress to stderr in way suitable for display on a terminal.
 
 Prerequisites:
  1) iRODS 4.2.8 or later
@@ -92,13 +92,15 @@ export TIMEDOUT=3
 readonly DEFAULT_AGE=1
 readonly DEFAULT_MAX_TRANSFER_THREADS=3
 readonly DEFAULT_PROC_MULT=1
-readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly LOG=3
 readonly MAX_DATA_OBJS_PER_IREPL=1000
 readonly MAX_THREADS=16
 readonly TRANSFER_BUF_SZ=100
 
-declare DEBUG=''
+EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
+readonly EXEC_NAME
+
+DEBUG=''
 
 
 main() {
@@ -215,17 +217,17 @@ resolve_opts() {
 
 format_opts() {
 	local longOpts=(
-		age: 
+		age:
 		collection:
 		debug
-		help 
-		host: 
-		max-transfer-threads: 
-		multiplier: 
-		port: 
-		dest-resc: 
-		src-resc: 
-		until: 
+		help
+		host:
+		max-transfer-threads:
+		multiplier:
+		port:
+		dest-resc:
+		src-resc:
+		until:
 		user:
 		version )
 
@@ -330,7 +332,7 @@ replicate() {
 
 			maxIreplArgs="$(max_args_per_irepl "$maxTransThreads")"
 
- 			# still small enough that they wouldn't default to using MAX_THREADS			
+ 			# still small enough that they wouldn't default to using MAX_THREADS
 			if (( minSize < lastCohortMinSz )); then
 				cnt="$(\
 					select_cohort_by_size \
@@ -344,7 +346,7 @@ replicate() {
 							"$untilTS" \
 							"$minSize" \
 							"$lastCohortMinSz" \
-						< "$objList" )" 
+						< "$objList" )"
 			fi
 
 			# transfer files that would default to using MAX_THREADS
@@ -444,14 +446,14 @@ mk_resc_cond() {
 cat <<SQL
 d.resc_id IN (
 	WITH RECURSIVE child_mapping AS (
-		SELECT resc_id AS id, (resc_net != 'EMPTY_RESC_HOST') AS storage, resc_name AS root 
-			FROM r_resc_main 
+		SELECT resc_id AS id, (resc_net != 'EMPTY_RESC_HOST') AS storage, resc_name AS root
+			FROM r_resc_main
 			WHERE resc_name = '$resc'
-		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root 
-			FROM r_resc_main AS r 
-				JOIN child_mapping AS m 
-					ON m.id = CASE WHEN r.resc_parent::TEXT = '' 
-						THEN NULL 
+		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root
+			FROM r_resc_main AS r
+				JOIN child_mapping AS m
+					ON m.id = CASE WHEN r.resc_parent::TEXT = ''
+						THEN NULL
 						ELSE r.resc_parent::BIGINT END )
 	SELECT id FROM child_mapping WHERE storage )
 SQL
@@ -519,7 +521,8 @@ select_cohort() {
 	fi >&2
 
 	if (( subTotal > 0 )); then
-		parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+		parallel --line-buffer --no-notice --null \
+					--halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
 					REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$LOG" \
@@ -576,7 +579,8 @@ select_cohort_by_size() {
 	disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin >&2
 
 	if (( subTotal > 0 )); then
-		parallel --no-notice --null --halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+		parallel --line-buffer --no-notice --null \
+					--halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
 					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxTransThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$LOG" \
