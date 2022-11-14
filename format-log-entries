@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-show_help()
-{
+show_help() {
   cat <<'EOF'
 This program parses the lines from a iRODS log file into log entries.
 
@@ -23,22 +22,20 @@ EOF
 set -o errexit -o nounset -o pipefail
 
 
-main()
-{
+main() {
   if [[ $# -lt 1 ]]
   then
     show_help >&2
     return 1
   fi
-  
+
   local year="$1"
 
-  iconv -c | format "$year"
+  iconv -c --from-encoding=UTF-8 --to-encoding=UTF-8 | format "$year"
 }
 
 
-format()
-{
+format() {
   local year="$1"
 
   awk --assign YEAR="$year" --file - <(cat) <<'EOF'
