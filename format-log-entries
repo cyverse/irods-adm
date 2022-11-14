@@ -15,6 +15,7 @@ Here's an example entry:
 
 All control characters including line feed (new line) are replaced with there
 escaped hex ASCII code, e.g., line feed => \x0a, carriage return => \x0d, etc.
+Any bytes sequences that are invalid UTF-8 are silently discarded.
 EOF
 }
 
