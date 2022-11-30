@@ -317,7 +317,11 @@ split_out_fs_errs() {
 			"$classFile"
 	)"
 
-	echo $((uFOEIOErrCnt + uFOESNCErrCnt))
+	local uFGFFErrCnt
+	uFGFFErrCnt="$(
+		split_out_tool_class "$errorsFile" -526020 'UNIX_FILE_GET_FS_FREESPACE_ERR' "$classFile" )"
+
+	echo $((uFOEIOErrCnt + uFOESNCErrCnt + uFGFFErrCnt))
 }
 
 split_out_tool_class() {
