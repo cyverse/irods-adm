@@ -319,7 +319,12 @@ split_out_fs_errs() {
 
 	local uFGFFErrCnt
 	uFGFFErrCnt="$(
-		split_out_tool_class "$errorsFile" -526020 'UNIX_FILE_GET_FS_FREESPACE_ERR' "$classFile" )"
+		split_out_tool_class \
+			"$errorsFile" \
+			-526020 \
+			'UNIX_FILE_GET_FS_FREESPACE_ERR, Not a directory' \
+			"$classFile"
+	)"
 
 	echo $((uFOEIOErrCnt + uFOESNCErrCnt + uFGFFErrCnt))
 }
