@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+#
+# Usage:
+#  missing-repl-replacements
+#
+# Given a set of data objects that are missing their replicas, it looks for 
+# other data objects that have replicas with the same checksum. It reads the set
+# of data objects from stdin, one per line. Each entry is expected to be an 
+# absolute, logical path. The candidate list is written to stdout, one candidate
+# per line. A candidate is a tab-separated list having the following form.
+#
+# <data obj>	<bad resc>	<bad repl>	<candidate resc>	<candidate repl>
+#
+# Here <data obj> is the absolute, logical path to the data object read from
+# stdin; <bad resc> is the name of the storage resource hosting the bad replica; 
+# <bad repl> is the absolute, physical path to the bad replica; <candidate resc> 
+# is the name of the storage resource hosting a candidate replica; and 
+# <candidate repl> is a replica that has the same checksum as the bad replica.   
+
+set -o errexit -o nounset -o pipefail
+
+declare -A ObjForChksum RescOf ReplOf
+
+main() {
+	local obj
+	while IFS= read -r obj; do
+		map_checksum "$obj"
+	done
+
+	local sameFiles
+	sameFiles="$(find_copies)"
+
+	local selfCandidates
+	selfCandidates="$(find_self_candidates)"
+	
+	local candidates
+	readarray -t candidates <<< "$(comm -23 <(sort <<< "$sameFiles") <(sort <<< "$selfCandidates"))"
+
+	if [[ -n "${candidates[@]}" ]]; then
+		local obj needyResc missingRepl
+		local selectedResc=''
+		local selectedRepl=''
+		local lastObj=''
+
+		local candidate
+		for candidate in "${candidates[@]}"; do
+			local chksum resc repl
+			IFS=$'\t' read -r chksum resc repl <<< "$candidate"
+			
+			obj="${ObjForChksum[$chksum]}"
+			needyResc="${RescOf[$obj]}"
+ 
+			if [[ "$obj" != "$lastObj" && -n "$lastObj" ]]; then
+				show_selected_mapping \
+					"$lastObj" \
+					"${RescOf[$lastObj]}" \
+					"${ReplOf[$lastObj]}" \
+					"$selectedResc" \
+					"$selectedRepl"
+
+				selectedResc=''
+				selectedRepl=''
+			fi
+
+			if select_copy "$needyResc" "$selectedResc" "$resc"; then
+				selectedResc="$resc"
+				selectedRepl="$repl"
+			fi
+			
+			lastObj="$obj"
+		done
+
+		if [[ -n "$selectedResc" ]]; then
+			show_selected_mapping \
+				"$lastObj" "$needyResc" "${ReplOf[$obj]}" "$selectedResc" "$selectedRepl"
+		fi
+	fi
+}
+
+find_copies() {
+	local chksumList
+	chksumList="$(mk_query_list "${!ObjForChksum[@]}")"
+
+	local query
+	printf -v query \
+		'select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH where DATA_CHECKSUM in (%s)\n' "$chksumList"
+
+	quest $'%s\t%s\t%s' <<< "$query"
+}
+
+find_self_candidates() {
+	local chksum
+	for chksum in "${!ObjForChksum[@]}"; do
+		local obj="${ObjForChksum[$chksum]}"
+		printf '%s\t%s\t%s\n' "$chksum" "${RescOf[$obj]}" "${ReplOf[$obj]}"
+	done
+}
+
+map_checksum() {
+	local objPath="$1"
+
+	local coll objName
+	coll="$(dirname "$objPath")"
+	objName="$(basename "$objPath")"
+	
+	local chksum resc repl
+	if IFS=$'\t' read -r chksum resc repl <<< "$(retrieve_chksum_and_loc "$coll" "$objName")"; then
+		if [[ -n "$chksum" && -n "$resc" && -n "$repl" ]]; then
+			ObjForChksum[$chksum]="$objPath"
+			RescOf[$objPath]="$resc"
+			ReplOf[$objPath]="$repl"
+		fi
+	fi
+}
+
+retrieve_chksum_and_loc() {
+	local collPath="$1"
+	local dataName="$2"
+
+	quest $'%s\t%s\t%s' <<EOF
+select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH 
+where COLL_NAME = '$collPath' and DATA_NAME = '$dataName'
+EOF
+}
+
+select_copy() {
+	local needyResc="$1"
+	local curCopyResc="$2"
+	local candidateResc="$3"
+ 
+	[[ "$candidateResc" == "$needyResc" ]] \
+		|| [[ "$candidateResc" != corral4 && "$curCopyResc" != "$needyResc" ]] \
+		|| [[ "$candidateResc" == corral4 && -z "$curCopyResc" ]]
+}
+
+show_selected_mapping() {
+	local obj="$1"
+	local needyResc="$2"
+	local missingRepl="$3"
+	local providingResc="$4"
+	local selectedRepl="$5"
+
+	printf '%s\t%s\t%s\t%s\t%s\n' \
+		"$obj" "$needyResc" "$missingRepl" "$providingResc" "$selectedRepl"
+}
+
+mk_query_list() {
+	local elmts=("$@")
+
+	printf $'\'%s\'\n' "${elmts[@]}" | paste --serial --delimiter=,
+}
+
+quest() {
+	local fmt="$1"
+
+	local query
+	query="$(cat)"
+
+	iquest --no-page "$fmt" "${query//$'\t'/ }" | sed '/^CAT_NO_ROWS_FOUND: /d'
+}
+
+main "$@"
