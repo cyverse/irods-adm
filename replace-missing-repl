@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# 
+# Usage:
+#  replace-missing-repl
+#
+# This program fixes a set of data objects that a have a replica missing its 
+# physical file. It does this by copying a known good replica of a data object 
+# that has the same checksum. It reads the set of data object replica fixes from
+# stdin. There is one fix per line with each fix having five tab-separated 
+# fields. A fix has the following form.
+#
+# <data obj>	<bad resc>	<bad repl>	<good resc>	<replacement repl>
+#
+# Here <data obj> is the absolute, logical path to the data object read from
+# stdin; <bad resc> is the name of the storage resource hosting the bad replica; 
+# <bad repl> is the absolute, physical path to the bad replica; <good resc> is 
+# the name of the storage resource hosting the replacement replica; and 
+# <replacement repl> is a replica that has the same checksum as the bad replica.
+#
+# This script is intended to read the output if `missing-repl-replacements`.
+   
+set -o errexit -o nounset -o pipefail
+
+declare StagedRepl
+
+main() {
+	StagedRepl="$(mktemp)"
+	trap 'rm --force "$StagedRepl"' EXIT
+
+	local needyObj needyResc missingRepl givingResc goodRepl
+	while IFS=$'\t' read -r needyObj needyResc missingRepl givingResc goodRepl; do
+		printf 'Recovering %s\n' "$needyObj"
+	
+		rm --force "$StagedRepl"
+
+		local missingReplDir
+		missingReplDir="$(dirname "$missingRepl")"
+
+		if ! scp -q -P1657 "$givingResc":"$goodRepl" "$StagedRepl"; then
+			printf 'ERROR: Good replica not found at %s:%s\n' "$givingResc" "$goodRepl"
+			continue
+		fi
+
+		# shellcheck disable=SC2029
+		ssh -q -p1657 "$needyResc" sudo --user=irods mkdir --parents "'$missingReplDir'" < /dev/null
+
+		scp -q -P1657 "$StagedRepl" "$needyResc":"$missingRepl"
+		
+		# shellcheck disable=SC2029
+		ssh -q -p1657 "$needyResc" chown irods.irods "'$missingRepl'" < /dev/null 
+
+		printf 'Recovered %s\n' "$needyObj"
+	done
+}
+
+main "$@"
