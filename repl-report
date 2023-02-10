@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 help() {
 	cat <<EOF
@@ -10,7 +10,7 @@ Usage:
  $EXEC_NAME (-v|--version)
  $EXEC_NAME [-d|--debug][(-A|--age) AGE][(-C|--collection) COLLECTION]
   [(-H|--host) HOST][(-P|--port) PORT][(-U|--user) USER]
- 
+
 This program generates a report on the data objects in the home collections of
 the local zone that need to be replicated. An object needs to be replicated if
 it was created before a given day at midnight and has no replica yet. The report
@@ -40,7 +40,7 @@ Options:
 Environment Variables:
  PGHOST  the default PostgreSQL host
  PGPORT  the default PostgreSQL listening port
- PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection 
+ PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection
 
 © 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
@@ -55,7 +55,9 @@ set -o errexit -o nounset -o pipefail
 export PGHOST PGPORT PGUSER
 
 readonly DEFAULT_AGE=1
-readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
+
+EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
+readonly EXEC_NAME
 
 declare DEBUG
 
@@ -180,15 +182,15 @@ $(inject_debug_msg 'Creating storage to root resource mapping')
 
 CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
 WITH RECURSIVE child_mapping AS (
-	SELECT 
-			resc_id AS id, 
-			resc_name AS name, 
-			(resc_net != 'EMPTY_RESC_HOST') AS storage, 
-			resc_name AS root 
-		FROM r_resc_main 
-		WHERE resc_parent = '' AND resc_name != 'bundleResc' 
-	UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root 
-		FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent ) 
+	SELECT
+			resc_id AS id,
+			resc_name AS name,
+			(resc_net != 'EMPTY_RESC_HOST') AS storage,
+			resc_name AS root
+		FROM r_resc_main
+		WHERE resc_parent = '' AND resc_name != 'bundleResc'
+	UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root
+		FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent )
 SELECT id, name, root FROM child_mapping WHERE storage;
 
 CREATE INDEX idx_storage_root_mapping_storage_id ON storage_root_mapping(storage_id);
@@ -247,7 +249,7 @@ inject_collection_restriction() {
 			$'SELECT coll_id FROM r_coll_main WHERE coll_name = \'%s\' OR coll_name LIKE \'%s/%%\'' \
 			"$collection" "$collection"
 
-		printf '%s.coll_id IN (%s)' "$table" "$collQuery" 
+		printf '%s.coll_id IN (%s)' "$table" "$collQuery"
 	else
 		printf TRUE
 	fi
