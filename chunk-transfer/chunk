@@ -32,7 +32,7 @@ main()
     local svr
     svr=$(iquest '%s' "select RESC_LOC where RESC_NAME = '$resc'")
 
-    ssh -q -t "$svr" \
+    ssh -n -q -t "$svr" \
       sudo --background --login --user "$IRODS_SVC_ACNT" \
         setsid chunk-resc "$resc" "$srcColl" "$destColl" /tmp/chunk-"$resc".log
 
