@@ -2,10 +2,10 @@
 
 set -o errexit -o nounset -o pipefail
 
-export IRODS_SVC_ACNT=irods
+EXEC_DIR="$(dirname "$(realpath --canonicalize-missing "$0")")"
+readonly EXEC_DIR
 
-EXEC_PATH="$(dirname "$(realpath --canonicalize-missing "$0")")"
-readonly EXEC_PATH
+readonly IRODS_SVC_ACNT=irods
 
 
 main()
@@ -35,7 +35,7 @@ main()
     local svr
     svr="$(quest %s <<< "select RESC_LOC where RESC_NAME = '$resc'")"
 
-    scp -q "$EXEC_PATH"/chunk-resc "$svr":chunk-resc
+    scp -q "$EXEC_DIR"/chunk-resc "$svr":chunk-resc
     ssh -n -q "$svr" sudo mv --force chunk-resc /tmp/chunk-resc
     ssh -n -q "$svr" sudo chmod +x /tmp/chunk-resc
     ssh -n -q "$svr" sudo chown "$IRODS_SVC_ACNT" /tmp/chunk-resc
@@ -108,7 +108,10 @@ resolve_user_names()
   do
     local userName
     userName="$(quest %s <<< "select USER_NAME where USER_ID = '$userId'")"
-    printf '%s %s\n' "$userName" "$perm"
+
+    if [[ "$userName" != public && "$userName" != anonymous ]]; then
+      printf '%s %s\n' "$userName" "$perm"
+    fi
   done
 }
 
