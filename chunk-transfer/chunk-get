@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -o errexit -o -nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 
 main()
@@ -19,7 +19,7 @@ main()
     dest="$2"
   fi
 
-  iquest --no-page '%s' "select DATA_NAME where COLL_NAME = '$src'" \
+  QUEST %s <<< "select DATA_NAME where COLL_NAME = '$src'" \
     | sed 's/^\(.\+\)-..$/\1/' \
     | sort --unique \
     | parallel --max-args=1 --max-procs=5 GET_SERVER_SET "$dest" "$src"
@@ -32,14 +32,40 @@ GET_SERVER_SET()
   local src="$2"
   local setPrefix="$3"
 
-  iquest --no-page \
-      '%s/%s' \
-      "select COLL_NAME, order(DATA_NAME)
-       where COLL_NAME = '$src' and DATA_NAME like '$setPrefix-%'" \
+  LIST_SERVER_CHUNKS "$src" "$setPrefix" \
     | xargs --replace=CHUNK iget -T -v CHUNK - \
     | tar --extract --no-overwrite-dir --directory="$dest"
 }
 export -f GET_SERVER_SET
+
+
+LIST_SERVER_CHUNKS()
+{
+  local src="$1"
+  local setPrefix="$2"
+
+  QUEST %s/%s <<EOQ
+select COLL_NAME, order(DATA_NAME) where COLL_NAME = '$src' and DATA_NAME like '$setPrefix-%'
+EOQ
+}
+export -f LIST_SERVER_CHUNKS
+
+
+QUEST()
+{
+  local fmt="$1"
+
+  local query=''
+
+  local line
+  while read -r line
+  do
+    query+=" $line"
+  done
+
+  iquest --no-page "$fmt" "${query//$'\t'/ }" | sed '/^CAT_NO_ROWS_FOUND: /d' || true
+}
+export -f QUEST
 
 
 main "$@"

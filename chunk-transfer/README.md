@@ -12,9 +12,9 @@ prior to transfer and reconstituting it afterwards, the overall time will be les
 
 The chunking happens on each resource server. Files on separate resource servers are archived,
 chunked, and registered into iRODS separately. This way the chunking on each resource server can
-happen in parallel. The script `chunk-resc` needs to be deployed on each resource server. The
-script `chunk` is the driver. It chunks the entire data set, calling `chunk-resc` in parallel on the
-relevant resource servers.
+happen in parallel. The script `chunk` is the driver. It copies the script `chunk-resc` to the
+relevant resource servers, and then `chunk` concurrently executes `chunk-resc` on each of the
+servers.
 
 Once the data set is chunked, the client uses the script `chunk-get` to download the chunks,
 reconstitute the tar files, and extract the data set. It also parallelizes this operation over the

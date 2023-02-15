@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -o errexit -o -nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 
 main()
@@ -32,18 +32,17 @@ chunk()
   local destColl="$3"
 
   local svr vault
-  #shellcheck disable=SC2046
   read -r svr vault \
-    <<< $(iquest '%s %s' "select RESC_LOC, RESC_VAULT_PATH where RESC_NAME = '$resc'")
+    <<< "$(quest '%s %s' <<< "select RESC_LOC, RESC_VAULT_PATH where RESC_NAME = '$resc'")"
 
-  if [[ "$svr" = CAT_NO_ROWS_FOUND: || "$svr" != EMPTY_RESC_HOST ]]
+  if [[ "$svr" = CAT_NO_ROWS_FOUND: || "$svr" == EMPTY_RESC_HOST ]]
   then
     printf '"%s" is not a storage resource\n' "$resc" >&2
     return 1
   fi
 
   local zone
-  zone=$(iquest '%s' "select ZONE_NAME where ZONE_TYPE = 'local'")
+  zone="$(quest %s <<< "select ZONE_NAME where ZONE_TYPE = 'local'")"
 
   local srcDir="${srcColl/\/$zone/$vault}"
 
@@ -68,6 +67,22 @@ chunk()
   fi
 
   printf 'DONE\n'
+}
+
+
+quest()
+{
+  local fmt="$1"
+
+  local query=''
+
+  local line
+  while read -r line
+  do
+    query+=" $line"
+  done
+
+  iquest --no-page "$fmt" "${query//$'\t'/ }" | sed '/^CAT_NO_ROWS_FOUND: /d' || true
 }
 
 

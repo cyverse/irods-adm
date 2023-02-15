@@ -1,8 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -o errexit -o -nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 export IRODS_SVC_ACNT=irods
+
+EXEC_PATH="$(dirname "$(realpath --canonicalize-missing "$0")")"
+readonly EXEC_PATH
 
 
 main()
@@ -16,7 +19,7 @@ main()
   local srcColl="$1"
 
   local destColl="$srcColl".chunked
-  imkdir "$destColl"
+  imkdir -p "$destColl"
 
   local user perm
   while read -r user perm
@@ -30,26 +33,61 @@ main()
   while read -r resc
   do
     local svr
-    svr=$(iquest '%s' "select RESC_LOC where RESC_NAME = '$resc'")
+    svr="$(quest %s <<< "select RESC_LOC where RESC_NAME = '$resc'")"
 
-    ssh -n -q -t "$svr" \
-      sudo --background --login --user "$IRODS_SVC_ACNT" \
-        setsid chunk-resc "$resc" "$srcColl" "$destColl" /tmp/chunk-"$resc".log
+    scp -q "$EXEC_PATH"/chunk-resc "$svr":chunk-resc
+    ssh -n -q "$svr" sudo mv --force chunk-resc /tmp/chunk-resc
+    ssh -n -q "$svr" sudo chmod +x /tmp/chunk-resc
+    ssh -n -q "$svr" sudo chown "$IRODS_SVC_ACNT" /tmp/chunk-resc
+
+    ssh -n -q "$svr" \
+      sudo --background --login --non-interactive --user="$IRODS_SVC_ACNT" \
+          /tmp/chunk-resc "$resc" "$srcColl" "$destColl" /tmp/chunk-"$resc".log \
+        '&>' /dev/null
 
     printf 'Launched on %s\n' "$svr"
-  done < <(get_resources "$srcColl")
+  done < <(get_storage_rescs "$(determine_default_resc)" "$srcColl")
 }
 
 
-get_resources()
+determine_default_resc()
 {
-  local coll="$1"
+  local zone
+  zone="$(quest %s <<< "select ZONE_NAME where ZONE_TYPE = 'local'")"
 
-  iquest \
-      '%s' \
-      "select DATA_RESC_HIER
-       where DATA_RESC_NAME = 'CyVerseRes' and COLL_NAME = '$coll' || like '$coll/%'" \
-    | sed '/^CAT_NO_ROWS_FOUND: /d;s/.*;//'
+  izonereport | default_resc_from_zonereport "$zone"
+}
+
+
+default_resc_from_zonereport()
+{
+  local zone="$1"
+
+  jq --raw-output --from-file /dev/stdin <(cat) <<JQ
+.zones
+  | map(select(.icat_server.server_config.irods_zone_name = "$zone"))
+  | .[0].icat_server.server_config.default_resource_name
+JQ
+}
+
+
+get_storage_rescs()
+{
+  local rootResc="$1"
+  local coll="$2"
+
+# XXX - See iRODS#6101, fixed in iRODS 4.2.12
+#  quest %s <<EOQ
+#select RESC_NAME
+#where DATA_RESC_HIER = '$rootResc' || like '$rootResc;%' and COLL_NAME = '$coll' || like '$coll/%'
+#EOQ
+  quest %s <<EOQ
+select RESC_NAME where DATA_RESC_HIER = '$rootResc' and COLL_NAME = '$coll' || like '$coll/%'
+EOQ
+  quest %s <<EOQ
+select RESC_NAME where DATA_RESC_HIER like '$rootResc;%' and COLL_NAME = '$coll' || like '$coll/%'
+EOQ
+# XXX - ^^^
 }
 
 
@@ -57,8 +95,8 @@ get_acl()
 {
   local coll="$1"
 
-  iquest '%s %s' "select COLL_ACCESS_USER_ID, COLL_ACCESS_NAME where COLL_NAME = '$coll'" \
-    | sed '/^CAT_NO_ROWS_FOUND: /d;s/read object/read/;s/modify object/write/' \
+  quest '%s %s' <<< "select COLL_ACCESS_USER_ID, COLL_ACCESS_NAME where COLL_NAME = '$coll'" \
+    | sed 's/read object/read/;s/modify object/write/' \
     | resolve_user_names
 }
 
@@ -69,9 +107,25 @@ resolve_user_names()
   while read -r userId perm
   do
     local userName
-    userName=$(iquest '%s' "select USER_NAME where USER_ID = '$userId'")
+    userName="$(quest %s <<< "select USER_NAME where USER_ID = '$userId'")"
     printf '%s %s\n' "$userName" "$perm"
   done
+}
+
+
+quest()
+{
+  local fmt="$1"
+
+  local query=''
+
+  local line
+  while read -r line
+  do
+    query+=" $line"
+  done
+
+  iquest --no-page "$fmt" "${query//$'\t'/ }" | sed '/^CAT_NO_ROWS_FOUND: /d' || true
 }
 
 
