@@ -22,8 +22,8 @@ Options:
  -v, --version        display version and exit
 
 Summary:
-The script reads a NUL-delimited list of iRODS data object paths from standard 
-in, one per line, and checks to see if any of the replicas have an incorrect 
+The script reads a NUL-delimited list of iRODS data object paths from standard
+in, one per line, and checks to see if any of the replicas have an incorrect
 checksum or size. The ones with incorrect sizes are appended to the file
 \`CLASS-BASE.bad_size\`. The ones with incorrect checksums are appended to the
 file \`CLASS-BASE.bad_chksum\`. If an error occurs while checking a replica, the
@@ -38,13 +38,12 @@ license information, see https://cyverse.org/license.
 EOF
 }
 
-
 readonly VERSION=5
 
 set -o errexit -o nounset -o pipefail
 
-readonly EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
-
+EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
+readonly EXEC_NAME
 
 # formats the command line arguments for getopt style
 # parsing
@@ -56,17 +55,14 @@ format_opts() {
 	getopt --name "$EXEC_NAME" --options hJ:R:v --longoptions help,jobs:,resource:,version -- "$@"
 }
 
-
 show_version() {
 	printf '%s\n' "$VERSION"
 }
-
 
 exit_with_help() {
 	show_help >&2
 	exit 1
 }
-
 
 # For a given data object, this fuction retrieves the size, checksum, resource,
 # and file path for each of its replicas.
@@ -89,15 +85,13 @@ GET_CAT_INFO() {
 		select DATA_SIZE, DATA_CHECKSUM, DATA_RESC_HIER, DATA_PATH
 		where COLL_NAME = '$collName' and DATA_NAME = '$dataName'"
 
-	if [[ -n "$rescName" ]]
-	then
+	if [[ -n "$rescName" ]]; then
 		query+=" and DATA_RESC_NAME = '$rescName'"
 	fi
 
 	iquest '%s %s %s %s' "$query" | sed '/CAT_NO_ROWS_FOUND/d'
 }
 export -f GET_CAT_INFO
-
 
 # For a given file on a given host, this function retrieves the file's size and
 # checksum.
@@ -123,7 +117,6 @@ EOSSH
 }
 export -f GET_STORE_INFO
 
-
 CHECK_OBJ() {
 	local resc="$1"
 	local objPath="$2"
@@ -131,10 +124,9 @@ CHECK_OBJ() {
 	local catInfo
 	readarray -t catInfo < <(GET_CAT_INFO "$objPath" "$resc") 2>&1
 
-	for replInfo in "${catInfo[@]}"
-	do
+	for replInfo in "${catInfo[@]}"; do
 		local replSize replChksum rescHier filePath
-		read -r replSize replChksum rescHier filePath <<< "$replInfo"
+		read -r replSize replChksum rescHier filePath <<<"$replInfo"
 
 		local storeHost
 		storeHost="$(iquest '%s' "select RESC_LOC where RESC_NAME = '${rescHier##*;}'")"
@@ -143,16 +135,13 @@ CHECK_OBJ() {
 		read -r fileSize fileChksum < <(GET_STORE_INFO "$storeHost" "$filePath")
 
 		local reason
-		if [[ "$replSize" != "$fileSize" ]]
-		then
+		if [[ "$replSize" != "$fileSize" ]]; then
 			reason=size
-		elif [[ "$replChksum" != "$fileChksum" ]]
-		then
+		elif [[ "$replChksum" != "$fileChksum" ]]; then
 			reason=checksum
 		fi
 
-		if [[ -n "$reason" ]]
-		then
+		if [[ -n "$reason" ]]; then
 			printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
 		fi
 	done 2>&1
@@ -161,65 +150,56 @@ CHECK_OBJ() {
 }
 export -f CHECK_OBJ
 
-
 log() {
-	while read -r reason entry
-	do
-		if [[ "$reason" == Completed ]]
-		then
+	while read -r reason entry; do
+		if [[ "$reason" == Completed ]]; then
 			printf 'Completed %s\n' "$entry"
-		elif [ "$reason" = size ]
-		then
-			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_size
-		elif [ "$reason" = checksum ]
-		then
-			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_chksum
+		elif [ "$reason" = size ]; then
+			printf '%s\n' "$entry" >>"$CLASS_BASE".bad_size
+		elif [ "$reason" = checksum ]; then
+			printf '%s\n' "$entry" >>"$CLASS_BASE".bad_chksum
 		else
-			printf '%s %s\n' "$reason" "$entry" >> "$ERR_LOG"
+			printf '%s %s\n' "$reason" "$entry" >>"$ERR_LOG"
 		fi
 	done
 }
 
-
-if ! opts="$(format_opts "$@")"
-then
+if ! opts="$(format_opts "$@")"; then
 	printf '\n' >&2
 	exit_with_help
 fi
 
 eval set -- "$opts"
 
-while true
-do
+while true; do
 	case "$1" in
-		-h|--help)
-			show_help
-			exit 0
-			;;
-		-J|--jobs)
-			readonly JOBS="$2"
-			shift 2
-			;;
-		-R|--resource)
-			readonly RESC="$2"
-			shift 2
-			;;
-		-v|--version)
-			show_version
-			exit 0
-			;;
-		--)
-			shift
-			break
-			;;
-		*)
-			exit_with_help
-			;;
+	-h | --help)
+		show_help
+		exit 0
+		;;
+	-J | --jobs)
+		readonly JOBS="$2"
+		shift 2
+		;;
+	-R | --resource)
+		readonly RESC="$2"
+		shift 2
+		;;
+	-v | --version)
+		show_version
+		exit 0
+		;;
+	--)
+		shift
+		break
+		;;
+	*)
+		exit_with_help
+		;;
 	esac
 done
 
-if [ "$#" -lt 1 ]
-then
+if [ "$#" -lt 1 ]; then
 	exit_with_help
 fi
 
@@ -227,11 +207,10 @@ readonly CLASS_BASE="$1"
 
 export ERR_LOG="$CLASS_BASE".errors
 
-ParallelOpts=( --eta --no-notice --null --max-args=1 )
+ParallelOpts=(--eta --no-notice --null --max-args=1)
 
-if [ -n "${JOBS-}" ]
-then
-	ParallelOpts+=( --jobs="$JOBS" )
+if [ -n "${JOBS-}" ]; then
+	ParallelOpts+=(--jobs="$JOBS")
 fi
 
 parallel "${ParallelOpts[@]}" CHECK_OBJ "${RESC-}" | log
