@@ -122,7 +122,7 @@ CHECK_OBJ() {
 	local objPath="$2"
 
 	local catInfo
-	readarray -t catInfo < <(GET_CAT_INFO "$objPath" "$resc") 2>&1
+	readarray -t catInfo < <(GET_CAT_INFO "$objPath" "$resc")
 
 	for replInfo in "${catInfo[@]}"; do
 		local replSize replChksum rescHier filePath
@@ -144,7 +144,7 @@ CHECK_OBJ() {
 		if [[ -n "$reason" ]]; then
 			printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
 		fi
-	done 2>&1
+	done
 
 	printf 'Completed %s\n' "$objPath"
 }
@@ -211,4 +211,4 @@ if [ -n "${JOBS-}" ]; then
 	ParallelOpts+=(--jobs="$JOBS")
 fi
 
-parallel "${ParallelOpts[@]}" CHECK_OBJ "${RESC-}" | log
+parallel "${ParallelOpts[@]}" CHECK_OBJ "${RESC-}" 2>&1 | log
