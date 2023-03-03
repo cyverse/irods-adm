@@ -155,11 +155,11 @@ log() {
 		if [[ "$reason" == Completed ]]; then
 			printf 'Completed %s\n' "$entry"
 		elif [ "$reason" = size ]; then
-			printf '%s\n' "$entry" >>"$CLASS_BASE".bad_size
+			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_size
 		elif [ "$reason" = checksum ]; then
-			printf '%s\n' "$entry" >>"$CLASS_BASE".bad_chksum
+			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_chksum
 		else
-			printf '%s %s\n' "$reason" "$entry" >>"$ERR_LOG"
+			printf '%s %s\n' "$reason" "$entry" >> "$CLASS_BASE".errors
 		fi
 	done
 }
@@ -204,8 +204,6 @@ if [ "$#" -lt 1 ]; then
 fi
 
 readonly CLASS_BASE="$1"
-
-export ERR_LOG="$CLASS_BASE".errors
 
 ParallelOpts=(--eta --no-notice --null --max-args=1)
 
