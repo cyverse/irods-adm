@@ -300,33 +300,34 @@ split_out_fs_errs() {
 	local classFile="$2"
 
 	local uFOEIOErrCnt
-	uFOEIOErrCnt="$(
-		split_out_tool_class \
-			"$errorsFile" \
-			-510005 \
-			'UNIX_FILE_OPEN_ERR, Input\/output error' \
-			"$classFile"
-	)"
+	uFOEIOErrCnt="$(split_out_tool_class \
+		"$errorsFile" \
+		-510005 \
+		'UNIX_FILE_OPEN_ERR, Input\/output error' \
+		"$classFile" )"
 
 	local uFOESNCErrCnt
-	uFOESNCErrCnt="$(
-		split_out_tool_class \
-			"$errorsFile" \
-			-510117 \
-			'UNIX_FILE_OPEN_ERR, Structure needs cleaning' \
-			"$classFile"
-	)"
+	uFOESNCErrCnt="$(split_out_tool_class \
+		"$errorsFile" \
+		-510117 \
+		'UNIX_FILE_OPEN_ERR, Structure needs cleaning' \
+		"$classFile" )"
+
+	local uFWEDQEErrCnt
+	uFWEDQEErrCnt="$(split_out_tool_class \
+		"$errorsFile" \
+		-513122 \
+		'UNIX_FILE_WRITE_ERR, Disk quota exceeded' \
+		"$classFile" )"
 
 	local uFGFFErrCnt
-	uFGFFErrCnt="$(
-		split_out_tool_class \
-			"$errorsFile" \
-			-526020 \
-			'UNIX_FILE_GET_FS_FREESPACE_ERR, Not a directory' \
-			"$classFile"
-	)"
+	uFGFFErrCnt="$(split_out_tool_class \
+		"$errorsFile" \
+		-526020 \
+		'UNIX_FILE_GET_FS_FREESPACE_ERR, Not a directory' \
+		"$classFile" )"
 
-	echo $((uFOEIOErrCnt + uFOESNCErrCnt + uFGFFErrCnt))
+	echo $(( uFOEIOErrCnt + uFOESNCErrCnt + uFWEDQEErrCnt + uFGFFErrCnt ))
 }
 
 split_out_tool_class() {
