@@ -164,51 +164,55 @@ log() {
 	done
 }
 
-if ! opts="$(format_opts "$@")"; then
-	printf '\n' >&2
-	exit_with_help
-fi
-
-eval set -- "$opts"
-
-while true; do
-	case "$1" in
-	-h | --help)
-		show_help
-		exit 0
-		;;
-	-J | --jobs)
-		readonly JOBS="$2"
-		shift 2
-		;;
-	-R | --resource)
-		readonly RESC="$2"
-		shift 2
-		;;
-	-v | --version)
-		show_version
-		exit 0
-		;;
-	--)
-		shift
-		break
-		;;
-	*)
+main() {
+	if ! opts="$(format_opts "$@")"; then
+		printf '\n' >&2
 		exit_with_help
-		;;
-	esac
-done
+	fi
 
-if [ "$#" -lt 1 ]; then
-	exit_with_help
-fi
+	eval set -- "$opts"
 
-readonly CLASS_BASE="$1"
+	while true; do
+		case "$1" in
+		-h | --help)
+			show_help
+			exit 0
+			;;
+		-J | --jobs)
+			readonly JOBS="$2"
+			shift 2
+			;;
+		-R | --resource)
+			readonly RESC="$2"
+			shift 2
+			;;
+		-v | --version)
+			show_version
+			exit 0
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			exit_with_help
+			;;
+		esac
+	done
 
-ParallelOpts=(--eta --no-notice --null --max-args=1)
+	if [ "$#" -lt 1 ]; then
+		exit_with_help
+	fi
 
-if [ -n "${JOBS-}" ]; then
-	ParallelOpts+=(--jobs="$JOBS")
-fi
+	readonly CLASS_BASE="$1"
 
-parallel "${ParallelOpts[@]}" CHECK_OBJ "${RESC-}" 2>&1 | log
+	ParallelOpts=(--eta --no-notice --null --max-args=1)
+
+	if [ -n "${JOBS-}" ]; then
+		ParallelOpts+=(--jobs="$JOBS")
+	fi
+
+	parallel "${ParallelOpts[@]}" CHECK_OBJ "${RESC-}" 2>&1 | log
+}
+
+main "$@"
