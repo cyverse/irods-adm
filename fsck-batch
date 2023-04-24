@@ -122,7 +122,9 @@ CHECK_OBJ() {
 	local objPath="$2"
 
 	local catInfo
-	readarray -t catInfo < <(GET_CAT_INFO "$objPath" "$resc")
+	{
+		readarray -t catInfo < <(GET_CAT_INFO "$objPath" "$resc")
+	} 2>&1
 
 	for replInfo in "${catInfo[@]}"; do
 		local replSize replChksum rescHier filePath
@@ -144,7 +146,7 @@ CHECK_OBJ() {
 		if [[ -n "$reason" ]]; then
 			printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
 		fi
-	done
+	done 2>&1
 
 	printf 'Completed %s\n' "$objPath"
 }
