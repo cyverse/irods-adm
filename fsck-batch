@@ -18,7 +18,7 @@ Options:
  -h, --help           display help text and exit
  -J, --jobs N         perform N checks simultaneously, default is the number of
                       CPUs
- -R, --resource RESC  only check replicas on resource RESC
+ -R, --resource RESC  only check replicas on the storage resource RESC
  -v, --version        display version and exit
 
 Summary:
@@ -45,6 +45,62 @@ set -o errexit -o nounset -o pipefail
 EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly EXEC_NAME
 
+main() {
+	if ! opts="$(format_opts "$@")"; then
+		printf '\n' >&2
+		exit_with_help
+	fi
+
+	eval set -- "$opts"
+
+	while true; do
+		case "$1" in
+		-h | --help)
+			show_help
+			exit 0
+			;;
+		-J | --jobs)
+			readonly JOBS="$2"
+			shift 2
+			;;
+		-R | --resource)
+			readonly RESC="$2"
+			shift 2
+			;;
+		-v | --version)
+			show_version
+			exit 0
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			exit_with_help
+			;;
+		esac
+	done
+
+	if [ "$#" -lt 1 ]; then
+		exit_with_help
+	fi
+
+	readonly CLASS_BASE="$1"
+
+	ParallelOpts=(--eta --no-notice --null --max-args=1)
+
+	if [ -n "${JOBS-}" ]; then
+		ParallelOpts+=(--jobs="$JOBS")
+	fi
+
+	parallel "${ParallelOpts[@]}" CHECK_OBJ "${RESC-}" | log
+}
+
+exit_with_help() {
+	show_help >&2
+	exit 1
+}
+
 # formats the command line arguments for getopt style
 # parsing
 # Arguments:
@@ -55,13 +111,22 @@ format_opts() {
 	getopt --name "$EXEC_NAME" --options hJ:R:v --longoptions help,jobs:,resource:,version -- "$@"
 }
 
-show_version() {
-	printf '%s\n' "$VERSION"
+log() {
+	while read -r reason entry; do
+		if [[ "$reason" == Completed ]]; then
+			printf 'Completed %s\n' "$entry"
+		elif [ "$reason" = size ]; then
+			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_size
+		elif [ "$reason" = checksum ]; then
+			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_chksum
+		else
+			printf '%s %s\n' "$reason" "$entry" >> "$CLASS_BASE".errors
+		fi
+	done
 }
 
-exit_with_help() {
-	show_help >&2
-	exit 1
+show_version() {
+	printf '%s\n' "$VERSION"
 }
 
 # For a given data object, this fuction retrieves the size, checksum, resource,
@@ -151,70 +216,5 @@ CHECK_OBJ() {
 	printf 'Completed %s\n' "$objPath"
 }
 export -f CHECK_OBJ
-
-log() {
-	while read -r reason entry; do
-		if [[ "$reason" == Completed ]]; then
-			printf 'Completed %s\n' "$entry"
-		elif [ "$reason" = size ]; then
-			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_size
-		elif [ "$reason" = checksum ]; then
-			printf '%s\n' "$entry" >> "$CLASS_BASE".bad_chksum
-		else
-			printf '%s %s\n' "$reason" "$entry" >> "$CLASS_BASE".errors
-		fi
-	done
-}
-
-main() {
-	if ! opts="$(format_opts "$@")"; then
-		printf '\n' >&2
-		exit_with_help
-	fi
-
-	eval set -- "$opts"
-
-	while true; do
-		case "$1" in
-		-h | --help)
-			show_help
-			exit 0
-			;;
-		-J | --jobs)
-			readonly JOBS="$2"
-			shift 2
-			;;
-		-R | --resource)
-			readonly RESC="$2"
-			shift 2
-			;;
-		-v | --version)
-			show_version
-			exit 0
-			;;
-		--)
-			shift
-			break
-			;;
-		*)
-			exit_with_help
-			;;
-		esac
-	done
-
-	if [ "$#" -lt 1 ]; then
-		exit_with_help
-	fi
-
-	readonly CLASS_BASE="$1"
-
-	ParallelOpts=(--eta --no-notice --null --max-args=1)
-
-	if [ -n "${JOBS-}" ]; then
-		ParallelOpts+=(--jobs="$JOBS")
-	fi
-
-	parallel "${ParallelOpts[@]}" CHECK_OBJ "${RESC-}" 2>&1 | log
-}
 
 main "$@"
