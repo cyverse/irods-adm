@@ -256,12 +256,7 @@ replicate() {
 
 	trap 'finish $? '"'$objList'" EXIT
 
-	printf 'Retrieving data objects to replicate...\n' >&2
-
-	if ! get_data_to_repl "$age" "$srcResc" "$destResc" "$baseColl" > "$objList"; then
-		printf 'Failed to retrieve data objects\n' >&2
-		return 1
-	fi
+	get_data_to_repl "$age" "$srcResc" "$destResc" "$baseColl" > "$objList"
 
 	if [[ -n "$DEBUG" ]]; then
 		printf 'DEBUG: object list in %s\n' "$objList" >&2
@@ -392,6 +387,8 @@ get_data_to_repl() {
 	local destResc="$3"
 	local baseColl="$4"
 
+	printf 'Retrieving data objects to replicate...\n' >&2
+
 	local maxCreateTime
 	maxCreateTime="$(date --date="$(date --iso-8601 --date="$age days ago")" '+%s')"
 
@@ -414,10 +411,15 @@ get_data_to_repl() {
 	local replQuery
 	replQuery="$(mk_repl_query "$maxCreateTime" "$baseCond" "$resCond")"
 
-	psql \
-		--no-align --tuples-only --record-separator-zero \
-		--command "$replQuery" --field-separator ' ' \
-		ICAT
+	if ! \
+		psql \
+			--no-align --tuples-only --record-separator-zero \
+			--command "$replQuery" --field-separator ' ' \
+			ICAT
+	then
+		printf 'Failed to retrieve data objects\n' >&2
+		return 1
+	fi
 }
 
 mk_repl_query() {
