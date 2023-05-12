@@ -80,7 +80,6 @@ license information, see https://cyverse.org/license.
 EOF
 }
 
-
 readonly VERSION=8
 
 set -o errexit -o nounset -o pipefail
@@ -101,7 +100,6 @@ EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly EXEC_NAME
 
 DEBUG=''
-
 
 main() {
 	declare -A optMap=(
@@ -135,7 +133,6 @@ main() {
 			"${optMap[until]}"
 	fi
 }
-
 
 resolve_opts() {
 	local mapVar="$1"
@@ -214,7 +211,6 @@ resolve_opts() {
 	done
 }
 
-
 format_opts() {
 	local longOpts=(
 		age:
@@ -235,7 +231,6 @@ format_opts() {
 	longOptsStr="$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)"
 	getopt --name "$EXEC_NAME" --longoptions "$longOptsStr" --options A:dC:hH:M:N:P:R:S:u:U:v -- "$@"
 }
-
 
 replicate() {
 	local age="$1"
@@ -263,33 +258,10 @@ replicate() {
 
 	printf 'Retrieving data objects to replicate...\n' >&2
 
-	local maxCreateTime
-	maxCreateTime="$(date --date="$(date --iso-8601 --date="$age days ago")" '+%s')"
-
-	local resCond
-	if [[ -n "$srcResc" ]]; then
-		resCond="$(mk_resc_cond "$srcResc")"
-	elif [[ -n "$destResc" ]]; then
-		resCond="$(mk_resc_cond "$destResc")"
-	else
-		resCond=TRUE
+	if ! get_data_to_repl "$age" "$srcResc" "$destResc" "$baseColl" > "$objList"; then
+		printf 'Failed to retrieve data objects\n' >&2
+		return 1
 	fi
-
-	local baseCond
-	if [[ -n "$baseColl" ]]; then
-		baseCond="c.coll_name = '$baseColl' OR c.coll_name LIKE '$baseColl/%'"
-	else
-		baseCond=TRUE
-	fi
-
-	local replQuery
-	replQuery="$(mk_repl_query "$maxCreateTime" "$baseCond" "$resCond")"
-
-	psql \
-			--no-align --tuples-only --record-separator-zero \
-			--command "$replQuery" --field-separator ' ' \
-			ICAT \
-		> "$objList"
 
 	if [[ -n "$DEBUG" ]]; then
 		printf 'DEBUG: object list in %s\n' "$objList" >&2
@@ -385,7 +357,6 @@ replicate() {
 	fi
 }
 
-
 finish() {
 	local exitCode="$1"
 	local objList="$2"
@@ -404,7 +375,6 @@ finish() {
 	exit "$exitCode"
 }
 
-
 compute_until_timestamp() {
 	local until="$1"
 
@@ -416,13 +386,39 @@ compute_until_timestamp() {
 	fi
 }
 
+get_data_to_repl() {
+	local age="$1"
+	local srcResc="$2"
+	local destResc="$3"
+	local baseColl="$4"
 
-max_args_per_irepl() {
-	local threadsPerDataObj="$1"
+	local maxCreateTime
+	maxCreateTime="$(date --date="$(date --iso-8601 --date="$age days ago")" '+%s')"
 
-	div_ceil "$MAX_DATA_OBJS_PER_IREPL" $(( threadsPerDataObj * threadsPerDataObj ))
+	local resCond
+	if [[ -n "$srcResc" ]]; then
+		resCond="$(mk_resc_cond "$srcResc")"
+	elif [[ -n "$destResc" ]]; then
+		resCond="$(mk_resc_cond "$destResc")"
+	else
+		resCond=TRUE
+	fi
+
+	local baseCond
+	if [[ -n "$baseColl" ]]; then
+		baseCond="c.coll_name = '$baseColl' OR c.coll_name LIKE '$baseColl/%'"
+	else
+		baseCond=TRUE
+	fi
+
+	local replQuery
+	replQuery="$(mk_repl_query "$maxCreateTime" "$baseCond" "$resCond")"
+
+	psql \
+		--no-align --tuples-only --record-separator-zero \
+		--command "$replQuery" --field-separator ' ' \
+		ICAT
 }
-
 
 mk_repl_query() {
 	local maxTime="$1"
@@ -438,7 +434,6 @@ WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUN
 	AND ($resCond)
 EOSQL
 }
-
 
 mk_resc_cond() {
 	local resc="$1"
@@ -459,6 +454,11 @@ d.resc_id IN (
 SQL
 }
 
+max_args_per_irepl() {
+	local threadsPerDataObj="$1"
+
+	div_ceil "$MAX_DATA_OBJS_PER_IREPL" $(( threadsPerDataObj * threadsPerDataObj ))
+}
 
 select_cohort() {
 	local cnt="$1"
@@ -535,7 +535,6 @@ select_cohort() {
 	rm --force "$cohortList"
 }
 
-
 # This is intended for large files.
 select_cohort_by_size() {
 	local cnt="$1"
@@ -593,7 +592,6 @@ select_cohort_by_size() {
 	rm --force "$cohortList"
 }
 
-
 validate_repl_conds() {
 	local procMult="$1"
 	local srcResc="$2"
@@ -629,7 +627,6 @@ validate_repl_conds() {
 	fi
 }
 
-
 count() {
 	local tot=0
 
@@ -639,7 +636,6 @@ count() {
 
 	echo "$tot"
 }
-
 
 disp_cohort_info() {
 	local cohortSize="$1"
@@ -682,7 +678,6 @@ disp_cohort_info() {
 		"$cohortSize" "$objSizeInfo" "$maxProcs" "$maxArgs"
 }
 
-
 max_procs() {
 	local threadsPerDataObj="$1"
 	local procMult="$2"
@@ -690,14 +685,12 @@ max_procs() {
 	div_ceil $(( MAX_THREADS * procMult )) "$threadsPerDataObj"
 }
 
-
 div_ceil() {
 	local numerator="$1"
 	local denominator="$2"
 
 	echo $(( 1 + (numerator - 1) / denominator ))
 }
-
 
 partition() {
 	local minSizeB="$1"
@@ -727,13 +720,11 @@ partition() {
 	fi
 }
 
-
 threads_to_min_MiB() {
 	local threads="$1"
 
 	echo $(( (threads - 1) * TRANSFER_BUF_SZ ))
 }
-
 
 track_prog() {
 	local cnt="$1"
@@ -763,7 +754,6 @@ track_prog() {
 	printf '%s' "$cnt"
 }
 
-
 mk_prog_msg() {
 	local count="$1"
 	local total="$2"
@@ -773,7 +763,6 @@ mk_prog_msg() {
 	printf 'cohort: %0*d/%d, all: %0*d/%d' \
 		${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
 }
-
 
 REPL_BATCH() {
 	set -o errexit -o nounset -o pipefail
@@ -808,7 +797,6 @@ REPL_BATCH() {
 }
 export -f REPL_BATCH
 
-
 CHECK_TIME() {
 	set -o errexit -o nounset -o pipefail
 
@@ -819,6 +807,5 @@ CHECK_TIME() {
 	fi
 }
 export -f CHECK_TIME
-
 
 main "$@"
