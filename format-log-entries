@@ -16,6 +16,8 @@ Here's an example entry:
 All control characters including line feed (new line) are replaced with there
 escaped hex ASCII code, e.g., line feed => \x0a, carriage return => \x0d, etc.
 Any bytes sequences that are invalid UTF-8 are silently discarded.
+
+NB: This program requires gawk to be installed.
 EOF
 }
 
@@ -30,7 +32,7 @@ main() {
 
 	local year="$1"
 
-	iconv -c --from-encoding=UTF-8 --to-encoding=UTF-8 | format "$year"
+	iconv -c --from-code=UTF-8 --to-code=UTF-8 | format "$year"
 }
 
 format() {
