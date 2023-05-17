@@ -3,75 +3,75 @@
 set -o errexit -o nounset -o pipefail
 
 main() {
-  if [[ "$#" -lt 3 ]]; then
-    printf 'Wrong number of input parameters\n' >&2
-    return 1
-  fi
+	if [[ "$#" -lt 3 ]]; then
+		printf 'Wrong number of input parameters\n' >&2
+		return 1
+	fi
 
-  local resc="$1"
-  local srcColl="$2"
-  local destColl="$3"
+	local resc="$1"
+	local srcColl="$2"
+	local destColl="$3"
 
-  local log=/dev/stdout
-  if [[ "$#" -ge 4 ]]; then
-    log="$4"
-  fi
+	local log=/dev/stdout
+	if [[ "$#" -ge 4 ]]; then
+		log="$4"
+	fi
 
-  chunk "$resc" "$srcColl" "$destColl" &>"$log"
+	chunk "$resc" "$srcColl" "$destColl" &>"$log"
 }
 
 chunk() {
-  local resc="$1"
-  local srcColl="$2"
-  local destColl="$3"
+	local resc="$1"
+	local srcColl="$2"
+	local destColl="$3"
 
-  local svr vault
-  read -r svr vault \
-    <<<"$(quest '%s %s' <<<"select RESC_LOC, RESC_VAULT_PATH where RESC_NAME = '$resc'")"
+	local svr vault
+	read -r svr vault \
+		<<<"$(quest '%s %s' <<<"select RESC_LOC, RESC_VAULT_PATH where RESC_NAME = '$resc'")"
 
-  if [[ "$svr" = CAT_NO_ROWS_FOUND: || "$svr" == EMPTY_RESC_HOST ]]; then
-    printf '"%s" is not a storage resource\n' "$resc" >&2
-    return 1
-  fi
+	if [[ "$svr" = CAT_NO_ROWS_FOUND: || "$svr" == EMPTY_RESC_HOST ]]; then
+		printf '"%s" is not a storage resource\n' "$resc" >&2
+		return 1
+	fi
 
-  local zone
-  zone="$(quest %s <<<"select ZONE_NAME where ZONE_TYPE = 'local'")"
+	local zone
+	zone="$(quest %s <<<"select ZONE_NAME where ZONE_TYPE = 'local'")"
 
-  local srcDir="${srcColl/\/$zone/$vault}"
+	local srcDir="${srcColl/\/$zone/$vault}"
 
-  if [[ -d "$srcDir" ]]; then
-    local srcParentDir
-    srcParentDir=$(dirname "$srcDir")
+	if [[ -d "$srcDir" ]]; then
+		local srcParentDir
+		srcParentDir=$(dirname "$srcDir")
 
-    local collName
-    collName=$(basename "$srcColl")
+		local collName
+		collName=$(basename "$srcColl")
 
-    local destDir="${destColl/\/$zone/$vault}"
-    mkdir --parents "$destDir"
-    cd "$destDir"
+		local destDir="${destColl/\/$zone/$vault}"
+		mkdir --parents "$destDir"
+		cd "$destDir"
 
-    printf 'Chunking data set %s\n' "$srcColl"
-    tar --create --directory "$srcParentDir" "$collName" |
-      split --verbose --bytes 100G - "$collName"."$resc"-
+		printf 'Chunking data set %s\n' "$srcColl"
+		tar --create --directory "$srcParentDir" "$collName" |
+			split --verbose --bytes 100G - "$collName"."$resc"-
 
-    printf '\nRegistering chunks into %s\n' "$destColl"
-    ireg -C -f -v -R "$resc" "$destDir" "$destColl"
-  fi
+		printf '\nRegistering chunks into %s\n' "$destColl"
+		ireg -C -f -v -R "$resc" "$destDir" "$destColl"
+	fi
 
-  printf 'DONE\n'
+	printf 'DONE\n'
 }
 
 quest() {
-  local fmt="$1"
+	local fmt="$1"
 
-  local query=''
+	local query=''
 
-  local line
-  while read -r line; do
-    query+=" $line"
-  done
+	local line
+	while read -r line; do
+		query+=" $line"
+	done
 
-  iquest --no-page "$fmt" "${query//$'\t'/ }" | sed '/^CAT_NO_ROWS_FOUND: /d' || true
+	iquest --no-page "$fmt" "${query//$'\t'/ }" | sed '/^CAT_NO_ROWS_FOUND: /d' || true
 }
 
 main "$@"
