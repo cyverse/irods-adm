@@ -25,6 +25,8 @@ chunk() {
 	local srcColl="$2"
 	local destColl="$3"
 
+	printf 'Chunking %s bytes\n' "$(chunk_vol "$resc" "$srcColl")"
+
 	local svr vault
 	read -r svr vault \
 		<<<"$(quest '%s %s' <<<"select RESC_LOC, RESC_VAULT_PATH where RESC_NAME = '$resc'")"
@@ -59,6 +61,15 @@ chunk() {
 	fi
 
 	printf 'DONE\n'
+}
+
+chunk_vol() {
+	local resc="$1"
+	local srcColl="$2"
+
+	quest %s <<EOQ
+select sum(DATA_SIZE) where RESC_NAME = '$resc' and COLL_NAME = '$srcColl' || like '$srcColl'/%'
+EOQ
 }
 
 quest() {
