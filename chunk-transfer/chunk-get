@@ -27,7 +27,7 @@ GET_SERVER_SET() {
   local setPrefix="$3"
 
   LIST_SERVER_CHUNKS "$src" "$setPrefix" |
-    xargs --replace=CHUNK iget -T -v CHUNK - |
+    xargs --replace=CHUNK iget -K -T -v CHUNK - |
     tar --extract --no-overwrite-dir --directory="$dest"
 }
 export -f GET_SERVER_SET
