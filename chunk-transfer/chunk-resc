@@ -2,6 +2,8 @@
 
 set -o errexit -o nounset -o pipefail
 
+readonly CHUNK_SIZE=100G
+
 main() {
 	if [[ "$#" -lt 3 ]]; then
 		printf 'Wrong number of input parameters\n' >&2
@@ -17,13 +19,14 @@ main() {
 		log="$4"
 	fi
 
-	chunk "$resc" "$srcColl" "$destColl" &>"$log"
+	chunk "$resc" "$srcColl" "$destColl" "$CHUNK_SIZE" &>"$log"
 }
 
 chunk() {
 	local resc="$1"
 	local srcColl="$2"
 	local destColl="$3"
+	local chunkSize="$4"
 
 	printf 'Chunking %s bytes\n' "$(chunk_vol "$resc" "$srcColl")"
 
@@ -54,7 +57,7 @@ chunk() {
 
 		printf 'Chunking data set %s\n' "$srcColl"
 		tar --create --directory "$srcParentDir" "$collName" |
-			split --verbose --bytes 100G - "$collName"."$resc"-
+			split --verbose --bytes "$chunkSize" - "$collName"."$resc"-
 
 		printf '\nRegistering chunks into %s\n' "$destColl"
 		ireg -C -f -v -R "$resc" "$destDir" "$destColl"
