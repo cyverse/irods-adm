@@ -18,7 +18,7 @@ main() {
   QUEST %s <<<"select DATA_NAME where COLL_NAME = '$src'" |
     sed 's/^\(.\+\)-..$/\1/' |
     sort --unique |
-    parallel --max-args=1 --max-procs=5 GET_SERVER_SET "$dest" "$src"
+    parallel --no-notice --max-args=1 --max-procs=5 GET_SERVER_SET "$dest" "$src"
 }
 
 GET_SERVER_SET() {
