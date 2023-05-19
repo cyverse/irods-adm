@@ -266,59 +266,44 @@ replicate() {
 	tot="$(count < "$objList")"
 	printf '%d data objects to replicate\n' "$tot" >&2
 
+	if (( tot == 0 )); then
+		return 0
+	fi
+
 	local maxIreplArgs maxProcs
 
-	if (( tot > 0 )); then
-		if (( maxTransThreads > 0 )); then
-			# threaded transfers
-			local cnt=0
+	if (( maxTransThreads > 0 )); then
+		# threaded transfers
+		local cnt=0
 
-			local threadsPerDataObj
-			for (( threadsPerDataObj=1; threadsPerDataObj<maxTransThreads; threadsPerDataObj++ )); do
-				maxProcs="$(max_procs "$threadsPerDataObj" "$procMult")"
-				maxIreplArgs="$(max_args_per_irepl "$threadsPerDataObj")"
+		local threadsPerDataObj
+		for (( threadsPerDataObj=1; threadsPerDataObj<maxTransThreads; threadsPerDataObj++ )); do
+			maxProcs="$(max_procs "$threadsPerDataObj" "$procMult")"
+			maxIreplArgs="$(max_args_per_irepl "$threadsPerDataObj")"
 
-				cnt="$(\
-					select_cohort \
-							"$cnt" \
-							"$tot" \
-							"$srcResc" \
-							"$destResc" \
-							"$maxProcs" \
-							"$maxIreplArgs" \
-							"$threadsPerDataObj" \
-							"$untilTS" \
-						< "$objList" )"
-			done
+			cnt="$(\
+				select_cohort \
+						"$cnt" \
+						"$tot" \
+						"$srcResc" \
+						"$destResc" \
+						"$maxProcs" \
+						"$maxIreplArgs" \
+						"$threadsPerDataObj" \
+						"$untilTS" \
+					< "$objList" )"
+		done
 
-			# Large file transfers
-			local minSize
-			minSize="$(threads_to_min_MiB "$maxTransThreads")"
+		# Large file transfers
+		local minSize
+		minSize="$(threads_to_min_MiB "$maxTransThreads")"
 
-			local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (MAX_THREADS - 1) ))
+		local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (MAX_THREADS - 1) ))
 
-			maxIreplArgs="$(max_args_per_irepl "$maxTransThreads")"
+		maxIreplArgs="$(max_args_per_irepl "$maxTransThreads")"
 
- 			# still small enough that they wouldn't default to using MAX_THREADS
-			if (( minSize < lastCohortMinSz )); then
-				cnt="$(\
-					select_cohort_by_size \
-							"$cnt" \
-							"$tot" \
-							"$srcResc" \
-							"$destResc" \
-							"$procMult" \
-							"$maxTransThreads" \
-							"$maxIreplArgs" \
-							"$untilTS" \
-							"$minSize" \
-							"$lastCohortMinSz" \
-						< "$objList" )"
-			fi
-
-			# transfer files that would default to using MAX_THREADS
-			maxIreplArgs=1
-
+		# still small enough that they wouldn't default to using MAX_THREADS
+		if (( minSize < lastCohortMinSz )); then
 			cnt="$(\
 				select_cohort_by_size \
 						"$cnt" \
@@ -329,26 +314,43 @@ replicate() {
 						"$maxTransThreads" \
 						"$maxIreplArgs" \
 						"$untilTS" \
+						"$minSize" \
 						"$lastCohortMinSz" \
 					< "$objList" )"
-
-			# zero byte files
-			maxProcs="$(div_ceil $(( MAX_THREADS * procMult )) 2)"
-			maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 2)"
-
-			cnt="$(\
-				select_cohort \
-						"$cnt" "$tot" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" 0 "$untilTS" \
-					< "$objList" )"
-		else
-			# streaming replication
-			maxProcs=$(( MAX_THREADS * procMult ))
-			maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 100)"
-
-			select_cohort 0 "$tot" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" -1 "$untilTS" \
-				< "$objList" \
-				> /dev/null
 		fi
+
+		# transfer files that would default to using MAX_THREADS
+		maxIreplArgs=1
+
+		cnt="$(\
+			select_cohort_by_size \
+					"$cnt" \
+					"$tot" \
+					"$srcResc" \
+					"$destResc" \
+					"$procMult" \
+					"$maxTransThreads" \
+					"$maxIreplArgs" \
+					"$untilTS" \
+					"$lastCohortMinSz" \
+				< "$objList" )"
+
+		# zero byte files
+		maxProcs="$(div_ceil $(( MAX_THREADS * procMult )) 2)"
+		maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 2)"
+
+		cnt="$(\
+			select_cohort \
+					"$cnt" "$tot" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" 0 "$untilTS" \
+				< "$objList" )"
+	else
+		# streaming replication
+		maxProcs=$(( MAX_THREADS * procMult ))
+		maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 100)"
+
+		select_cohort 0 "$tot" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" -1 "$untilTS" \
+			< "$objList" \
+			> /dev/null
 	fi
 }
 
