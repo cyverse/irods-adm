@@ -8,7 +8,7 @@ main() {
 
 
 prep_pep_definitions() {
-	curl --silent https://docs.irods.org/4.2.8/plugins/dynamic_policy_enforcement_points/ \
+	curl --silent https://docs.irods.org/4.2.12/plugins/dynamic_policy_enforcement_points/ \
 		| sed --quiet 's|<tr><td>\(pep_[^<]*\)</td><td>\(.*\)</td></tr>|\1\t\2|p' \
 		| grep --invert PLUGINOPERATION \
 		| sed 's|<br/>|\t|g' \
