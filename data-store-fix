@@ -5,7 +5,6 @@
 ##!/usr/bin/env bash
 # XXX ^^^
 
-
 show_help() {
 	cat <<EOF
 
@@ -17,7 +16,7 @@ Usage:
  $EXEC_NAME [-d|--debug | (-A|--age) AGE | (-U|--db-user) DB-USER |
     (-H|--dbms-host) DBMS-HOST | (-P|--dbms-port) DBMS-PORT]...
 
-This program fixes the following three common problems that happen when an 
+This program fixes the following three common problems that happen when an
 upload fails.
 
 1. The rodsadmin group isn't given own permission on a new collection or data
@@ -25,10 +24,10 @@ upload fails.
 2. A new collection or data object doesn't receive a UUID.
 3. A checksum isn't computed for a new or modified data object replica.
 
-It generates two reports: one for collections and one for data objects. Each 
-report lists all collections or data objects, respectively, that had one or more 
-of the problems. For each problem, the report indicates if the script was able 
-to fix the problem. If the program wasn't able to, the error encountered while 
+It generates two reports: one for collections and one for data objects. Each
+report lists all collections or data objects, respectively, that had one or more
+of the problems. For each problem, the report indicates if the script was able
+to fix the problem. If the program wasn't able to, the error encountered while
 attempting the fix will be included at the bottom of the relevant report.
 
 Options:
@@ -39,23 +38,22 @@ Options:
  -H, --dbms-host DBMS-HOST  the domain name or IP address of the server hosting
                             the PostgreSQL DBMS containing the DB
  -P, --dbms-port DBMS-PORT  the TCP port the DBMS listens on
- -d, --debug                will cause the program to display messages 
+ -d, --debug                will cause the program to display messages
                             describing what it is doing
  -h, --help                 show help and exit
  -v, --version              show version and exit
 
 Environment Variables:
  PGHOST  provides the default value for the DBMS host, default is "localhost"
- PGPORT  provides the default value for the TCP port the DBMS listens on, 
+ PGPORT  provides the default value for the TCP port the DBMS listens on,
          default is 5432
- PGUSER  provides the default value for the account used to authorize the 
+ PGUSER  provides the default value for the account used to authorize the
          connection, default is the user executing this program.
 
 © 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
 EOF
 }
-
 
 readonly VERSION=5
 
@@ -77,7 +75,6 @@ declare -i CollCnt=0
 declare -i ObjCnt=0
 
 declare -a TempFiles
-
 
 main() {
 	local opts
@@ -139,7 +136,6 @@ main() {
 	fi
 }
 
-
 # formats the command-line options using getopt
 # Arguments:
 #  It accepts the raw commandline arguments
@@ -153,10 +149,9 @@ format_opts() {
 		-- "$@"
 }
 
-
 # performs any needed fixes and genertes the report
 # Arguments:
-#  age  how many days old a collection or data object must be before it will be 
+#  age  how many days old a collection or data object must be before it will be
 #       considered
 # Output:
 #  the reports
@@ -187,7 +182,6 @@ fix() {
 	generate_report "$cutoffTime" "$fixLog" "$errorLog"
 }
 
-
 check_existing_instance() {
 	local pidofExec
 	if ! pidofExec="$(command -v pidof)"; then
@@ -201,7 +195,6 @@ check_existing_instance() {
 		fi
 	done
 }
-
 
 display_problems() {
 	local cutoffTime="$1"
@@ -319,7 +312,6 @@ ROLLBACK;
 EOF
 }
 
-
 inject_debug_msg() {
 	local msg="$*"
 
@@ -327,11 +319,9 @@ inject_debug_msg() {
 	inject_debug_stmt "\\echo '$msg'"
 }
 
-
 inject_debug_newline() {
 	inject_debug_stmt "\\echo ''"
 }
-
 
 inject_debug_stmt() {
 	local stmt="$*"
@@ -341,7 +331,6 @@ inject_debug_stmt() {
 	fi
 }
 
-
 inject_set_title() {
 	local title="$*"
 
@@ -350,13 +339,11 @@ inject_set_title() {
 	inject_debug_quiet off
 }
 
-
 inject_debug_quiet() {
 	local state="$1"
 
 	printf $'\\set QUIET %s\n' "$state"
 }
-
 
 fix_problems() {
 	while IFS= read -r; do
@@ -374,7 +361,6 @@ fix_problems() {
 		esac
 	done
 }
-
 
 fix_collection_problems() {
 	pass_hdr_thru
@@ -411,15 +397,13 @@ fix_collection_problems() {
 	done
 }
 
-
 complete_fix_coll() {
 	local funcName="$1"
 
-	if [[ "$funcName" == fix_collection_problems ]]; then 
+	if [[ "$funcName" == fix_collection_problems ]]; then
 		printf '(%d collections)' "$CollCnt"
 	fi
 }
-
 
 fix_object_problems() {
 	pass_hdr_thru
@@ -457,19 +441,17 @@ fix_object_problems() {
 		printf '%s|%s|%s|%s|%s|%s|%s\n' \
 			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
 
-		: $(( ObjCnt++ ))	
+		: $(( ObjCnt++ ))
 	done
 }
-
 
 complete_fix_objs() {
 	local funcName="$1"
 
-	if [[ "$funcName" == fix_object_problems ]]; then 
+	if [[ "$funcName" == fix_object_problems ]]; then
 		printf '(%d data objects)' "$ObjCnt"
 	fi
 }
-
 
 pass_hdr_thru() {
 	while read -r; do
@@ -481,14 +463,12 @@ pass_hdr_thru() {
 	done
 }
 
-
 trim() {
 	local str="$*"
 	str="${str#"${str%%[![:space:]]*}"}"
 	str="${str%"${str##*[![:space:]]}"}"
 	printf '%s' "$str"
 }
-
 
 unescape() {
 	local escEntity="$*"
@@ -519,7 +499,6 @@ unescape() {
 	printf '%s' "$entity"
 }
 
-
 process_chksum_issue() {
 	local issue="$1"
 	local repl="$2"
@@ -547,7 +526,6 @@ process_chksum_issue() {
 	fi
 }
 
-
 process_perm_issue() {
 	local issue="$1"
 	local entity="$2"
@@ -567,7 +545,6 @@ process_perm_issue() {
 		printf '%s' "$issue"
 	fi
 }
-
 
 process_uuid_issue() {
 	local uuidCntField="$1"
@@ -612,7 +589,6 @@ process_uuid_issue() {
 	printf '%s%s ' "$uuidCntField" "$statusFmt"
 }
 
-
 add_missing_uuid() {
 	local entity="$1"
 	local imetaFlag="$2"
@@ -633,7 +609,6 @@ add_missing_uuid() {
 		fi
 	fi
 }
-
 
 rm_extra_uuids() {
 	local entity="$1"
@@ -671,7 +646,6 @@ rm_extra_uuids() {
 	fi
 }
 
-
 # Retrieve UUIDs for an entity sorted by the metdata's DB Ids
 get_meta_id_uuid_map() {
 	local entityPath="$1"
@@ -697,7 +671,6 @@ get_meta_id_uuid_map() {
 	echo "$results"
 }
 
-
 mk_coll_uuid_query() {
 	local collPath="$1"
 
@@ -706,7 +679,6 @@ select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
 where META_COLL_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath'"
 EOF
 }
-
 
 mk_data_uuid_query() {
 	local collPath="$1"
@@ -717,7 +689,6 @@ select order(META_DATA_ATTR_ID), META_DATA_ATTR_VALUE
 where META_DATA_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath' and DATA_NAME = '$dataName'"
 EOF
 }
-
 
 generate_report() {
 	local cutoffTime="$1"
@@ -766,7 +737,6 @@ generate_report() {
 	fi
 }
 
-
 strip_noise() {
 	while IFS= read -r; do
 		if [[ -n "${DEBUG-}" ]]; then
@@ -783,10 +753,8 @@ strip_noise() {
 	done
 }
 
-
 rm_temp_files() {
 	rm --force "${TempFiles[@]}"
 }
-
 
 main "$@"
