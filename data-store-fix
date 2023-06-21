@@ -480,8 +480,9 @@ unescape() {
 		local curChar="${escEntity:$i:1}"
 
 		if (( escaped == 1 )); then
-			if [ "$curChar" = n ]; then
-				printf -v entity '%s\n' "$entity"
+			if [[ "$curChar" =~ (n|r) ]]; then
+				# shellcheck disable=SC1003
+				printf -v entity '%s\'"$curChar" "$entity"
 			else
 				entity="$entity$curChar"
 			fi
