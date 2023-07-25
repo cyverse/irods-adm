@@ -71,7 +71,7 @@ chunk_vol() {
 	local srcColl="$2"
 
 	quest %s <<EOQ
-select sum(DATA_SIZE) where RESC_NAME = '$resc' and COLL_NAME = '$srcColl' || like '$srcColl'/%'
+select sum(DATA_SIZE) where RESC_NAME = '$resc' and COLL_NAME = '$srcColl' || like '$srcColl/%'
 EOQ
 }
 
