@@ -1,4 +1,23 @@
 #!/usr/bin/env bash
+#
+# This script bundles an iRODS collection into chunks for efficient transfer.
+#
+# Usage: chunk COLL-PATH
+#
+# Parameters:
+#    COLL-PATH  The absolute path to the iRODS collection to chunk
+#
+# This script breaks bundles all of the data objects in COLL-PATH that have on
+# the default resource for the first catalog service provider. For each storage
+# resource under the default resource, it archives all of the replicas on this
+# storage resource that belong to a data object in COLL-PATH, splitting the
+# archive into data objects no larger that 100 GiB in size. Let COLL-NAME be
+# the base name of the collection being chunked. For a store resource named
+# RESC, its archive chunks will be named "COLL-NAME.RESC-??" where ? is
+# lowercase letter between "a" and "z", inclusive. The chunks are generated in
+# lexicographic order so that if the are concatenated using
+# `cat COLL-NAME.RESC-*`, the full archive will be rebuilt correctly. All chunks
+# for all storage resources are stored in the collection "COLL-PATH.chunked".
 
 set -o errexit -o nounset -o pipefail
 
