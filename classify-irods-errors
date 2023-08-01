@@ -170,7 +170,7 @@ classify_errors() {
 	sPECnt="$(split_out_class \
 		"$errorsFile" \
 		'^\(phymv\|repl\)Util: srcPath \(.*\) does not exist$' \
-		'\1' \
+		'\2' \
 		"$logBase".src_path_errors)"
 
 	display_error_count 'source path errors' "$sPECnt" "$errCnt"
