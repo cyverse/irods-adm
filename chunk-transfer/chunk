@@ -27,108 +27,108 @@ readonly EXEC_DIR
 readonly IRODS_SVC_ACNT=irods
 
 main() {
-  if [[ "$#" -lt 1 ]]; then
-    printf 'The absolute path to the collection to chunk is required\n' >&2
-    return 1
-  fi
+	if [[ "$#" -lt 1 ]]; then
+		printf 'The absolute path to the collection to chunk is required\n' >&2
+		return 1
+	fi
 
-  local srcColl="$1"
+	local srcColl="$1"
 
-  local destColl="$srcColl".chunked
-  imkdir -p "$destColl"
+	local destColl="$srcColl".chunked
+	imkdir -p "$destColl"
 
-  local user perm
-  while read -r user perm; do
-    ichmod -M "$perm" "$user" "$destColl"
-  done < <(get_acl "$srcColl")
+	local user perm
+	while read -r user perm; do
+		ichmod -M "$perm" "$user" "$destColl"
+	done < <(get_acl "$srcColl")
 
-  ichmod inherit "$destColl"
+	ichmod inherit "$destColl"
 
-  local resc
-  while read -r resc; do
-    local svr
-    svr="$(quest %s <<<"select RESC_LOC where RESC_NAME = '$resc'")"
+	local resc
+	while read -r resc; do
+		local svr
+		svr="$(quest %s <<<"select RESC_LOC where RESC_NAME = '$resc'")"
 
-    scp -q "$EXEC_DIR"/chunk-resc "$svr":chunk-resc
-    ssh -n -q "$svr" sudo mv --force chunk-resc /tmp/chunk-resc
-    ssh -n -q "$svr" sudo chmod +x /tmp/chunk-resc
-    ssh -n -q "$svr" sudo chown "$IRODS_SVC_ACNT" /tmp/chunk-resc
+		scp -q "$EXEC_DIR"/chunk-resc "$svr":chunk-resc
+		ssh -n -q "$svr" sudo mv --force chunk-resc /tmp/chunk-resc
+		ssh -n -q "$svr" sudo chmod +x /tmp/chunk-resc
+		ssh -n -q "$svr" sudo chown "$IRODS_SVC_ACNT" /tmp/chunk-resc
 
-    ssh -n -q "$svr" \
-      sudo --background --login --non-interactive --user="$IRODS_SVC_ACNT" \
-          /tmp/chunk-resc "$resc" "$srcColl" "$destColl" /tmp/chunk-"$resc".log \
-        '&>' /dev/null
+		ssh -n -q "$svr" \
+			sudo --background --login --non-interactive --user="$IRODS_SVC_ACNT" \
+					/tmp/chunk-resc "$resc" "$srcColl" "$destColl" /tmp/chunk-"$resc".log \
+				'&>' /dev/null
 
-    printf 'Launched on %s\n' "$svr"
-  done < <(get_storage_rescs "$(determine_default_resc)" "$srcColl")
+		printf 'Launched on %s\n' "$svr"
+	done < <(get_storage_rescs "$(determine_default_resc)" "$srcColl")
 }
 
 determine_default_resc() {
-  local zone
-  zone="$(quest %s <<<"select ZONE_NAME where ZONE_TYPE = 'local'")"
+	local zone
+	zone="$(quest %s <<<"select ZONE_NAME where ZONE_TYPE = 'local'")"
 
-  izonereport | default_resc_from_zonereport "$zone"
+	izonereport | default_resc_from_zonereport "$zone"
 }
 
 default_resc_from_zonereport() {
-  local zone="$1"
+	local zone="$1"
 
-  jq --raw-output --from-file /dev/stdin <(cat) <<JQ
+	jq --raw-output --from-file /dev/stdin <(cat) <<JQ
 .zones
-  | map(select(.icat_server.server_config.irods_zone_name = "$zone"))
-  | .[0].icat_server.server_config.default_resource_name
+	| map(select(.icat_server.server_config.irods_zone_name = "$zone"))
+	| .[0].icat_server.server_config.default_resource_name
 JQ
 }
 
 get_storage_rescs() {
-  local rootResc="$1"
-  local coll="$2"
+	local rootResc="$1"
+	local coll="$2"
 
 # XXX - See iRODS#6101, fixed in iRODS 4.2.12
-#  quest %s <<EOQ
+# 	quest %s <<EOQ
 #select RESC_NAME
 #where DATA_RESC_HIER = '$rootResc' || like '$rootResc;%' and COLL_NAME = '$coll' || like '$coll/%'
 #EOQ
-  quest %s <<EOQ
+	quest %s <<EOQ
 select RESC_NAME where DATA_RESC_HIER = '$rootResc' and COLL_NAME = '$coll' || like '$coll/%'
 EOQ
-  quest %s <<EOQ
+	quest %s <<EOQ
 select RESC_NAME where DATA_RESC_HIER like '$rootResc;%' and COLL_NAME = '$coll' || like '$coll/%'
 EOQ
 # XXX - ^^^
 }
 
 get_acl() {
-  local coll="$1"
+	local coll="$1"
 
-  quest '%s %s' <<<"select COLL_ACCESS_USER_ID, COLL_ACCESS_NAME where COLL_NAME = '$coll'" |
-    sed 's/read object/read/;s/modify object/write/' |
-    resolve_user_names
+	quest '%s %s' <<<"select COLL_ACCESS_USER_ID, COLL_ACCESS_NAME where COLL_NAME = '$coll'" |
+		sed 's/read object/read/;s/modify object/write/' |
+		resolve_user_names
 }
 
 resolve_user_names() {
-  local userId perm
-  while read -r userId perm; do
-    local userName
-    userName="$(quest %s <<<"select USER_NAME where USER_ID = '$userId'")"
+	local userId perm
+	while read -r userId perm; do
+		local userName
+		userName="$(quest %s <<<"select USER_NAME where USER_ID = '$userId'")"
 
-    if [[ "$userName" != public && "$userName" != anonymous ]]; then
-      printf '%s %s\n' "$userName" "$perm"
-    fi
-  done
+		if [[ "$userName" != public && "$userName" != anonymous ]]; then
+			printf '%s %s\n' "$userName" "$perm"
+		fi
+	done
 }
 
 quest() {
-  local fmt="$1"
+	local fmt="$1"
 
-  local query=''
+	local query=''
 
-  local line
-  while read -r line; do
-    query+=" $line"
-  done
+	local line
+	while read -r line; do
+		query+=" $line"
+	done
 
-  iquest --no-page "$fmt" "${query//$'\t'/ }" | sed '/^CAT_NO_ROWS_FOUND: /d' || true
+	iquest --no-page "$fmt" "${query//$'\t'/ }" | sed '/^CAT_NO_ROWS_FOUND: /d' || true
 }
 
 main "$@"
