@@ -27,7 +27,7 @@ readonly EXEC_DIR
 readonly IRODS_SVC_ACNT=irods
 
 main() {
-	if [[ "$#" -lt 1 ]]; then
+	if (( $# < 1 )); then
 		printf 'The absolute path to the collection to chunk is required\n' >&2
 		return 1
 	fi
