@@ -39,99 +39,86 @@ format() {
 
 	awk --assign YEAR="$year" --file - <(cat) <<'EOF'
 function escape_ctrls(line) {
-  patsplit(line, ctrlChars, /[\x01-\x1f]/, segs);
-  escLine = segs[0];
-
-  for (idx in ctrlChars) {
-    escLine = escLine ctrlEsc[ctrlChars[idx]] segs[idx];
-  }
-
-  return escLine;
+	patsplit(line, ctrlChars, /[\x01-\x1f]/, segs);
+	escLine = segs[0];
+	for (idx in ctrlChars) {
+		escLine = escLine ctrlEsc[ctrlChars[idx]] segs[idx];
+	}
+	return escLine;
 }
-
 
 function month_number(month) {
-  switch(month) {
-    case "Jan":
-      return "01";
-    case "Feb":
-      return "02";
-    case "Mar":
-      return "03";
-    case "Apr":
-      return "04";
-    case "May":
-      return "05";
-    case "Jun":
-      return "06";
-    case "Jul":
-      return "07";
-    case "Aug":
-      return "08";
-    case "Sep":
-      return "09";
-    case "Oct":
-      return "10";
-    case "Nov":
-      return "11";
-    case "Dec":
-      return "12";
-    default:
-      return "??";
-  }
+	switch(month) {
+		case "Jan":
+			return "01";
+		case "Feb":
+			return "02";
+		case "Mar":
+			return "03";
+		case "Apr":
+			return "04";
+		case "May":
+			return "05";
+		case "Jun":
+			return "06";
+		case "Jul":
+			return "07";
+		case "Aug":
+			return "08";
+		case "Sep":
+			return "09";
+		case "Oct":
+			return "10";
+		case "Nov":
+			return "11";
+		case "Dec":
+			return "12";
+		default:
+			return "??";
+	}
 }
-
 
 BEGIN {
-  currentEntry = "";
-  lastMonth = "";
-
-  for (n = 1; n <= 0x1f; n++) {
-    ctrlEsc[sprintf("%c", n)] = sprintf("\\x%02x", n);
-  }
-
-  if (YEAR !~ /[0-9][0-9]*/) {
-    print "The YEAR variable must be set to a number on the command line" > "/dev/stderr";
-    exit 1;
-  }
+	currentEntry = "";
+	lastMonth = "";
+	for (n = 1; n <= 0x1f; n++) {
+		ctrlEsc[sprintf("%c", n)] = sprintf("\\x%02x", n);
+	}
+	if (YEAR !~ /[0-9][0-9]*/) {
+		print "The YEAR variable must be set to a number on the command line" > "/dev/stderr";
+		exit 1;
+	}
 }
-
 
 /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [ 1-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-5][0-9] / {
-  if (currentEntry != "") {
-    print currentEntry;
-  }
-
-  month = month_number($1);
-  day = $2;
-  rest = substr($0, match($0, $3) - 1);
-
-  # Ensure days are two digits
-  if (day ~ /^[1-9]$/) {
-    day = "0" day;
-  }
-
-  if (lastMonth == "12" && month == "01") {
-    YEAR = YEAR + 1;
-  }
-
-  currentEntry = YEAR "-" month "-" day escape_ctrls(rest);
-  lastMonth = month;
-  next;
+	if (currentEntry != "") {
+		print currentEntry;
+	}
+	month = month_number($1);
+	day = $2;
+	rest = substr($0, match($0, $3) - 1);
+	# Ensure days are two digits
+	if (day ~ /^[1-9]$/) {
+		day = "0" day;
+	}
+	if (lastMonth == "12" && month == "01") {
+		YEAR = YEAR + 1;
+	}
+	currentEntry = YEAR "-" month "-" day escape_ctrls(rest);
+	lastMonth = month;
+	next;
 }
-
 
 NF > 0 {
-  if (currentEntry != "") {
-    currentEntry = currentEntry ctrlEsc["\x0a"] escape_ctrls($0);
-  }
+	if (currentEntry != "") {
+		currentEntry = currentEntry ctrlEsc["\x0a"] escape_ctrls($0);
+	}
 }
 
-
 END {
-  if (currentEntry != "") {
-    print currentEntry;
-  }
+	if (currentEntry != "") {
+		print currentEntry;
+	}
 }
 EOF
 }
