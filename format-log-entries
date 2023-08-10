@@ -24,8 +24,7 @@ EOF
 set -o errexit -o nounset -o pipefail
 
 main() {
-	if (( $# < 1 ))
-	then
+	if (( $# < 1 )); then
 		show_help >&2
 		return 1
 	fi
