@@ -24,7 +24,10 @@ set -o errexit -o nounset -o pipefail
 EXEC_DIR="$(dirname "$(realpath --canonicalize-missing "$0")")"
 readonly EXEC_DIR
 
+readonly CHUNKED_EXT=chunked
+readonly CHUNKING_LOG_SUFFIX=-chunk.log
 readonly IRODS_SVC_ACNT=irods
+readonly TMP_DIR=/tmp
 
 main() {
 	if (( $# < 1 )); then
@@ -34,7 +37,7 @@ main() {
 
 	local srcColl="$1"
 
-	local destColl="$srcColl".chunked
+	local destColl="$srcColl"."$CHUNKED_EXT"
 	imkdir -p "$destColl"
 
 	local user perm
@@ -50,13 +53,14 @@ main() {
 		svr="$(quest %s <<<"select RESC_LOC where RESC_NAME = '$resc'")"
 
 		scp -q "$EXEC_DIR"/chunk-resc "$svr":chunk-resc
-		ssh -n -q "$svr" sudo mv --force chunk-resc /tmp/chunk-resc
-		ssh -n -q "$svr" sudo chmod +x /tmp/chunk-resc
-		ssh -n -q "$svr" sudo chown "$IRODS_SVC_ACNT" /tmp/chunk-resc
+		ssh -n -q "$svr" sudo mv --force chunk-resc "'$TMP_DIR'"/chunk-resc
+		ssh -n -q "$svr" sudo chmod +x "'$TMP_DIR'"/chunk-resc
+		ssh -n -q "$svr" sudo chown "'$IRODS_SVC_ACNT'" "'$TMP_DIR'"/chunk-resc
 
 		ssh -n -q "$svr" \
-			sudo --background --login --non-interactive --user="$IRODS_SVC_ACNT" \
-					/tmp/chunk-resc "$resc" "$srcColl" "$destColl" /tmp/chunk-"$resc".log \
+			sudo --background --login --non-interactive --user="'$IRODS_SVC_ACNT'" \
+					"'$TMP_DIR'"/chunk-resc \
+						"'$resc'" "'$srcColl'" "'$destColl'" "'$TMP_DIR/$resc$CHUNKING_LOG_SUFFIX'" \
 				'&>' /dev/null
 
 		printf 'Launched on %s\n' "$svr"
