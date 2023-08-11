@@ -504,7 +504,7 @@ process_chksum_issue() {
 
 	if [ "${issue// /}" = t ]; then
 		local err retCode
-		err="$(ichksum --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
+		err="$(ichksum -M --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
 		retCode="$?"
 
 		if [[ "$err" =~ 'does not exist' ]]; then
