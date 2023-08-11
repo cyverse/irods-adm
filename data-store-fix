@@ -168,7 +168,7 @@ fix() {
 	local cutoffTime
 	cutoffTime="$(date --iso-8601 --date "$age days ago")"
 
-	display_problems "$(date --date="$cutoffTime" '+%s')" | strip_noise > "$problems"
+	find_problems "$(date --date="$cutoffTime" '+%s')" | strip_noise > "$problems"
 
 	trap 'if [[ "${FUNCNAME[0]-}" != main ]]; then return; fi' SIGINT SIGTERM
 
@@ -196,7 +196,7 @@ check_existing_instance() {
 	done
 }
 
-display_problems() {
+find_problems() {
 	local cutoffTS="$1"
 
 	psql ICAT <<EOF
