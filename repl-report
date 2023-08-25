@@ -47,7 +47,6 @@ license information, see https://cyverse.org/license.
 EOF
 }
 
-
 readonly VERSION=9
 
 set -o errexit -o nounset -o pipefail
@@ -60,7 +59,6 @@ EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly EXEC_NAME
 
 declare DEBUG
-
 
 main() {
 	declare -A optMap=(
@@ -86,7 +84,6 @@ main() {
 
 	mk_report "${optMap[age]}" "${optMap[collection]}"
 }
-
 
 map_opts() {
 	local mapVar="$1"
@@ -143,7 +140,6 @@ map_opts() {
 	readonly DEBUG
 }
 
-
 prep_opts() {
 	getopt \
 		--longoptions age:,collection:,debug,help,host:,port:,user:,version \
@@ -152,7 +148,6 @@ prep_opts() {
 		-- \
 		"$@"
 }
-
 
 mk_report() {
 	local age="$1"
@@ -166,7 +161,6 @@ $(inject_debug_quiet off)
 
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
-
 $(inject_debug_msg 'Gathering unreplicated data')
 
 CREATE TEMPORARY TABLE unreplicated_data(id) ON COMMIT DROP AS
@@ -174,9 +168,7 @@ SELECT data_id FROM r_data_main
 WHERE ( $(inject_collection_restriction r_data_main "$collection") )
 GROUP BY data_id
 HAVING COUNT(*) = 1;
-
 CREATE INDEX idx_unreplicated_data_id ON unreplicated_data(id);
-
 
 $(inject_debug_msg 'Creating storage to root resource mapping')
 
@@ -192,9 +184,7 @@ WITH RECURSIVE child_mapping AS (
 	UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root
 		FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent )
 SELECT id, name, root FROM child_mapping WHERE storage;
-
 CREATE INDEX idx_storage_root_mapping_storage_id ON storage_root_mapping(storage_id);
-
 
 $(inject_debug_msg 'Gathering unreplicated replicas')
 
@@ -203,10 +193,8 @@ SELECT s.root_name, s.storage_name, d.data_size
 FROM storage_root_mapping AS s JOIN r_data_main AS d ON d.resc_id = s.storage_id
 WHERE d.data_id IN (SELECT id FROM unreplicated_data)
 	AND ( $(inject_time_restriction d "$age") );
-
 CREATE INDEX idx_unreplicated_replicas_root_resc ON unreplicated_replicas(root_resc);
 CREATE INDEX idx_unreplicated_replicas_store_resc ON unreplicated_replicas(store_resc);
-
 
 \\echo
 
@@ -220,7 +208,6 @@ FROM unreplicated_replicas
 GROUP BY store_resc
 ORDER BY store_resc;
 
-
 $(inject_debug_newline)
 $(inject_set_title 'Unreplicated in Root Resources')
 SELECT
@@ -231,13 +218,11 @@ SELECT
 GROUP BY root_resc
 ORDER BY root_resc;
 
-
 $(inject_debug_newline)
 $(inject_debug_newline)
 ROLLBACK;
 EOSQL
 }
-
 
 inject_collection_restriction() {
 	local table="$1"
@@ -254,7 +239,6 @@ inject_collection_restriction() {
 		printf TRUE
 	fi
 }
-
 
 inject_time_restriction() {
 	local table="$1"
@@ -276,7 +260,6 @@ inject_time_restriction() {
 	fi
 }
 
-
 inject_set_title() {
 	local title="$*"
 
@@ -285,13 +268,11 @@ inject_set_title() {
 	inject_debug_quiet off
 }
 
-
 inject_debug_quiet() {
 	local state="$1"
 
 	inject_debug_stmt \\set QUIET "$state"
 }
-
 
 inject_debug_msg() {
 	local msg="$*"
@@ -300,11 +281,9 @@ inject_debug_msg() {
 	inject_debug_stmt "\echo '$msg'"
 }
 
-
 inject_debug_newline() {
 	inject_debug_stmt \\echo
 }
-
 
 inject_debug_stmt() {
 	local stmt="$*"
@@ -313,6 +292,5 @@ inject_debug_stmt() {
 		printf '%s\n' "$stmt"
 	fi
 }
-
 
 main "$@"
