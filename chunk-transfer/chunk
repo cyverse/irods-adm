@@ -40,15 +40,23 @@ main() {
 	local destColl="$srcColl"."$CHUNKED_EXT"
 	imkdir -p "$destColl"
 
-	local user perm
-	while read -r user perm; do
+	local acls
+	readarray -t acls <<< "$(get_acl "$srcColl")"
+
+	local acl
+	for acl in "${acls[@]}"; do
+		local user perm
+		read -r user perm <<< "$acl"
 		ichmod -M "$perm" "$user" "$destColl"
-	done < <(get_acl "$srcColl")
+	done
 
 	ichmod inherit "$destColl"
 
+	local rescs
+	readarray -t rescs <<< "$(get_storage_rescs "$(determine_default_resc)" "$srcColl")"
+
 	local resc
-	while read -r resc; do
+	for resc in "${rescs[@]}"; do
 		local svr
 		svr="$(quest %s <<<"select RESC_LOC where RESC_NAME = '$resc'")"
 
@@ -64,7 +72,7 @@ main() {
 				'&>' /dev/null
 
 		printf 'Launched on %s\n' "$svr"
-	done < <(get_storage_rescs "$(determine_default_resc)" "$srcColl")
+	done
 }
 
 determine_default_resc() {
