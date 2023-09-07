@@ -244,7 +244,7 @@ inject_time_restriction() {
 	local table="$1"
 	local age="$2"
 
-	if [[ "$age" -lt 0 ]]; then
+	if (( age < 0 )); then
 		# No time restriction
 
  		printf TRUE
