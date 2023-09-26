@@ -26,14 +26,12 @@ resources.
 EOF
 }
 
-
 readonly Version=2
 
 set -o errexit -o nounset -o pipefail
 
 readonly ExecPath="$(readlink --canonicalize "$0")"
 readonly ExecName="$(basename "$ExecPath")"
-
 
 main() {
 	if ! opts="$(getopt --name "$ExecName" --options hJ:v --longoptions help,jobs:,version -- "$@")"
@@ -85,11 +83,9 @@ main() {
 	parallel --eta --no-notice --delimiter '\n' --max-args 1 "$JobsOpt" FIX > /dev/null
 }
 
-
 show_version() {
 	printf '%s\n' "$Version"
 }
-
 
 FIX() {
 	local objPath="$1"
@@ -162,6 +158,5 @@ CMD
 	fi
 }
 export -f FIX
-
 
 main "$@"
