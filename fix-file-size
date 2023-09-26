@@ -30,8 +30,9 @@ readonly Version=2
 
 set -o errexit -o nounset -o pipefail
 
-readonly ExecPath="$(readlink --canonicalize "$0")"
-readonly ExecName="$(basename "$ExecPath")"
+ExecPath="$(readlink --canonicalize "$0")"
+ExecName="$(basename "$ExecPath")"
+readonnly ExecName ExecPath
 
 main() {
 	if ! opts="$(getopt --name "$ExecName" --options hJ:v --longoptions help,jobs:,version -- "$@")"
@@ -96,7 +97,7 @@ FIX() {
 		local rs="$1"
 		local cmd="$2"
 
-		local superCmd="if [[ "\$USER" == irods ]]; then $cmd; else sudo -i -u irods <<'EOSUDO'
+		local superCmd="if [[ \$USER == irods ]]; then $cmd; else sudo -i -u irods <<'EOSUDO'
 $cmd
 EOSUDO
 fi"
@@ -117,16 +118,10 @@ CMD
 
 	printf '%s\n' "$objPath"
 
-	local collPath objName
-	collPath="$(dirname "$objPath")"
-	objName="$(basename "$objPath")"
-
 	local icatSize rescHier storeHost filePath
 	while read -r icatSize rescHier storeHost filePath
 	do
 		fixed=
-
-		local coordResc="${rescHier%%;*}"
 
 		local sizeCmd
 		if ! sizeCmd="$(mk_physical_size_cmd "$filePath")"; then
