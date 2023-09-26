@@ -14,8 +14,9 @@ Parameters:
  <data object>  the path to the data object
 
 Options:
- -h, --help     show help and exit
- -v, --version  show version and exit
+ -R, --resc RESC  only retrieve replicas from the root resource RESC
+ -h, --help       show help and exit
+ -v, --version    show version and exit
 
 Summary:
 For each replica of the data object, size, resource hierarchy, the host name of
@@ -53,7 +54,7 @@ show_help_and_error_out()
 }
 
 
-if ! opts=$(getopt --name "$EXEC_NAME" --options hv --longoptions help,version -- "$@")
+if ! opts=$(getopt --name "$EXEC_NAME" --options hR:v --longoptions help,resc:,version -- "$@")
 then
   printf '\n' >&2
   show_help_and_error_out
@@ -61,12 +62,17 @@ fi
 
 eval set -- "$opts"
 
+declare resc
 while true
 do
   case "$1" in
     -h|--help)
       show_help
       exit 0
+      ;;
+    -R|--resc)
+      resc="$2"
+      shift 2
       ;;
     -v|--version)
       show_version
@@ -91,9 +97,10 @@ fi
 
 readonly OBJ_PATH="$*"
 
-
 ask_irods()
 {
+  local resc="$1"
+
   local collPath
   collPath=$(dirname "$OBJ_PATH")
 
@@ -111,7 +118,30 @@ ask_irods()
   then
     printf 'invalid data object: %s\n' "$OBJ_PATH" >&2
   else
-    cut --delimiter ' ' --fields 2- <<< "$resp"
+    cut --delimiter ' ' --fields 2- <<< "$resp" | filter_resc "$resc"
+  fi
+}
+
+
+filter_resc()
+{
+  local resc="$1"
+
+  if [[ -z "$resc" ]]
+  then
+    cat
+  else
+    local entry
+    while IFS= read -r entry
+    do
+      local size rescHier
+      read -r size rescHier _ <<< "$entry"
+
+      if [[ "$rescHier" =~ ^$resc ]]
+      then
+        echo "$entry"
+      fi
+    done
   fi
 }
 
@@ -126,4 +156,4 @@ do
   else
     printf '%s %s %s %s\n' "$size" "$rescHier" "$storeHost" "$filePath"
   fi
-done < <(ask_irods)
+done < <(ask_irods "${resc-}")
