@@ -18,8 +18,8 @@ Options:
  -v, --version  show version and exit
 
 Summary:
-For each replica of the data object, size, resource hierarchy, the host name of 
-the resource server serving the storage resource, and the path to the file. It 
+For each replica of the data object, size, resource hierarchy, the host name of
+the resource server serving the storage resource, and the path to the file. It
 writes this information to standard out with the following format with one line
 per replica.
 
@@ -34,7 +34,9 @@ EOF
 
 set -o errexit
 
-readonly EXEC_NAME=$(basename "$0")
+EXEC_NAME=$(basename "$0")
+readonly EXEC_NAME
+
 readonly VERSION=1
 
 
