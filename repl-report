@@ -261,7 +261,7 @@ inject_time_restriction() {
 }
 
 inject_set_title() {
-	local title="$*"
+	local title="$1"
 
 	inject_debug_quiet on
 	printf $'\pset title \'%s\'\n' "$title"
@@ -271,22 +271,22 @@ inject_set_title() {
 inject_debug_quiet() {
 	local state="$1"
 
-	inject_debug_stmt \\set QUIET "$state"
+	inject_debug_stmt "\\set QUIET $state"
 }
 
 inject_debug_msg() {
-	local msg="$*"
+	local msg="$1"
 
 	inject_debug_newline
-	inject_debug_stmt "\echo '$msg'"
+	inject_debug_stmt "\\echo '$msg'"
 }
 
 inject_debug_newline() {
-	inject_debug_stmt \\echo
+	inject_debug_stmt '\echo'
 }
 
 inject_debug_stmt() {
-	local stmt="$*"
+	local stmt="$1"
 
 	if [[ -n "${DEBUG-}" ]]; then
 		printf '%s\n' "$stmt"
