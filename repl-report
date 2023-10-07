@@ -224,9 +224,9 @@ $(inject_debug_newline)
 $(inject_set_title 'Unreplicated in Storage Resources')
 SELECT
 	COALESCE(u.store_resc, s.store_resc)                          AS "Storage Resource",
-	COALESCE(COUNT(u.*), 0)                                       AS "Unreplicated Count",
+	COUNT(u.size)                                                 AS "Unreplicated Count",
 	ROUND(CAST(COALESCE(SUM(u.size), 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Unreplicated Volume (TiB)",
-	COALESCE(COUNT(s.*), 0)                                       AS "Stale Count",
+	COUNT(s.size)                                                 AS "Stale Count",
 	ROUND(CAST(COALESCE(SUM(s.size), 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Stale Volume (TiB)"
 FROM unreplicated_replicas AS u FULL JOIN stale_replicas AS s ON s.store_resc = u.store_resc
 GROUP BY COALESCE(u.store_resc, s.store_resc)
@@ -236,9 +236,9 @@ $(inject_debug_newline)
 $(inject_set_title 'Unreplicated in Root Resources')
 SELECT
 	COALESCE(u.root_resc, s.root_resc)                            AS "Root Resource",
-	COALESCE(COUNT(u.*), 0)                                       AS "Unreplicated Count",
+	COUNT(u.size)                                                 AS "Unreplicated Count",
 	ROUND(CAST(COALESCE(SUM(u.size), 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Unreplicated Volume (TiB)",
-	COALESCE(COUNT(s.*), 0)                                       AS "Stale Count",
+	COUNT(s.size)                                                 AS "Stale Count",
 	ROUND(CAST(COALESCE(SUM(s.size), 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Stale Volume (TiB)"
 FROM unreplicated_replicas AS u FULL JOIN stale_replicas AS s ON s.root_resc = u.root_resc
 GROUP BY COALESCE(u.root_resc, s.root_resc)
