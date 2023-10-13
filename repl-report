@@ -11,12 +11,10 @@ Usage:
  $EXEC_NAME [-d|--debug][(-A|--age) AGE][(-C|--collection) COLLECTION]
   [(-H|--host) HOST][(-P|--port) PORT][(-U|--user) USER]
 
-This program generates a report on the data objects in the home collections of
-the local zone that need to be replicated. An object needs to be replicated if
-it was created before a given day at midnight and has no replica yet or if its
-existing replica is stale. The report lists the numbers of unreplicated and
-stale data objects and their volumes broken down by the storage resource holding
-the corresponding good replicas. It also lists the same numbers grouped by root
+This program generates a report on the data objects that are unreplicated or
+have a stale replica. The report lists the numbers of unreplicated and stale
+data objects and their volumes broken down by the storage resource holding the
+corresponding good replicas. It also lists the same numbers grouped by root
 resource.
 
 The caller must have an initialized iRODS session, i.e., called \`iinit\` to open
@@ -28,7 +26,8 @@ Options:
  -A, --age AGE                how many days old a data object must be to be
                               replicated. A negative number means no time
                               restriction. default: 1
- -C, --collection COLLECTION  only consider data objects in this collection
+ -C, --collection COLLECTION  only consider this collection when locating
+                              unreplicated data objects.
  -d, --debug                  display progress and query time information
  -h, --help                   display help text and exit
  -H, --host HOST              connect to the ICAT's DBMS on the host HOST
@@ -202,9 +201,7 @@ CREATE INDEX idx_unreplicated_replicas_store_resc ON unreplicated_replicas(store
 $(inject_debug_msg 'Gathering stale data')
 
 CREATE TEMPORARY TABLE stale_data(id) ON COMMIT DROP AS
-SELECT DISTINCT data_id
-FROM r_data_main
-WHERE data_is_dirty = 0 AND ( $(inject_collection_restriction r_data_main "$collection") );
+SELECT DISTINCT data_id FROM r_data_main WHERE data_is_dirty = 0;
 CREATE INDEX idx_stale_data ON stale_data(id);
 
 $(inject_debug_msg 'Gathering stale replicas')
