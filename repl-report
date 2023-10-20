@@ -220,25 +220,43 @@ CREATE INDEX idx_stale_replicas_store_resc ON stale_replicas(store_resc);
 $(inject_debug_newline)
 $(inject_set_title 'Unreplicated in Storage Resources')
 SELECT
-	COALESCE(u.store_resc, s.store_resc)                          AS "Storage Resource",
-	COUNT(u.size)                                                 AS "Unreplicated Count",
-	ROUND(CAST(COALESCE(SUM(u.size), 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Unreplicated Volume (TiB)",
-	COUNT(s.size)                                                 AS "Stale Count",
-	ROUND(CAST(COALESCE(SUM(s.size), 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Stale Volume (TiB)"
-FROM unreplicated_replicas AS u FULL JOIN stale_replicas AS s ON s.store_resc = u.store_resc
-GROUP BY COALESCE(u.store_resc, s.store_resc)
+	COALESCE(u.store_resc, s.store_resc)                     AS "Storage Resource",
+	COALESCE(u.count, 0)                                     AS "Unreplicated Count",
+	ROUND(CAST(COALESCE(u.size, 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Unreplicated Volume (TiB)",
+	COALESCE(s.count, 0)                                     AS "Stale Count",
+	ROUND(CAST(COALESCE(s.size, 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Stale Volume (TiB)"
+FROM (
+		SELECT store_resc, COUNT(*) AS count, SUM(size) AS size
+		FROM unreplicated_replicas
+		GROUP BY store_resc
+	) AS u
+	FULL JOIN (
+		SELECT store_resc, COUNT(*) AS count, SUM(size) AS size
+		FROM stale_replicas
+		GROUP BY store_resc
+	) AS s
+	ON s.store_resc = u.store_resc
 ORDER BY 1;
 
 $(inject_debug_newline)
 $(inject_set_title 'Unreplicated in Root Resources')
 SELECT
-	COALESCE(u.root_resc, s.root_resc)                            AS "Root Resource",
-	COUNT(u.size)                                                 AS "Unreplicated Count",
-	ROUND(CAST(COALESCE(SUM(u.size), 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Unreplicated Volume (TiB)",
-	COUNT(s.size)                                                 AS "Stale Count",
-	ROUND(CAST(COALESCE(SUM(s.size), 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Stale Volume (TiB)"
-FROM unreplicated_replicas AS u FULL JOIN stale_replicas AS s ON s.root_resc = u.root_resc
-GROUP BY COALESCE(u.root_resc, s.root_resc)
+	COALESCE(u.root_resc, s.root_resc)                       AS "Root Resource",
+	COALESCE(u.count, 0)                                     AS "Unreplicated Count",
+	ROUND(CAST(COALESCE(u.size, 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Unreplicated Volume (TiB)",
+	COALESCE(s.count, 0)                                     AS "Stale Count",
+	ROUND(CAST(COALESCE(s.size, 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Stale Volume (TiB)"
+FROM (
+			SELECT root_resc, COUNT(*) AS count, SUM(size) AS size
+			FROM unreplicated_replicas
+			GROUP BY root_resc
+		) AS u
+	FULL JOIN (
+			SELECT root_resc, COUNT(*) AS count, SUM(size) AS size
+			FROM stale_replicas
+			GROUP BY root_resc
+		) AS s
+	ON s.root_resc = u.root_resc
 ORDER BY 1;
 
 $(inject_debug_newline)
