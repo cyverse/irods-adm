@@ -247,15 +247,15 @@ SELECT
 	COALESCE(s.count, 0)                                     AS "Stale Count",
 	ROUND(CAST(COALESCE(s.size, 0) / 2 ^ 40 AS NUMERIC), 3)  AS "Stale Volume (TiB)"
 FROM (
-			SELECT root_resc, COUNT(*) AS count, SUM(size) AS size
-			FROM unreplicated_replicas
-			GROUP BY root_resc
-		) AS u
+		SELECT root_resc, COUNT(*) AS count, SUM(size) AS size
+		FROM unreplicated_replicas
+		GROUP BY root_resc
+	) AS u
 	FULL JOIN (
-			SELECT root_resc, COUNT(*) AS count, SUM(size) AS size
-			FROM stale_replicas
-			GROUP BY root_resc
-		) AS s
+		SELECT root_resc, COUNT(*) AS count, SUM(size) AS size
+		FROM stale_replicas
+		GROUP BY root_resc
+	) AS s
 	ON s.root_resc = u.root_resc
 ORDER BY 1;
 
