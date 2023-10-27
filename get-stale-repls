@@ -20,7 +20,6 @@ set -o errexit -o nounset -o pipefail
 readonly DEFAULT_CUTOFF_DATE=yesterday
 readonly MAX_STALE_SLICE=1000
 
-
 main() {
 	local cutoffDate="$DEFAULT_CUTOFF_DATE"
 	if (( $# >= 1 )); then
@@ -46,7 +45,6 @@ main() {
 
 	map_resources "${oldStales[@]}"
 }
-
 
 filter_old_stales() {
 	local modCutoff="$1"; shift
@@ -76,11 +74,9 @@ filter_old_stales() {
 	done
 }
 
-
 get_stales() {
 	quest %s "select DATA_ID where DATA_REPL_STATUS = '0'"
 }
-
 
 map_resources() {
 	local oldStales=( "$@" )
@@ -107,12 +103,9 @@ map_resources() {
 	done
 }
 
-
-
 fmt_query_list() {
 	printf $'\'%s\'\n' "$@" | paste --serial --delimiter ,
 }
-
 
 quest() {
 	local fmtStr="$1"
@@ -125,6 +118,5 @@ quest() {
 
 	iquest --no-page "$fmtStr" "$query" | sed '/^CAT_NO_ROWS_FOUND: /d'
 }
-
 
 main "$@"
