@@ -260,6 +260,16 @@ FROM (
 ORDER BY 1;
 
 $(inject_debug_newline)
+$(inject_set_title 'All Unreplicated')
+SELECT
+	u.count                                     AS "Unreplicated Count",
+	ROUND(CAST(u.size / 2 ^ 40 AS NUMERIC), 3)  AS "Unreplicated Volume (TiB)",
+	s.count                                     AS "Stale Count",
+	ROUND(CAST(s.size / 2 ^ 40 AS NUMERIC), 3)  AS "Stale Volume (TiB)"
+FROM (SELECT COUNT(*) AS count, SUM(size) AS size FROM unreplicated_replicas) AS u,
+	 (SELECT COUNT(*) AS count, SUM(size) AS size FROM stale_replicas) AS s;
+
+$(inject_debug_newline)
 $(inject_debug_newline)
 ROLLBACK;
 EOSQL
