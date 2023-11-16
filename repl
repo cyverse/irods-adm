@@ -247,9 +247,7 @@ replicate() {
 	fi
 
 	validate_repl_conds "$procMult" "$srcResc" "$destResc" "$untilTS"
-
-	# Redirect stdout to FD 3 to use as a logging channel
-	eval "exec $LOG>&1"
+	prep_logging
 
 	local objList
 	objList="$(mktemp)"
@@ -462,6 +460,11 @@ max_args_per_irepl() {
 	local threadsPerDataObj="$1"
 
 	div_ceil "$MAX_DATA_OBJS_PER_IREPL" $(( threadsPerDataObj * threadsPerDataObj ))
+}
+
+# Redirect stdout to FD 3 to use as a logging channel
+prep_logging() {
+	eval "exec $LOG>&1"
 }
 
 select_cohort() {
