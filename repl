@@ -101,6 +101,8 @@ readonly EXEC_NAME
 
 DEBUG=''
 
+declare ObjCache
+
 main() {
 	declare -A optMap=(
 		[age]="$DEFAULT_AGE"
@@ -249,10 +251,10 @@ replicate() {
 	validate_repl_conds "$procMult" "$srcResc" "$destResc" "$untilTS"
 	prep_logging
 
-	local objList
-	objList="$(mktemp)"
+	trap 'finish $?' EXIT
+	ObjCache="$(mktemp)"
 
-	trap 'finish $? '"'$objList'" EXIT
+	local objList="$ObjCache"
 
 	get_data_to_repl "$age" "$srcResc" "$destResc" "$baseColl" > "$objList"
 
@@ -354,10 +356,9 @@ replicate() {
 
 finish() {
 	local exitCode="$1"
-	local objList="$2"
 
-	if [[ -z "$DEBUG" ]]; then
-		rm --force "$objList"
+	if [[ -z "$DEBUG" && -n "${ObjCache-}" ]]; then
+		rm --force "$ObjCache"
 	fi
 
 	eval "exec 1>&$LOG $LOG>&-"
