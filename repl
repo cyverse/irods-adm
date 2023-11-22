@@ -250,20 +250,17 @@ replicate() {
 
 	validate_repl_conds "$procMult" "$srcResc" "$destResc" "$untilTS"
 	prep_logging
-
 	trap 'finish $?' EXIT
 	ObjCache="$(mktemp)"
 
-	local objList="$ObjCache"
-
-	get_data_to_repl "$age" "$srcResc" "$destResc" "$baseColl" > "$objList"
+	get_data_to_repl "$age" "$srcResc" "$destResc" "$baseColl" > "$ObjCache"
 
 	if [[ -n "$DEBUG" ]]; then
-		printf 'DEBUG: object list in %s\n' "$objList" >&2
+		printf 'DEBUG: object list in %s\n' "$ObjCache" >&2
 	fi
 
 	local tot
-	tot="$(count < "$objList")"
+	tot="$(count < "$ObjCache")"
 	printf '%d data objects to replicate\n' "$tot" >&2
 
 	if (( tot == 0 )); then
@@ -291,7 +288,7 @@ replicate() {
 						"$maxIreplArgs" \
 						"$threadsPerDataObj" \
 						"$untilTS" \
-					< "$objList" )"
+					< "$ObjCache" )"
 		done
 
 		# Large file transfers
@@ -316,7 +313,7 @@ replicate() {
 						"$untilTS" \
 						"$minSize" \
 						"$lastCohortMinSz" \
-					< "$objList" )"
+					< "$ObjCache" )"
 		fi
 
 		# transfer files that would default to using MAX_THREADS
@@ -333,7 +330,7 @@ replicate() {
 					"$maxIreplArgs" \
 					"$untilTS" \
 					"$lastCohortMinSz" \
-				< "$objList" )"
+				< "$ObjCache" )"
 
 		# zero byte files
 		maxProcs="$(div_ceil $(( MAX_THREADS * procMult )) 2)"
@@ -342,14 +339,14 @@ replicate() {
 		cnt="$(\
 			select_cohort \
 					"$cnt" "$tot" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" 0 "$untilTS" \
-				< "$objList" )"
+				< "$ObjCache" )"
 	else
 		# streaming replication
 		maxProcs=$(( MAX_THREADS * procMult ))
 		maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 100)"
 
 		select_cohort 0 "$tot" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" -1 "$untilTS" \
-			< "$objList" \
+			< "$ObjCache" \
 			> /dev/null
 	fi
 }
