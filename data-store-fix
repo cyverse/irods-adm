@@ -230,7 +230,9 @@ CREATE TEMPORARY TABLE coll_perm_probs AS
 SELECT coll_id
 FROM r_coll_main AS c
 WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
-	AND c.coll_name LIKE '/$zone/%/%' AND c.coll_type != 'linkPoint' AND c.modify_ts < '0$cutoffTS';
+	AND c.coll_name SIMILAR TO '/$zone(/trash)?/home/%'
+	AND c.coll_type != 'linkPoint'
+	AND c.modify_ts < '0$cutoffTS';
 CREATE INDEX idx_coll_perm_probs ON coll_perm_probs(coll_id);
 
 -- This may overestimate the number of problems, since it may find objects not in the zone.
@@ -238,7 +240,7 @@ $(inject_debug_msg 'creating data_perm_probs')
 CREATE TEMPORARY TABLE data_perm_probs AS
 SELECT DISTINCT data_id
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE c.coll_name LIKE '/$zone/%'
+WHERE c.coll_name SIMILAR TO '/$zone(/trash)?/home/%'
 	AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
 	AND d.modify_ts < '0$cutoffTS';
 CREATE INDEX idx_data_perm_probs ON data_perm_probs(data_id);
