@@ -166,10 +166,13 @@ fix() {
 	TempFiles+=("$(mktemp)")
 	local problems="${TempFiles[-1]}"
 
+	local zone
+	zone="$(determine_zone)"
+
 	local cutoffTime
 	cutoffTime="$(date --iso-8601 --date "$age days ago")"
 
-	find_problems "$(date --date="$cutoffTime" '+%s')" | strip_noise > "$problems"
+	find_problems "$zone" "$(date --date="$cutoffTime" '+%s')" | strip_noise > "$problems"
 
 	trap 'if [[ "${FUNCNAME[0]-}" != main ]]; then return; fi' SIGINT SIGTERM
 
@@ -198,15 +201,20 @@ check_existing_instance() {
 	done
 }
 
+determine_zone() {
+	iquest '%s' "select ZONE_NAME where ZONE_TYPE = 'local'"
+}
+
 find_problems() {
-	local cutoffTS="$1"
+	local zone="$1"
+	local cutoffTS="$2"
 
 	psql ICAT <<EOF
 $(inject_debug_stmt '\timing on')
 $(inject_debug_newline)
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
-$(inject_debug_msg creating owned_by_rodsadmin)
+$(inject_debug_msg 'creating owned_by_rodsadmin')
 CREATE TEMPORARY TABLE owned_by_rodsadmin AS
 SELECT a.object_id
 FROM r_objt_access AS a JOIN r_user_main AS u ON u.user_id = a.user_id
@@ -217,42 +225,42 @@ WHERE u.user_name = 'rodsadmin'
 		WHERE token_namespace = 'access_type' AND token_name = 'own');
 CREATE INDEX idx_owned_by_rodsadmin ON owned_by_rodsadmin (object_id);
 
-$(inject_debug_msg creating coll_perm_probs)
+$(inject_debug_msg 'creating coll_perm_probs')
 CREATE TEMPORARY TABLE coll_perm_probs AS
 SELECT coll_id
 FROM r_coll_main AS c
 WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
-	AND c.coll_name LIKE '/iplant/%/%' AND c.coll_type != 'linkPoint' AND c.modify_ts < '0$cutoffTS';
+	AND c.coll_name LIKE '/$zone/%/%' AND c.coll_type != 'linkPoint' AND c.modify_ts < '0$cutoffTS';
 CREATE INDEX idx_coll_perm_probs ON coll_perm_probs(coll_id);
 
--- This may overestimate the number of problems, since it may find objects not in the iplant zone.
-$(inject_debug_msg creating data_perm_probs)
+-- This may overestimate the number of problems, since it may find objects not in the zone.
+$(inject_debug_msg 'creating data_perm_probs')
 CREATE TEMPORARY TABLE data_perm_probs AS
 SELECT DISTINCT data_id
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE c.coll_name LIKE '/iplant/%'
+WHERE c.coll_name LIKE '/$zone/%'
 	AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
 	AND d.modify_ts < '0$cutoffTS';
 CREATE INDEX idx_data_perm_probs ON data_perm_probs(data_id);
 
-$(inject_debug_msg creating uuid_attrs)
+$(inject_debug_msg 'creating uuid_attrs')
 CREATE TEMPORARY TABLE uuid_attrs AS
 SELECT o.object_id
 FROM r_objt_metamap AS o JOIN r_meta_main AS m ON m.meta_id = o.meta_id
 WHERE m.meta_attr_name = 'ipc_UUID';
 CREATE INDEX idx_uuid_attrs ON uuid_attrs (object_id);
 
-$(inject_debug_msg creating coll_uuid_probs)
+$(inject_debug_msg 'creating coll_uuid_probs')
 CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count) AS
 SELECT c.coll_id, COUNT(u.object_id)
 FROM r_coll_main AS c LEFT JOIN uuid_attrs AS u ON u.object_id = c.coll_id
-WHERE c.coll_name LIKE '/iplant/%' AND c.coll_type != 'linkPoint' AND c.modify_ts < '0$cutoffTS'
+WHERE c.coll_name LIKE '/$zone/%' AND c.coll_type != 'linkPoint' AND c.modify_ts < '0$cutoffTS'
 GROUP BY c.coll_id
 HAVING COUNT(u.object_id) != 1;
 CREATE INDEX idx_coll_uuid_probs ON coll_uuid_probs (coll_id);
 
--- This may overestimate the number of problems, since it may find objects not in the iplant zone.
-$(inject_debug_msg creating data_uuid_probs)
+-- This may overestimate the number of problems, since it may find objects not in the zone.
+$(inject_debug_msg 'creating data_uuid_probs')
 CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count) AS
 SELECT DISTINCT d.data_id, COUNT(u.object_id)
 FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
@@ -262,8 +270,8 @@ GROUP BY d.data_id, d.data_repl_num
 HAVING COUNT(u.object_id) != 1;
 CREATE INDEX idx_data_uuid_probs ON data_uuid_probs(data_id);
 
--- This may overestimate the number of problems, since it may find objects not in the iplant zone.
-$(inject_debug_msg creating data_checksum_probs)
+-- This may overestimate the number of problems, since it may find objects not in the zone.
+$(inject_debug_msg 'creating data_checksum_probs')
 CREATE TEMPORARY TABLE data_chksum_probs AS
 SELECT DISTINCT data_id
 FROM r_data_main
@@ -280,7 +288,7 @@ SELECT
 	REPLACE(REPLACE(coll_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')  AS "Collection"
 FROM r_coll_main AS c
 WHERE coll_id IN (SELECT * FROM coll_perm_probs UNION SELECT coll_id FROM coll_uuid_probs)
-	AND coll_name LIKE '/iplant/%'
+	AND coll_name LIKE '/$zone/%'
 	AND coll_type != 'linkPoint'
 	AND modify_ts < '0$cutoffTS'
 ORDER BY modify_ts;
@@ -298,7 +306,7 @@ SELECT
 	REPLACE(REPLACE(c.coll_name || '/' || d.data_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')
 		AS "Data Object"
 FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
-WHERE c.coll_name LIKE '/iplant/%'
+WHERE c.coll_name LIKE '/$zone/%'
 	AND d.modify_ts < '0$cutoffTS'
 	AND d.data_id IN (
 		SELECT * FROM data_perm_probs
@@ -312,7 +320,7 @@ EOF
 }
 
 inject_debug_msg() {
-	local msg="$*"
+	local msg="$1"
 
 	inject_debug_newline
 	inject_debug_stmt "\\echo '$msg'"
