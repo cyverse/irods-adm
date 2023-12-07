@@ -324,6 +324,9 @@ get_data_to_repl() {
 	local maxCreateTime
 	maxCreateTime="$(date --date="$(date --iso-8601 --date="$age days ago")" '+%s')"
 
+	local baseCond
+	baseCond="$(mk_coll_cond "$baseColl")"
+
 	local resCond
 	if [[ -n "$srcResc" ]]; then
 		resCond="$(mk_resc_cond "$srcResc")"
@@ -331,13 +334,6 @@ get_data_to_repl() {
 		resCond="$(mk_resc_cond "$destResc")"
 	else
 		resCond=TRUE
-	fi
-
-	local baseCond
-	if [[ -n "$baseColl" ]]; then
-		baseCond="c.coll_name = '$baseColl' OR c.coll_name LIKE '$baseColl/%'"
-	else
-		baseCond=TRUE
 	fi
 
 	local replQuery
@@ -352,6 +348,50 @@ get_data_to_repl() {
 		printf 'Failed to retrieve data objects\n' >&2
 		return 1
 	fi
+}
+
+mk_coll_cond() {
+	local baseColl="$1"
+
+	if [[ -n "$baseColl" ]]; then
+		printf $'c.coll_name = \'%s' OR c.coll_name LIKE \'%s/%%'' "$baseColl" "$baseColl"
+	else
+		printf TRUE
+	fi
+}
+
+mk_repl_query() {
+	local maxTime="$1"
+	local baseCond="$2"
+	local resCond="$3"
+
+	cat <<EOSQL
+SELECT d.data_size, c.coll_name || '/' || d.data_name
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
+	AND d.create_ts < '0$maxTime'
+	AND ($baseCond)
+	AND ($resCond)
+EOSQL
+}
+
+mk_resc_cond() {
+	local resc="$1"
+
+cat <<SQL
+d.resc_id IN (
+	WITH RECURSIVE child_mapping AS (
+		SELECT resc_id AS id, (resc_net != 'EMPTY_RESC_HOST') AS storage, resc_name AS root
+			FROM r_resc_main
+			WHERE resc_name = '$resc'
+		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root
+			FROM r_resc_main AS r
+				JOIN child_mapping AS m
+					ON m.id = CASE WHEN r.resc_parent::TEXT = ''
+						THEN NULL
+						ELSE r.resc_parent::BIGINT END )
+	SELECT id FROM child_mapping WHERE storage )
+SQL
 }
 
 # Redirect stdout to FD 3 to use as a logging channel
@@ -372,7 +412,7 @@ validate_repl_conds() {
 
 	if [[ -n "$destResc" && "$srcResc" == "$destResc" ]]; then
 		printf 'The destination resource, %s, cannot be the same as the source resource, %s.\n' \
-		    "$destResc" "$srcResc" \
+				"$destResc" "$srcResc" \
 			>&2
 
 		return 1
@@ -490,40 +530,6 @@ replicate_threaded() {
 		< "$objCache" )"
 
 	echo "$cnt"
-}
-
-mk_repl_query() {
-	local maxTime="$1"
-	local baseCond="$2"
-	local resCond="$3"
-
-	cat <<EOSQL
-SELECT d.data_size, c.coll_name || '/' || d.data_name
-FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
-	AND d.create_ts < '0$maxTime'
-	AND ($baseCond)
-	AND ($resCond)
-EOSQL
-}
-
-mk_resc_cond() {
-	local resc="$1"
-
-cat <<SQL
-d.resc_id IN (
-	WITH RECURSIVE child_mapping AS (
-		SELECT resc_id AS id, (resc_net != 'EMPTY_RESC_HOST') AS storage, resc_name AS root
-			FROM r_resc_main
-			WHERE resc_name = '$resc'
-		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root
-			FROM r_resc_main AS r
-				JOIN child_mapping AS m
-					ON m.id = CASE WHEN r.resc_parent::TEXT = ''
-						THEN NULL
-						ELSE r.resc_parent::BIGINT END )
-	SELECT id FROM child_mapping WHERE storage )
-SQL
 }
 
 max_args_per_irepl() {
