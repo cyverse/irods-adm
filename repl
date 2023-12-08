@@ -324,20 +324,14 @@ get_data_to_repl() {
 	local maxCreateTime
 	maxCreateTime="$(date --date="$(date --iso-8601 --date="$age days ago")" '+%s')"
 
-	local baseCond
-	baseCond="$(mk_coll_cond "$baseColl")"
+	local collCond
+	collCond="$(mk_coll_cond "$baseColl")"
 
-	local resCond
-	if [[ -n "$srcResc" ]]; then
-		resCond="$(mk_resc_cond "$srcResc")"
-	elif [[ -n "$destResc" ]]; then
-		resCond="$(mk_resc_cond "$destResc")"
-	else
-		resCond=TRUE
-	fi
+	local rescCond
+	rescCond="$(mk_resc_cond "$srcResc" "$destResc")"
 
 	local replQuery
-	replQuery="$(mk_repl_query "$maxCreateTime" "$baseCond" "$resCond")"
+	replQuery="$(mk_repl_query "$maxCreateTime" "$collCond" "$rescCond")"
 
 	if ! \
 		psql \
@@ -362,20 +356,33 @@ mk_coll_cond() {
 
 mk_repl_query() {
 	local maxTime="$1"
-	local baseCond="$2"
-	local resCond="$3"
+	local collCond="$2"
+	local rescCond="$3"
 
 	cat <<EOSQL
 SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
 	AND d.create_ts < '0$maxTime'
-	AND ($baseCond)
-	AND ($resCond)
+	AND ($collCond)
+	AND ($rescCond)
 EOSQL
 }
 
 mk_resc_cond() {
+	local srcResc="$1"
+	local destResc="$2"
+
+	if [[ -n "$srcResc" ]]; then
+		mk_resc_restrict_cond "$srcResc"
+	elif [[ -n "$destResc" ]]; then
+		mk_resc_restrict_cond "$destResc"
+	else
+		printf TRUE
+	fi
+}
+
+mk_resc_restrict_cond() {
 	local resc="$1"
 
 cat <<SQL
