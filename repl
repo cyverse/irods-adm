@@ -348,7 +348,7 @@ mk_coll_cond() {
 	local baseColl="$1"
 
 	if [[ -n "$baseColl" ]]; then
-		printf $'c.coll_name = \'%s' OR c.coll_name LIKE \'%s/%%'' "$baseColl" "$baseColl"
+		printf $'c.coll_name = \'%s\' OR c.coll_name LIKE \'%s/%%\'' "$baseColl" "$baseColl"
 	else
 		printf TRUE
 	fi
