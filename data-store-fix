@@ -1,9 +1,4 @@
-#!/bin/bash
-# XXX pidof that is installed from sysvinit-tools-2.88 doesn't detect scripts
-#     launched using env. After switching our admin servers to Ubuntu, we
-#     can revert this workaround
-##!/usr/bin/env bash
-# XXX ^^^
+#!/usr/bin/env bash
 
 show_help() {
 	cat <<EOF
@@ -215,13 +210,11 @@ $(inject_debug_stmt '\timing on')
 $(inject_debug_newline)
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
-$(inject_owned_by_irods_table)
-$(inject_coll_perm_probs_table "$zone" "$cutoffTS")
-$(inject_data_perm_probs_table "$zone" "$cutoffTS")
-$(inject_uuid_attrs_table)
-$(inject_coll_uuid_probs_table "$zone" "$cutoffTS")
-$(inject_data_uuid_probs_table "$cutoffTS")
-$(inject_data_checksum_probs_table "$cutoffTS")
+$(inject_perm_probs_tables "$zone" "$cutoffTS")
+
+$(inject_uuid_prods_tables "$zone" "$cutoffTS")
+
+$(inject_checksum_probs_table "$cutoffTS")
 
 $(inject_debug_newline)
 $(inject_set_title "$COLL_TABLE_TITLE")
@@ -266,44 +259,7 @@ ROLLBACK;
 EOF
 }
 
-inject_coll_perm_probs_table() {
-	local zone="$1"
-	local cutoffTS="$2"
-
-cat <<EOF
-$(inject_debug_msg 'creating coll_perm_probs')
-
-CREATE TEMPORARY TABLE coll_perm_probs AS
-SELECT coll_id
-FROM r_coll_main AS c
-WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
-	AND c.coll_name SIMILAR TO '/$zone(/trash)?/home/%'
-	AND c.coll_type != 'linkPoint'
-	AND c.modify_ts < '0$cutoffTS';
-
-CREATE INDEX idx_coll_perm_probs ON coll_perm_probs(coll_id);
-EOF
-}
-
-inject_coll_uuid_probs_table() {
-	local zone="$1"
-	local cutoffTS="$2"
-
-	cat <<EOF
-$(inject_debug_msg 'creating coll_uuid_probs')
-
-CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count) AS
-SELECT c.coll_id, COUNT(u.object_id)
-FROM r_coll_main AS c LEFT JOIN uuid_attrs AS u ON u.object_id = c.coll_id
-WHERE c.coll_name LIKE '/$zone/%' AND c.coll_type != 'linkPoint' AND c.modify_ts < '0$cutoffTS'
-GROUP BY c.coll_id
-HAVING COUNT(u.object_id) != 1;
-
-CREATE INDEX idx_coll_uuid_probs ON coll_uuid_probs (coll_id);
-EOF
-}
-
-inject_data_checksum_probs_table() {
+inject_checksum_probs_table() {
 	local cutoffTS="$1"
 
 	cat <<EOF
@@ -318,50 +274,12 @@ WHERE modify_ts < '0$cutoffTS' AND (data_checksum IS NULL OR data_checksum = '')
 EOF
 }
 
-inject_data_perm_probs_table() {
+inject_perm_probs_tables() {
 	local zone="$1"
 	local cutoffTS="$2"
 
 	cat <<EOF
-$(inject_debug_msg 'creating data_perm_probs')
-
--- This may overestimate the number of problems, since it may find objects not
--- in the zone.
-CREATE TEMPORARY TABLE data_perm_probs AS
-SELECT DISTINCT data_id
-FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE c.coll_name SIMILAR TO '/$zone(/trash)?/home/%'
-	AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
-	AND d.modify_ts < '0$cutoffTS';
-
-CREATE INDEX idx_data_perm_probs ON data_perm_probs(data_id);
-EOF
-}
-
-inject_data_uuid_probs_table() {
-	local cutoffTS="$1"
-
-	cat <<EOF
-$(inject_debug_msg 'creating data_uuid_probs')
-
--- This may overestimate the number of problems, since it may find objects not
--- in the zone.
-CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count) AS
-SELECT DISTINCT d.data_id, COUNT(u.object_id)
-FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
-WHERE d.modify_ts < '0$cutoffTS'
-GROUP BY d.data_id, d.data_repl_num
-	-- data_repl_num prevents counting uuids for multiple repls in a single count
-HAVING COUNT(u.object_id) != 1;
-
-CREATE INDEX idx_data_uuid_probs ON data_uuid_probs(data_id);
-EOF
-}
-
-inject_owned_by_rodsadmin_table() {
-	cat <<EOF
 $(inject_debug_msg 'creating owned_by_rodsadmin')
-
 CREATE TEMPORARY TABLE owned_by_rodsadmin AS
 SELECT a.object_id
 FROM r_objt_access AS a JOIN r_user_main AS u ON u.user_id = a.user_id
@@ -370,21 +288,60 @@ WHERE u.user_name = 'rodsadmin'
 		SELECT token_id
 		FROM r_tokn_main
 		WHERE token_namespace = 'access_type' AND token_name = 'own');
-
 CREATE INDEX idx_owned_by_rodsadmin ON owned_by_rodsadmin (object_id);
+
+$(inject_debug_msg 'creating coll_perm_probs')
+CREATE TEMPORARY TABLE coll_perm_probs AS
+SELECT coll_id
+FROM r_coll_main AS c
+WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.coll_id)
+	AND c.coll_name SIMILAR TO '/$zone(/trash)?/home/%'
+	AND c.coll_type != 'linkPoint'
+	AND c.modify_ts < '0$cutoffTS';
+CREATE INDEX idx_coll_perm_probs ON coll_perm_probs(coll_id);
+
+-- This may overestimate the number of problems, since it may find objects not
+-- in the zone.
+$(inject_debug_msg 'creating data_perm_probs')
+CREATE TEMPORARY TABLE data_perm_probs AS
+SELECT DISTINCT data_id
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE c.coll_name SIMILAR TO '/$zone(/trash)?/home/%'
+	AND NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = d.data_id)
+	AND d.modify_ts < '0$cutoffTS';
+CREATE INDEX idx_data_perm_probs ON data_perm_probs(data_id);
 EOF
 }
 
-inject_uuid_attrs_table() {
+inject_uuid_probs_tables() {
 	cat <<EOF
 $(inject_debug_msg 'creating uuid_attrs')
-
 CREATE TEMPORARY TABLE uuid_attrs AS
 SELECT o.object_id
 FROM r_objt_metamap AS o JOIN r_meta_main AS m ON m.meta_id = o.meta_id
 WHERE m.meta_attr_name = 'ipc_UUID';
-
 CREATE INDEX idx_uuid_attrs ON uuid_attrs (object_id);
+
+$(inject_debug_msg 'creating coll_uuid_probs')
+CREATE TEMPORARY TABLE coll_uuid_probs (coll_id, uuid_count) AS
+SELECT c.coll_id, COUNT(u.object_id)
+FROM r_coll_main AS c LEFT JOIN uuid_attrs AS u ON u.object_id = c.coll_id
+WHERE c.coll_name LIKE '/$zone/%' AND c.coll_type != 'linkPoint' AND c.modify_ts < '0$cutoffTS'
+GROUP BY c.coll_id
+HAVING COUNT(u.object_id) != 1;
+CREATE INDEX idx_coll_uuid_probs ON coll_uuid_probs (coll_id);
+
+-- This may overestimate the number of problems, since it may find objects not
+-- in the zone.
+$(inject_debug_msg 'creating data_uuid_probs')
+CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count) AS
+SELECT DISTINCT d.data_id, COUNT(u.object_id)
+FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
+WHERE d.modify_ts < '0$cutoffTS'
+GROUP BY d.data_id, d.data_repl_num
+	-- data_repl_num prevents counting uuids for multiple repls in a single count
+HAVING COUNT(u.object_id) != 1;
+CREATE INDEX idx_data_uuid_probs ON data_uuid_probs(data_id);
 EOF
 }
 
