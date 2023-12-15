@@ -321,17 +321,8 @@ get_data_to_repl() {
 
 	printf 'Retrieving data objects to replicate...\n' >&2
 
-	local maxCreateTs
-	maxCreateTs="$(max_create_ts "$age")"
-
-	local collCond
-	collCond="$(mk_coll_cond "$baseColl")"
-
-	local rescCond
-	rescCond="$(mk_resc_cond "$srcResc" "$destResc")"
-
 	local replQuery
-	replQuery="$(mk_repl_query "$maxCreateTs" "$collCond" "$rescCond")"
+	replQuery="$(mk_repl_query "$age" "$baseColl" "$srcResc" "$destResc")"
 
 	if ! \
 		psql \
@@ -344,10 +335,20 @@ get_data_to_repl() {
 	fi
 }
 
-max_create_ts() {
+mk_repl_query() {
 	local age="$1"
+	local baseColl="$2"
+	local srcResc="$3"
+	local destResc="$4"
 
-	date --date="$(date --iso-8601 --date="$age days ago")" '+0%s'
+	cat <<EOSQL
+SELECT d.data_size, c.coll_name || '/' || d.data_name
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
+	AND d.create_ts < '$(mk_max_create_ts "$age")'
+	AND ($(mk_coll_cond "$baseColl"))
+	AND ($(mk_resc_cond "$srcResc" "$destResc"))
+EOSQL
 }
 
 mk_coll_cond() {
@@ -360,19 +361,10 @@ mk_coll_cond() {
 	fi
 }
 
-mk_repl_query() {
-	local maxCreateTs="$1"
-	local collCond="$2"
-	local rescCond="$3"
+mk_max_create_ts() {
+	local age="$1"
 
-	cat <<EOSQL
-SELECT d.data_size, c.coll_name || '/' || d.data_name
-FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
-	AND d.create_ts < '$maxCreateTs'
-	AND ($collCond)
-	AND ($rescCond)
-EOSQL
+	date --date="$(date --iso-8601 --date="$age days ago")" '+0%s'
 }
 
 mk_resc_cond() {
