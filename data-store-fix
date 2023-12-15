@@ -212,7 +212,7 @@ BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 $(inject_perm_probs_tables "$zone" "$cutoffTS")
 
-$(inject_uuid_prods_tables "$zone" "$cutoffTS")
+$(inject_uuid_probs_tables "$zone" "$cutoffTS")
 
 $(inject_checksum_probs_table "$cutoffTS")
 
