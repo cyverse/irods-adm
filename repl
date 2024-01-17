@@ -206,7 +206,7 @@ resolve_opts() {
 				break
 				;;
 			*)
-				printf 'INTERNAL ERROR: Failed to resolve command line options\n' >&2
+				printf 'INTERNAL ERROR: failed to resolve command line options\n' >&2
 				return 1
 				;;
 		esac
@@ -231,7 +231,7 @@ format_opts() {
 
 	local longOptsStr
 	longOptsStr="$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)"
-	getopt --name "$EXEC_NAME" --longoptions "$longOptsStr" --options A:dC:hH:M:N:P:R:S:u:U:v -- "$@"
+	getopt --name="$EXEC_NAME" --longoptions="$longOptsStr" --options=A:dC:hH:M:N:P:R:S:u:U:v -- "$@"
 }
 
 replicate() {
@@ -253,6 +253,7 @@ replicate() {
 	trap 'finish $?' EXIT
 	ObjCache="$(mktemp)"
 
+	printf 'retrieving data objects to replicate...\n' >&2
 	get_data_to_repl "$age" "$srcResc" "$destResc" "$baseColl" > "$ObjCache"
 
 	if [[ -n "$DEBUG" ]]; then
@@ -319,18 +320,15 @@ get_data_to_repl() {
 	local destResc="$3"
 	local baseColl="$4"
 
-	printf 'Retrieving data objects to replicate...\n' >&2
-
 	local replQuery
 	replQuery="$(mk_repl_query "$age" "$baseColl" "$srcResc" "$destResc")"
 
-	if ! \
-		psql \
-			--no-align --tuples-only --record-separator-zero \
-			--command "$replQuery" --field-separator ' ' \
-			ICAT
+	if ! psql \
+		--no-align --tuples-only --record-separator-zero \
+		--command="$replQuery" --field-separator=' ' \
+		ICAT
 	then
-		printf 'Failed to retrieve data objects\n' >&2
+		printf 'failed to retrieve data objects\n' >&2
 		return 1
 	fi
 }
