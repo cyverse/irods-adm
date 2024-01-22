@@ -27,10 +27,10 @@ main() {
 		formerFilePath="${formerFilePath//\"/}"
 
 		local server
-		server=$(get_server "${rescHier##*;}")
+		server="$(get_server "${rescHier##*;}")"
 
 		local foundPath
-		if ! foundPath=$(find_real_path "$server" "$formerFilePath" "$size" "$chksum"); then
+		if ! foundPath="$(find_real_path "$server" "$formerFilePath" "$size" "$chksum")"; then
 			printf 'Cannot locate physical file for %s\n' "$dataPath" >&2
 			continue
 		fi
@@ -89,10 +89,10 @@ get_physical_attributes() {
 	local dataPath="$1"
 
 	local collPath
-	collPath=$(dirname "$dataPath")
+	collPath="$(dirname "$dataPath")"
 
 	local dataName
-	dataName=$(basename "$dataPath")
+	dataName="$(basename "$dataPath")"
 
 	local query="select DATA_RESC_HIER, DATA_SIZE, DATA_CHECKSUM, DATA_PATH
 						where COLL_NAME = '$collPath' and DATA_NAME = '$dataName'"
@@ -123,7 +123,7 @@ quest() {
 	local query="$2"
 
 	local result
-	result=$(iquest --no-page "$fmt" "$(trim_all "$query")")
+	result="$(iquest --no-page "$fmt" "$(trim_all "$query")")"
 
 	if [[ "$result" =~ ^CAT_NO_ROWS_FOUND: ]]; then
 		return 1
