@@ -344,16 +344,17 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
 	AND d.create_ts < '$(mk_max_create_ts "$age")'
-	AND ($(mk_coll_cond "$baseColl"))
+	AND ($(mk_coll_cond c.coll_name "$baseColl"))
 	AND ($(mk_resc_cond "$srcResc" "$destResc"))
 EOSQL
 }
 
 mk_coll_cond() {
-	local baseColl="$1"
+	local collColName="$1"
+	local baseColl="$2"
 
 	if [[ -n "$baseColl" ]]; then
-		printf $'c.coll_name = \'%s\' OR c.coll_name LIKE \'%s/%%\'' "$baseColl" "$baseColl"
+		printf $'%s SIMILAR TO \'%s(/%%)?\'' "$collColName" "$baseColl"
 	else
 		printf TRUE
 	fi
