@@ -5,9 +5,9 @@
 # Usage:
 #  find-missing-replicas
 #
-# This script attempts to locate physical files for replicas that have bad 
+# This script attempts to locate physical files for replicas that have bad
 # paths. It reads a list of data objects from stdin whose only replica has a bad
-# path. Each data object is specified by its absolute, logical path, one per 
+# path. Each data object is specified by its absolute, logical path, one per
 # line. The script assumes each data object has only one replica.
 
 set -o nounset -o errexit -o pipefail
@@ -16,7 +16,7 @@ main() {
 	local dataPath
 	while IFS= read -r dataPath; do
 		printf '%s\n' "$dataPath"
-   
+
 		local rescHier size chksum formerFilePath
 		IFS=$'\t' read -r rescHier size chksum formerFilePath \
 			<<<"$(get_physical_attributes "$dataPath")"
@@ -25,7 +25,7 @@ main() {
 		size="${size//\"/}"
 		chksum="${chksum//\"/}"
 		formerFilePath="${formerFilePath//\"/}"
-    
+
 		local server
 		server=$(get_server "${rescHier##*;}")
 
@@ -56,7 +56,7 @@ find_real_path() {
 <<EOF
 check() {
 	local root="\$1"
-    
+
 	local candidates
 	readarray -t candidates < <(ls --sort=time "\$root".* 2> /dev/null)
 
@@ -71,7 +71,6 @@ check() {
 
 	return 1
 }
-
 
 if ! path="\$(check "$orphanRoot")"; then
 	path="\$(check "$replicaRoot")"
@@ -95,7 +94,7 @@ get_physical_attributes() {
 	local dataName
 	dataName=$(basename "$dataPath")
 
-	local query="select DATA_RESC_HIER, DATA_SIZE, DATA_CHECKSUM, DATA_PATH 
+	local query="select DATA_RESC_HIER, DATA_SIZE, DATA_CHECKSUM, DATA_PATH
 						where COLL_NAME = '$collPath' and DATA_NAME = '$dataName'"
 
 	quest $'"%s"\t"%s"\t"%s"\t"%s"' "$query"
@@ -144,6 +143,5 @@ trim_all() {
 	printf '%s\n' "$*"
 	set +o noglob
 }
-
 
 main "$@"
