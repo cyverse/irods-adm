@@ -405,41 +405,6 @@ prep_logging() {
 	eval "exec $LOG>&1"
 }
 
-validate_repl_conds() {
-	local procMult="$1"
-	local srcResc="$2"
-	local destResc="$3"
-	local untilTS="$4"
-
-	if [[ -n "$procMult" ]] && ! [[ "$procMult" =~ ^[1-9][0-9]* ]]; then
-		printf 'The multiplier must be a positive number. The given value was %s.\n' "$procMult" >&2
-		return 1
-	fi
-
-	if [[ -n "$destResc" && "$srcResc" == "$destResc" ]]; then
-		printf 'The destination resource, %s, cannot be the same as the source resource, %s.\n' \
-				"$destResc" "$srcResc" \
-			>&2
-
-		return 1
-	fi
-
-	if ! CHECK_TIME "$untilTS"; then
-		printf 'Stop time is in the past\n' >&2
-		return 1
-	fi
-
-	if ! iadmin lz &> /dev/null; then
-		printf "aren't authenticated as a rodsadmin user\n" >&2
-		return 1
-	fi
-
-	if ! psql ICAT <<<'' &> /dev/null; then
-		printf "aren't able to connect to the ICAT DB without a password\n" >&2
-		return 1
-	fi
-}
-
 replicate_streaming() {
 	local procMult="$1"
 	local srcResc="$2"
@@ -536,6 +501,41 @@ replicate_threaded() {
 		< "$objCache" )"
 
 	echo "$cnt"
+}
+
+validate_repl_conds() {
+	local procMult="$1"
+	local srcResc="$2"
+	local destResc="$3"
+	local untilTS="$4"
+
+	if [[ -n "$procMult" ]] && ! [[ "$procMult" =~ ^[1-9][0-9]* ]]; then
+		printf 'The multiplier must be a positive number. The given value was %s.\n' "$procMult" >&2
+		return 1
+	fi
+
+	if [[ -n "$destResc" && "$srcResc" == "$destResc" ]]; then
+		printf 'The destination resource, %s, cannot be the same as the source resource, %s.\n' \
+				"$destResc" "$srcResc" \
+			>&2
+
+		return 1
+	fi
+
+	if ! CHECK_TIME "$untilTS"; then
+		printf 'Stop time is in the past\n' >&2
+		return 1
+	fi
+
+	if ! iadmin lz &> /dev/null; then
+		printf "aren't authenticated as a rodsadmin user\n" >&2
+		return 1
+	fi
+
+	if ! psql ICAT <<<'' &> /dev/null; then
+		printf "aren't able to connect to the ICAT DB without a password\n" >&2
+		return 1
+	fi
 }
 
 max_args_per_irepl() {
