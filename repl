@@ -345,16 +345,16 @@ FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
 	AND d.create_ts < '$(mk_max_create_ts "$age")'
 	AND ($(mk_coll_cond c.coll_name "$baseColl"))
-	AND ($(mk_resc_cond "$srcResc" "$destResc"))
+	AND ($(mk_resc_cond d.resc_id "$srcResc" "$destResc"))
 EOSQL
 }
 
 mk_coll_cond() {
-	local collColName="$1"
+	local collNameCol="$1"
 	local baseColl="$2"
 
 	if [[ -n "$baseColl" ]]; then
-		printf $'%s SIMILAR TO \'%s(/%%)?\'' "$collColName" "$baseColl"
+		printf $'%s SIMILAR TO \'%s(/%%)?\'' "$collNameCol" "$baseColl"
 	else
 		printf TRUE
 	fi
@@ -367,23 +367,25 @@ mk_max_create_ts() {
 }
 
 mk_resc_cond() {
-	local srcResc="$1"
-	local destResc="$2"
+	local rescCol="$1"
+	local srcResc="$2"
+	local destResc="$3"
 
 	if [[ -n "$srcResc" ]]; then
-		mk_resc_restrict_cond "$srcResc"
+		mk_resc_restrict_cond "$rescCol" "$srcResc"
 	elif [[ -n "$destResc" ]]; then
-		mk_resc_restrict_cond "$destResc"
+		mk_resc_restrict_cond "$rescCol" "$destResc"
 	else
 		printf TRUE
 	fi
 }
 
 mk_resc_restrict_cond() {
-	local resc="$1"
+	local rescCol="$1"
+	local resc="$2"
 
 cat <<SQL
-d.resc_id IN (
+$rescCol IN (
 	WITH RECURSIVE child_mapping AS (
 		SELECT resc_id AS id, (resc_net != 'EMPTY_RESC_HOST') AS storage, resc_name AS root
 			FROM r_resc_main
