@@ -48,9 +48,6 @@ find_real_path() {
 	local expSize="$3"
 	local expChksum="$4"
 
-	local orphanRoot="${pathRoot/home/orphan/home}"
-	local replicaRoot="${pathRoot/home/replica/home}"
-
 	# shellcheck disable=SC2087
 	ssh -q -t "$server" \
 <<EOF
@@ -72,8 +69,11 @@ check() {
 	return 1
 }
 
-if ! path="\$(check "$orphanRoot")"; then
-	path="\$(check "$replicaRoot")"
+orphanRoot="${pathRoot/home/orphan/home}"
+replicaRoot="${pathRoot/home/replica/home}"
+
+if ! path="\$(check "\$orphanRoot")"; then
+	path="\$(check "\$replicaRoot")"
 fi
 
 if [[ -n "\$path" ]]; then
