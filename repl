@@ -424,6 +424,88 @@ replicate_streaming() {
 		> /dev/null
 }
 
+div_ceil() {
+	local numerator="$1"
+	local denominator="$2"
+
+	echo $(( 1 + (numerator - 1) / denominator ))
+}
+
+select_cohort() {
+	local cnt="$1"
+	local tot="$2"
+	local srcResc="$3"
+	local destResc="$4"
+	local maxProcs="$5"
+	local maxArgs="$6"
+	local transThreads="$7"
+	local untilTS="$8"
+
+	if ! CHECK_TIME "$untilTS"; then
+		return "$TIMEDOUT"
+	fi
+
+	local maxSizeB maxSizeMiB minSizeB minSizeMiB
+	if (( transThreads == -1 )); then
+		transThreads=0
+		minSizeMiB=0
+		minSizeB=0
+		maxSizeMiB=
+		maxSizeB=
+	elif (( transThreads == 0 )); then
+		minSizeMiB=0
+		minSizeB=0
+		maxSizeMiB=0
+		maxSizeB=1
+	else
+		minSizeMiB="$(threads_to_min_MiB "$transThreads")"
+
+		# zero byte files are handled later
+		if (( minSizeMiB == 0 )); then
+			minSizeB=1
+		else
+			minSizeB=$(( minSizeMiB * 1024 ** 2 ))
+		fi
+
+		maxSizeMiB="$(threads_to_min_MiB $(( transThreads + 1 )))"
+		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
+	fi
+
+	local cohortList
+	cohortList="$(mktemp)"
+
+	if [[ -n "$maxSizeB" ]]; then
+		partition "$minSizeB" "$maxSizeB"
+	else
+		partition "$minSizeB"
+	fi > "$cohortList"
+
+	local subTotal
+	subTotal="$(count <"$cohortList")"
+
+	if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
+	elif (( minSizeMiB <= 0 )); then
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
+	else
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
+	fi >&2
+
+	if (( subTotal > 0 )); then
+		parallel --line-buffer --no-notice --null \
+					--halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+					REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
+				< "$cohortList" \
+				2>&"$LOG" \
+			| tee >(cat >&"$LOG") \
+			| track_prog "$cnt" "$tot" "$subTotal"
+	else
+		printf '%s\n' "$cnt"
+	fi
+
+	rm --force "$cohortList"
+}
+
 replicate_threaded() {
 	local maxThreads="$1"
 	local procMult="$2"
@@ -545,81 +627,6 @@ max_args_per_irepl() {
 	div_ceil "$MAX_DATA_OBJS_PER_IREPL" $(( threadsPerDataObj * threadsPerDataObj ))
 }
 
-select_cohort() {
-	local cnt="$1"
-	local tot="$2"
-	local srcResc="$3"
-	local destResc="$4"
-	local maxProcs="$5"
-	local maxArgs="$6"
-	local transThreads="$7"
-	local untilTS="$8"
-
-	if ! CHECK_TIME "$untilTS"; then
-		return "$TIMEDOUT"
-	fi
-
-	local maxSizeB maxSizeMiB minSizeB minSizeMiB
-	if (( transThreads == -1 )); then
-		transThreads=0
-		minSizeMiB=0
-		minSizeB=0
-		maxSizeMiB=
-		maxSizeB=
-	elif (( transThreads == 0 )); then
-		minSizeMiB=0
-		minSizeB=0
-		maxSizeMiB=0
-		maxSizeB=1
-	else
-		minSizeMiB="$(threads_to_min_MiB "$transThreads")"
-
-		# zero byte files are handled later
-		if (( minSizeMiB == 0 )); then
-			minSizeB=1
-		else
-			minSizeB=$(( minSizeMiB * 1024 ** 2 ))
-		fi
-
-		maxSizeMiB="$(threads_to_min_MiB $(( transThreads + 1 )))"
-		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
-	fi
-
-	local cohortList
-	cohortList="$(mktemp)"
-
-	if [[ -n "$maxSizeB" ]]; then
-		partition "$minSizeB" "$maxSizeB"
-	else
-		partition "$minSizeB"
-	fi > "$cohortList"
-
-	local subTotal
-	subTotal="$(count <"$cohortList")"
-
-	if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
-		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
-	elif (( minSizeMiB <= 0 )); then
-		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
-	else
-		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
-	fi >&2
-
-	if (( subTotal > 0 )); then
-		parallel --line-buffer --no-notice --null \
-					--halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
-					REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
-				< "$cohortList" \
-				2>&"$LOG" \
-			| tee >(cat >&"$LOG") \
-			| track_prog "$cnt" "$tot" "$subTotal"
-	else
-		printf '%s\n' "$cnt"
-	fi
-
-	rm --force "$cohortList"
-}
-
 # This is intended for large files.
 select_cohort_by_size() {
 	local cnt="$1"
@@ -723,13 +730,6 @@ max_procs() {
 	local procMult="$2"
 
 	div_ceil $(( MAX_THREADS * procMult )) "$threadsPerDataObj"
-}
-
-div_ceil() {
-	local numerator="$1"
-	local denominator="$2"
-
-	echo $(( 1 + (numerator - 1) / denominator ))
 }
 
 partition() {
