@@ -94,6 +94,7 @@ readonly DEFAULT_PROC_MULT=1
 readonly LOG=3
 readonly MAX_DATA_OBJS_PER_IREPL=1000
 readonly MAX_THREADS=16
+readonly STREAMING_IREPL_ARG_FRAC=100
 readonly TRANSFER_BUF_SZ=100
 
 EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
@@ -416,7 +417,7 @@ replicate_streaming() {
 	local maxProcs=$(( MAX_THREADS * procMult ))
 
 	local maxIreplArgs
-	maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 100)"
+	maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" "$STREAMING_IREPL_ARG_FRAC")"
 
 	select_cohort 0 "$totObjs" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" -1 "$untilTS" \
 		< "$objCache" \
