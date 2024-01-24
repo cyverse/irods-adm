@@ -459,14 +459,7 @@ select_cohort() {
 		maxSizeB=1
 	else
 		minSizeMiB="$(threads_to_min_MiB "$transThreads")"
-
-		# zero byte files are handled later
-		if (( minSizeMiB == 0 )); then
-			minSizeB=1
-		else
-			minSizeB=$(( minSizeMiB * 1024 ** 2 ))
-		fi
-
+		minSizeB="$(compute_min_size_bytes "$minSizeMiB")"
 		maxSizeMiB="$(threads_to_min_MiB $(( transThreads + 1 )))"
 		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
 	fi
@@ -504,6 +497,17 @@ select_cohort() {
 	fi
 
 	rm --force "$cohortList"
+}
+
+compute_min_size_bytes() {
+	local minSizeMiB="$1"
+
+	# zero byte files are handled later
+	if (( minSizeMiB == 0 )); then
+		echo 1
+	else
+		echo $(( minSizeMiB * 1024 ** 2 ))
+	fi
 }
 
 replicate_threaded() {
