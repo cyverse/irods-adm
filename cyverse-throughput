@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 help() {
-  cat <<EOF
+	cat <<EOF
 
 $ExecName version $Version
 
@@ -114,558 +114,563 @@ declare StatusLog
 
 
 main() {
-  declare -A optMap=(
-    [help]=''
-    [version]=''
-    [verbose]=''
-    [client-dir]="${TMPDIR:-$PWD}/throughput-$TestTime"
-    [num-runs]="$DefaultNumRuns"
-    [server-coll]=''
-    [sizes]=1GiB
-    [log]=/dev/stdout )
+	declare -A optMap=(
+		[help]=''
+		[version]=''
+		[verbose]=''
+		[client-dir]="${TMPDIR:-$PWD}/throughput-$TestTime"
+		[num-runs]="$DefaultNumRuns"
+		[server-coll]=''
+		[sizes]=1GiB
+		[log]=/dev/stdout )
 
-  if ! map_opts optMap "$@"
-  then
-    help >&2
-    return 1
-  fi
+	if ! map_opts optMap "$@"
+	then
+		help >&2
+		return 1
+	fi
 
-  if [[ -n "${optMap[help]}" ]]
-  then
-    help
-    return 0
-  fi
+	if [[ -n "${optMap[help]}" ]]
+	then
+		help
+		return 0
+	fi
 
-  if [[ -n "${optMap[version]}" ]]
-  then
-    printf '%s\n' "$Version"
-    return 0
-  fi
+	if [[ -n "${optMap[version]}" ]]
+	then
+		printf '%s\n' "$Version"
+		return 0
+	fi
 
-  if (( optMap[num-runs] < 1 ))
-  then
-    printf 'There must be at least 1 run.\n' >&2
-    return 1
-  fi
+	if (( optMap[num-runs] < 1 ))
+	then
+		printf 'There must be at least 1 run.\n' >&2
+		return 1
+	fi
 
-  if [[ -z "${optMap[verbose]}" ]]
-  then
-    StatusLog=/dev/null
-  else
-    StatusLog=/dev/stderr
-  fi
+	if [[ -z "${optMap[verbose]}" ]]
+	then
+		StatusLog=/dev/null
+	else
+		StatusLog=/dev/stderr
+	fi
 
-  ReportLog="${optMap[log]}"
+	ReportLog="${optMap[log]}"
 
-  do_test "${optMap[num-runs]}" "${optMap[sizes]}" "${optMap[client-dir]}" "${optMap[server-coll]}"
+	do_test "${optMap[num-runs]}" "${optMap[sizes]}" "${optMap[client-dir]}" "${optMap[server-coll]}"
 }
 
 
 map_opts() {
-  local mapVar="$1"
-  shift
+	local mapVar="$1"
+	shift
 
-  local opts
-  if ! opts=$(fmt_opts "$@")
-  then
-    return 1
-  fi
+	local opts
+	if ! opts=$(fmt_opts "$@")
+	then
+		return 1
+	fi
 
-  eval set -- "$opts"
+	eval set -- "$opts"
 
-  while true
-  do
-    case "$1" in
-      -h|--help)
-        eval "$mapVar"'[help]=help'
-        shift
-        ;;
-      -V|--version)
-        eval "$mapVar"'[version]=version'
-        shift
-        ;;
-      -v|--verbose)
-        eval "$mapVar"'[verbose]=verbose'
-        shift
-        ;;
-      -D|--client-dir)
-        eval "$mapVar""[client-dir]='$2'"
-        shift 2
-        ;;
-      -L|--log)
-        eval "$mapVar""[log]='$2'"
-        shift 2
-        ;;
-      -N|--num-runs)
-        eval "$mapVar""[num-runs]='$2'"
-        shift 2
-        ;;
-      -C|--server-coll)
-        eval "$mapVar""[server-coll]='$2'"
-        shift 2
-        ;;
-      -S|--sizes)
-        eval "$mapVar""[sizes]='$2'"
-        shift 2
-        ;;
-      --)
-        shift
-        break
-        ;;
-      *)
-        return 1
-        ;;
-    esac
-  done
+	while true
+	do
+		case "$1" in
+			-h|--help)
+				eval "$mapVar"'[help]=help'
+				shift
+				;;
+			-V|--version)
+				eval "$mapVar"'[version]=version'
+				shift
+				;;
+			-v|--verbose)
+				eval "$mapVar"'[verbose]=verbose'
+				shift
+				;;
+			-D|--client-dir)
+				eval "$mapVar""[client-dir]='$2'"
+				shift 2
+				;;
+			-L|--log)
+				eval "$mapVar""[log]='$2'"
+				shift 2
+				;;
+			-N|--num-runs)
+				eval "$mapVar""[num-runs]='$2'"
+				shift 2
+				;;
+			-C|--server-coll)
+				eval "$mapVar""[server-coll]='$2'"
+				shift 2
+				;;
+			-S|--sizes)
+				eval "$mapVar""[sizes]='$2'"
+				shift 2
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				return 1
+				;;
+		esac
+	done
 }
 
 
 fmt_opts() {
-  getopt \
-    --name "$ExecName" \
-    --longoptions help,verbose,version,client-dir:,log:,num-runs:,server-coll:,sizes: \
-    --options hVvD:L:N:S:C: \
-    -- \
-    "$@"
+	getopt \
+		--name "$ExecName" \
+		--longoptions help,verbose,version,client-dir:,log:,num-runs:,server-coll:,sizes: \
+		--options hVvD:L:N:S:C: \
+		-- \
+		"$@"
 }
 
 
 do_test() {
-  local numRuns="$1"
-  local sizes="$2"
-  local clientDir="$3"
-  local svrColl="$4"
+	local numRuns="$1"
+	local sizes="$2"
+	local clientDir="$3"
+	local svrColl="$4"
 
-  if ! ensure_irods_sess
-  then
-    printf 'iRODS session not initialized\n' >&2
-    return 1
-  fi
+	if ! ensure_irods_sess
+	then
+		printf 'iRODS session not initialized\n' >&2
+		return 1
+	fi
 
-  if [[ -z "$svrColl" ]]
-  then
-    svrColl="$(ipwd)/throughput-$TestTime"
-  fi
+	if [[ -z "$svrColl" ]]
+	then
+		svrColl="$(ipwd)/throughput-$TestTime"
+	fi
 
-  # shellcheck disable=SC2064
-  trap "clean_up '$clientDir' '$svrColl'" EXIT
+	# shellcheck disable=SC2064
+	trap "clean_up '$clientDir' '$svrColl'" EXIT
 
-  printf 'Creating server collection %s\n' "$svrColl" >> "$StatusLog"
-  if ! imkdir "$svrColl"
-  then
-    printf 'Failed to create server collection\n' >&2
-    return 1
-  fi
+	printf 'Creating server collection %s\n' "$svrColl" >> "$StatusLog"
+	if ! imkdir "$svrColl"
+	then
+		printf 'Failed to create server collection\n' >&2
+		return 1
+	fi
 
-  printf 'Creating client directory %s\n' "$clientDir" >> "$StatusLog"
-  if ! mkdir "$clientDir"
-  then
-    printf 'Cannot create client directory\n' >&2
-    return 1
-  fi
+	printf 'Creating client directory %s\n' "$clientDir" >> "$StatusLog"
+	if ! mkdir "$clientDir"
+	then
+		printf 'Cannot create client directory\n' >&2
+		return 1
+	fi
 
-  printf 'Beginning test\n' >> "$StatusLog"
+	printf 'Beginning test\n' >> "$StatusLog"
 
-  local size
-  for size in ${sizes//,/ }
-  do
-    measure_downloads "$numRuns" "$size" "$svrColl" "$clientDir"
-    measure_uploads "$numRuns" "$size" "$clientDir" "$svrColl"
-  done | gen_report > "$ReportLog"
+	local size
+	for size in ${sizes//,/ }
+	do
+		measure_downloads "$numRuns" "$size" "$svrColl" "$clientDir"
+		measure_uploads "$numRuns" "$size" "$clientDir" "$svrColl"
+	done | gen_report > "$ReportLog"
 
-  printf 'Finished test\n' >> "$StatusLog"
+	printf 'Finished test\n' >> "$StatusLog"
 }
 
 
 clean_up() {
-  local clientDir="$1"
-  local svrColl="$2"
+	local clientDir="$1"
+	local svrColl="$2"
 
-  printf 'Deleting client directory %s\n' "$clientDir" >> "$StatusLog"
-  rm --force --recursive "$clientDir"
+	printf 'Deleting client directory %s\n' "$clientDir" >> "$StatusLog"
+	rm --force --recursive "$clientDir"
 
-  if ils "$svrColl" &> /dev/null
-  then
-    printf 'Deleting server collection %s\n' "$svrColl" >> "$StatusLog"
-    irm -f -r "$svrColl"
-  fi
+	if ils "$svrColl" &> /dev/null
+	then
+		printf 'Deleting server collection %s\n' "$svrColl" >> "$StatusLog"
+		irm -f -r "$svrColl"
+	fi
 
-  printf 'Finished\n' >> "$StatusLog"
-  return 0
+	printf 'Finished\n' >> "$StatusLog"
+	return 0
 }
 
 
 ensure_irods_sess() {
-  local authFile
-  authFile="$(ienv | sed --quiet 's/.*irods_authentication_file - //p')"
+	local authFile
+	authFile="$(ienv | sed --quiet 's/.*irods_authentication_file - //p')"
 
-  if [[ -z "$authFile" ]]
-  then
-    authFile="$HOME"/.irods/.irodsA
-  fi
+	if [[ -z "$authFile" ]]
+	then
+		authFile="$HOME"/.irods/.irodsA
+	fi
 
-  if [[ ! -e "$authFile" ]]
-  then
-    if ! iinit
-    then
-      iexit full
-      return 1
-    fi
-  fi
+	if [[ ! -e "$authFile" ]]
+	then
+		if ! iinit
+		then
+			iexit full
+			return 1
+		fi
+	fi
 }
 
 
 measure_downloads() {
-  local numRuns="$1"
-  local reqSize="$2"
-  local srcColl="$3"
-  local destDir="$4"
+	local numRuns="$1"
+	local reqSize="$2"
+	local srcColl="$3"
+	local destDir="$4"
 
-  local srcObj
-  srcObj=$(setup_download "$reqSize" "$srcColl" "$destDir")
+	local srcObj
+	srcObj=$(setup_download "$reqSize" "$srcColl" "$destDir")
 
-  local srcName
-  srcName=$(basename "$srcObj")
+	local srcName
+	srcName=$(basename "$srcObj")
 
-  local actSize
-  actSize=$(iquest '%s' "select DATA_SIZE where COLL_NAME = '$srcColl' and DATA_NAME = '$srcName'")
+	local actSize
+	actSize=$(iquest '%s' "select DATA_SIZE where COLL_NAME = '$srcColl' and DATA_NAME = '$srcName'")
 
-  printf 'Beginning %s download measurements\n' "$reqSize" >> "$StatusLog"
+	printf 'Beginning %s download measurements\n' "$reqSize" >> "$StatusLog"
 
-  local attempt
-  for attempt in $(seq "$numRuns")
-  do
-    printf 'Downloading %s\n' "$attempt" >> "$StatusLog"
+	local attempt
+	for attempt in $(seq "$numRuns")
+	do
+		printf 'Downloading %s\n' "$attempt" >> "$StatusLog"
 
-    local file
-    printf -v file '%s/%s-download-%02d' "$destDir" "$reqSize" "$attempt"
-    perform_download "$reqSize" "$actSize" "$attempt" "$srcObj" "$file" | tee --append "$StatusLog"
-    rm --force "$file"
-  done
+		local file
+		printf -v file '%s/%s-download-%02d' "$destDir" "$reqSize" "$attempt"
 
-  printf 'Finished %s download measurements\n' "$reqSize" >> "$StatusLog"
+		perform_download "$reqSize" "$actSize" "$attempt" "$srcObj" "$file" \
+			| tee --append "$StatusLog"
+
+		rm --force "$file"
+	done
+
+	printf 'Finished %s download measurements\n' "$reqSize" >> "$StatusLog"
 }
 
 
 setup_download() {
-  local size="$1"
-  local srcColl="$2"
-  local destDir="$3"
+	local size="$1"
+	local srcColl="$2"
+	local destDir="$3"
 
-  local srcFile
-  if ! srcFile=$(TMPDIR="$destDir" mktemp)
-  then
-   printf 'Cannot reserve temporary file\n' >&2
-   return 1
-  fi
+	local srcFile
+	if ! srcFile=$(TMPDIR="$destDir" mktemp)
+	then
+		printf 'Cannot reserve temporary file\n' >&2
+		return 1
+	fi
 
-  local fail
+	local fail
 
-  printf 'Creating %s test file\n' "$size" >> "$StatusLog"
-  if ! truncate --size "$size" "$srcFile"
-  then
-    printf 'Failed to create %s test file\n' "$size" >&2
-    fail=fail
-  fi
+	printf 'Creating %s test file\n' "$size" >> "$StatusLog"
+	if ! truncate --size "$size" "$srcFile"
+	then
+		printf 'Failed to create %s test file\n' "$size" >&2
+		fail=fail
+	fi
 
-  local srcObj="$srcColl/test_file.$size"
+	local srcObj="$srcColl/test_file.$size"
 
-  printf 'Staging %s test file\n' "$size" >> "$StatusLog"
-  if [[ -z "${fail-}" ]] && ! iput "$srcFile" "$srcObj"
-  then
-    printf 'Failed to stage %s test file\n' "$size" >&2
-    fail=fail
-  fi
+	printf 'Staging %s test file\n' "$size" >> "$StatusLog"
+	if [[ -z "${fail-}" ]] && ! iput "$srcFile" "$srcObj"
+	then
+		printf 'Failed to stage %s test file\n' "$size" >&2
+		fail=fail
+	fi
 
-  rm --force "$srcFile"
+	rm --force "$srcFile"
 
-  if [[ -z "${fail-}" ]]
-  then
-    echo "$srcObj"
-  else
-    return 1
-  fi
+	if [[ -z "${fail-}" ]]
+	then
+		echo "$srcObj"
+	else
+		return 1
+	fi
 }
 
 
 measure_uploads() {
-  local numRuns="$1"
-  local reqSize="$2"
-  local srcDir="$3"
-  local destColl="$4"
+	local numRuns="$1"
+	local reqSize="$2"
+	local srcDir="$3"
+	local destColl="$4"
 
-  local srcFile
-  srcFile=$(setup_uploads "$reqSize" "$srcDir")
+	local srcFile
+	srcFile=$(setup_uploads "$reqSize" "$srcDir")
 
-  local actSize
-  actSize=$(stat --format '%s' "$srcFile")
+	local actSize
+	actSize=$(stat --format '%s' "$srcFile")
 
-  printf 'Beginning %s upload measurements\n' "$reqSize" >> "$StatusLog"
+	printf 'Beginning %s upload measurements\n' "$reqSize" >> "$StatusLog"
 
-  local attempt
-  for attempt in $(seq "$numRuns")
-  do
-    printf 'Uploading %s\n' "$attempt" >> "$StatusLog"
+	local attempt
+	for attempt in $(seq "$numRuns")
+	do
+		printf 'Uploading %s\n' "$attempt" >> "$StatusLog"
 
-    local obj
-    printf -v obj '%s/%s-upload-%02d' "$destColl" "$reqSize" "$attempt"
-    perform_upload "$reqSize" "$actSize" "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
-  done
+		local obj
+		printf -v obj '%s/%s-upload-%02d' "$destColl" "$reqSize" "$attempt"
+		perform_upload "$reqSize" "$actSize" "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
+	done
 
-  printf 'Finished %s upload measurements\n' "$reqSize" >> "$StatusLog"
+	printf 'Finished %s upload measurements\n' "$reqSize" >> "$StatusLog"
 
-  printf 'Deleting test file %s\n' "$srcFile" >> "$StatusLog"
-  rm --force "$srcFile"
+	printf 'Deleting test file %s\n' "$srcFile" >> "$StatusLog"
+	rm --force "$srcFile"
 }
 
 
 setup_uploads() {
-  local size="$1"
-  local srcDir="$2"
+	local size="$1"
+	local srcDir="$2"
 
-  local srcFile
-  if ! srcFile=$(TMPDIR="$srcDir" mktemp)
-  then
-    printf 'Cannot reserve temporary file\n' >&2
-    return 1
-  fi
+	local srcFile
+	if ! srcFile=$(TMPDIR="$srcDir" mktemp)
+	then
+		printf 'Cannot reserve temporary file\n' >&2
+		return 1
+	fi
 
-  printf 'Creating test file %s\n' "$srcFile" >> "$StatusLog"
-  if ! truncate --size "$size" "$srcFile"
-  then
-    printf 'Failed to create file\n' >&2
-    return 1
-  fi
+	printf 'Creating test file %s\n' "$srcFile" >> "$StatusLog"
+	if ! truncate --size "$size" "$srcFile"
+	then
+		printf 'Failed to create file\n' >&2
+		return 1
+	fi
 
-  echo "$srcFile"
+	echo "$srcFile"
 }
 
 
 perform_download() {
-  local reqSize="$1"
-  local actSize="$2"
-  local run="$3"
-  local src="$4"
-  local dest="$5"
+	local reqSize="$1"
+	local actSize="$2"
+	local run="$3"
+	local src="$4"
+	local dest="$5"
 
-  local startTime
-  startTime=$(date --utc --iso-8601=seconds)
+	local startTime
+	startTime=$(date --utc --iso-8601=seconds)
 
-  local duration rate
-  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget -v "$src" "$dest")
+	local duration rate
+	IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget -v "$src" "$dest")
 
-  printf 'download %d %s %s %s %s %s\n' \
-    "$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
+	printf 'download %d %s %s %s %s %s\n' \
+	"$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
 }
 
 
 perform_upload() {
-  local reqSize="$1"
-  local actSize="$2"
-  local run="$3"
-  local src="$4"
-  local dest="$5"
+	local reqSize="$1"
+	local actSize="$2"
+	local run="$3"
+	local src="$4"
+	local dest="$5"
 
-  local startTime
-  startTime=$(date --utc --iso-8601=seconds)
+	local startTime
+	startTime=$(date --utc --iso-8601=seconds)
 
-  local duration rate
-  IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
+	local duration rate
+	IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
 
-  printf 'upload %d %s %s %s %s %s\n' "$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
+	printf 'upload %d %s %s %s %s %s\n' "$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
 }
 
 
 gen_report() {
-  local clientReport
-  clientReport=$(gen_client_report)
+	local clientReport
+	clientReport=$(gen_client_report)
 
-  local sumReport
-  printf -v sumReport 'Summary'
+	local sumReport
+	printf -v sumReport 'Summary'
 
-  local downDurs=()
-  local upDurs=()
-  local runsReport=
-  local reportSize=
-  local curSize=
-  local curDir=
+	local downDurs=()
+	local upDurs=()
+	local runsReport=
+	local reportSize=
+	local curSize=
+	local curDir=
 
-  local direction duration rate reqSize run actSize startTime
-  while IFS=' ' read -r direction run startTime reqSize actSize duration rate
-  do
-    if [[ "$direction" != "$curDir" ]]
-    then
-      curDir="$direction"
+	local direction duration rate reqSize run actSize startTime
+	while IFS=' ' read -r direction run startTime reqSize actSize duration rate
+	do
+		if [[ "$direction" != "$curDir" ]]
+		then
+			curDir="$direction"
 
-      if [[ "$actSize" != "$curSize" ]]
-      then
-        if [[ -n "${downDurs-}" ]] || [[ -n "${upDurs-}" ]]
-        then
-          sumReport=$(append_size_summary "$sumReport" "$reportSize" "$curSize" downDurs upDurs)
-          downDurs=()
-          upDurs=()
-        fi
+			if [[ "$actSize" != "$curSize" ]]
+			then
+				if [[ -n "${downDurs-}" ]] || [[ -n "${upDurs-}" ]]
+				then
+					sumReport=$(append_size_summary
+						"$sumReport" "$reportSize" "$curSize" downDurs upDurs )
 
-        curSize="$actSize"
-        reportSize="$reqSize"
-      fi
+					downDurs=()
+					upDurs=()
+				fi
 
-      printf -v runsReport '%s\n\nSize %s %s\n' "$runsReport" "$reportSize" "${curDir^}s"
-      printf -v runsReport \
-        '%s\nRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$runsReport"
-    fi
+				curSize="$actSize"
+				reportSize="$reqSize"
+			fi
 
-    if [[ "$curDir" = download ]]
-    then
-      #shellcheck disable=SC2206
-      downDurs=(${downDurs[@]-} "$duration")
-    else
-      #shellcheck disable=SC2206
-      upDurs=(${upDurs[@]-} "$duration")
-    fi
+			printf -v runsReport '%s\n\nSize %s %s\n' "$runsReport" "$reportSize" "${curDir^}s"
+			printf -v runsReport \
+				'%s\nRun   Start Time (UTC)      Duration (s)   Throughput (MiB/s)\n' "$runsReport"
+		fi
 
-    printf -v runsReport \
-      '%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "${startTime%+*}" "$duration" "$rate"
-  done
+		if [[ "$curDir" = download ]]
+		then
+			#shellcheck disable=SC2206
+			downDurs=(${downDurs[@]-} "$duration")
+		else
+			#shellcheck disable=SC2206
+			upDurs=(${upDurs[@]-} "$duration")
+		fi
 
-  sumReport=$(append_size_summary "$sumReport" "$reportSize" "$curSize" downDurs upDurs)
+		printf -v runsReport \
+			'%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "${startTime%+*}" "$duration" "$rate"
+	done
 
-  local report
-  printf -v report 'CYVERSE THROUGHPUT REPORT\n'
-  printf -v report '%s\nExecution Time:  %s\n' "$report" "$TestTime"
-  printf -v report '%s\n\n%s\n\n\n%s\n%s' "$report" "$clientReport" "$sumReport" "$runsReport"
+	sumReport=$(append_size_summary "$sumReport" "$reportSize" "$curSize" downDurs upDurs)
 
-  printf '%s' "$report"
+	local report
+	printf -v report 'CYVERSE THROUGHPUT REPORT\n'
+	printf -v report '%s\nExecution Time:  %s\n' "$report" "$TestTime"
+	printf -v report '%s\n\n%s\n\n\n%s\n%s' "$report" "$clientReport" "$sumReport" "$runsReport"
+
+	printf '%s' "$report"
 }
 
 
 gen_client_report() {
-  local irodsVer numCores totMem
-  numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
-  totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
-  irodsVer=$(get_irods_version)
+	local irodsVer numCores totMem
+	numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
+	totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
+	irodsVer=$(get_irods_version)
 
-  local report
-  printf -v report 'Client Information\n\n'
-  printf -v report '%siCommands:  %s\n' "$report" "$irodsVer"
-  printf -v report '%sMemory:     %s\n' "$report" "$totMem"
-  printf -v report '%sCores:      %d\n' "$report" "$numCores"
+	local report
+	printf -v report 'Client Information\n\n'
+	printf -v report '%siCommands:  %s\n' "$report" "$irodsVer"
+	printf -v report '%sMemory:     %s\n' "$report" "$totMem"
+	printf -v report '%sCores:      %d\n' "$report" "$numCores"
 
-  printf '%s\n' "$report"
+	printf '%s\n' "$report"
 }
 
 get_irods_version() {
-  local version
-  version=$(ienv | sed --quiet 's/.*irods_version - \([0-9.]*\).*/\1/p')
+	local version
+	version=$(ienv | sed --quiet 's/.*irods_version - \([0-9.]*\).*/\1/p')
 
-  if [[ -z "$version" ]]
-  then
-    version=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
-  fi
+	if [[ -z "$version" ]]
+	then
+		version=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
+	fi
 
-  printf '%s' "$version"
+	printf '%s' "$version"
 }
 
 
 append_size_summary() {
-  local report="$1"
-  local repSize="$2"
-  local size="$3"
-  local downDurationsVar="$4"
-  local upDurationsVar="$5"
+	local report="$1"
+	local repSize="$2"
+	local size="$3"
+	local downDurationsVar="$4"
+	local upDurationsVar="$5"
 
-  local downDurations upDurations
-  eval 'downDurations=(${'"$downDurationsVar"'[@]})'
-  eval 'upDurations=(${'"$upDurationsVar"'[@]})'
+	local downDurations upDurations
+	eval 'downDurations=(${'"$downDurationsVar"'[@]})'
+	eval 'upDurations=(${'"$upDurationsVar"'[@]})'
 
-  local geoMeanDownDur geoMeanDownRate geoDevDown
-  geoMeanDownDur=$(compute_geomean "${downDurations[@]}")
-  geoMeanDownRate=$(compute_rate "$size" "$geoMeanDownDur")
-  geoDevDown=$(compute_geodev "$geoMeanDownDur" "${downDurations[@]}")
+	local geoMeanDownDur geoMeanDownRate geoDevDown
+	geoMeanDownDur=$(compute_geomean "${downDurations[@]}")
+	geoMeanDownRate=$(compute_rate "$size" "$geoMeanDownDur")
+	geoDevDown=$(compute_geodev "$geoMeanDownDur" "${downDurations[@]}")
 
-  local geoMeanUpDur geoMeanUpRate geoDevUp
-  geoMeanUpDur=$(compute_geomean "${upDurations[@]}")
-  geoMeanUpRate=$(compute_rate "$size" "$geoMeanUpDur")
-  geoDevUp=$(compute_geodev "$geoMeanUpDur" "${upDurations[@]}")
+	local geoMeanUpDur geoMeanUpRate geoDevUp
+	geoMeanUpDur=$(compute_geomean "${upDurations[@]}")
+	geoMeanUpRate=$(compute_rate "$size" "$geoMeanUpDur")
+	geoDevUp=$(compute_geodev "$geoMeanUpDur" "${upDurations[@]}")
 
-  local downDurSum downRateSum upDurSum upRateSum
-  downDurSum=$(gen_stat "$geoMeanDownDur" "$geoDevDown")
-  downRateSum=$(gen_stat "$geoMeanDownRate" "$geoDevDown")
-  upDurSum=$(gen_stat "$geoMeanUpDur" "$geoDevUp")
-  upRateSum=$(gen_stat "$geoMeanUpRate" "$geoDevUp")
+	local downDurSum downRateSum upDurSum upRateSum
+	downDurSum=$(gen_stat "$geoMeanDownDur" "$geoDevDown")
+	downRateSum=$(gen_stat "$geoMeanDownRate" "$geoDevDown")
+	upDurSum=$(gen_stat "$geoMeanUpDur" "$geoDevUp")
+	upRateSum=$(gen_stat "$geoMeanUpRate" "$geoDevUp")
 
-  local summary=
-  printf -v summary '%sFile Size:            %s\n' "$summary" "$repSize"
-  printf -v summary '%sDownload Duration:    %s s\n' "$summary" "$downDurSum"
-  printf -v summary '%sDownload Throughput:  %s MiB/s\n' "$summary" "$downRateSum"
-  printf -v summary '%sUpload Duration:      %s s\n' "$summary" "$upDurSum"
-  printf -v summary '%sUpload Throughput:    %s MiB/s\n' "$summary" "$upRateSum"
+	local summary=
+	printf -v summary '%sFile Size:            %s\n' "$summary" "$repSize"
+	printf -v summary '%sDownload Duration:    %s s\n' "$summary" "$downDurSum"
+	printf -v summary '%sDownload Throughput:  %s MiB/s\n' "$summary" "$downRateSum"
+	printf -v summary '%sUpload Duration:      %s s\n' "$summary" "$upDurSum"
+	printf -v summary '%sUpload Throughput:    %s MiB/s\n' "$summary" "$upRateSum"
 
-  printf '%s\n\n%s\n' "$report" "$summary"
+	printf '%s\n\n%s\n' "$report" "$summary"
 }
 
 
 gen_stat() {
-  local geoMean="$1"
-  local geoDev="$2"
+	local geoMean="$1"
+	local geoDev="$2"
 
-  local expectedVal likelyLB likelyUB
-  expectedVal=$(awk --assign VAL="$geoMean" 'END { printf "%0.3f", VAL; }' /dev/null)
-  likelyLB=$(compute_low_bound "$geoMean" "$geoDev")
-  likelyUB=$(compute_high_bound "$geoMean" "$geoDev")
+	local expectedVal likelyLB likelyUB
+	expectedVal=$(awk --assign VAL="$geoMean" 'END { printf "%0.3f", VAL; }' /dev/null)
+	likelyLB=$(compute_low_bound "$geoMean" "$geoDev")
+	likelyUB=$(compute_high_bound "$geoMean" "$geoDev")
 
-  printf '%s [%s, %s]' "$expectedVal" "$likelyLB" "$likelyUB"
+	printf '%s [%s, %s]' "$expectedVal" "$likelyLB" "$likelyUB"
 }
 
 
 compute_geomean() {
-  awk --file - <(printf '%s\n' "$@") <<'EOF'
-    BEGIN { totLn = 0.0; }
-    { totLn += log($0); }
-    END { print exp(totLn / NR); }
+	awk --file - <(printf '%s\n' "$@") <<'EOF'
+BEGIN { totLn = 0.0; }
+{ totLn += log($0); }
+END { print exp(totLn / NR); }
 EOF
 }
 
 
 compute_geodev() {
-  local geoMean="$1"
-  shift
+	local geoMean="$1"
+	shift
 
-  awk --assign GEOMEAN="$geoMean" --file - <(printf '%s\n' "$@") <<'EOF'
-    BEGIN { totSqrLnScaled = 0.0; }
-    GEOMEAN == 0 { totSqrLnScaled = +inf; }
-    GEOMEAN != 0 { totSqrLnScaled += log($0 / GEOMEAN)^2; }
-    END { print exp(sqrt(totSqrLnScaled / NR)); }
+	awk --assign GEOMEAN="$geoMean" --file - <(printf '%s\n' "$@") <<'EOF'
+BEGIN { totSqrLnScaled = 0.0; }
+GEOMEAN == 0 { totSqrLnScaled = +inf; }
+GEOMEAN != 0 { totSqrLnScaled += log($0 / GEOMEAN)^2; }
+END { print exp(sqrt(totSqrLnScaled / NR)); }
 EOF
 }
 
 
 compute_high_bound() {
-  local geoMean="$1"
-  local geoDev="$2"
+	local geoMean="$1"
+	local geoDev="$2"
 
-  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - <<'EOF'
-    BEGIN { printf "%0.3f", GEOMEAN * GEODEV; }
+	awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - <<'EOF'
+BEGIN { printf "%0.3f", GEOMEAN * GEODEV; }
 EOF
 }
 
 
 compute_low_bound() {
-  local geoMean="$1"
-  local geoDev="$2"
+	local geoMean="$1"
+	local geoDev="$2"
 
-  awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - <<'EOF'
-    BEGIN { printf "%0.3f", GEOMEAN / GEODEV; }
+	awk --assign GEOMEAN="$geoMean" --assign GEODEV="$geoDev" --file - <<'EOF'
+BEGIN { printf "%0.3f", GEOMEAN / GEODEV; }
 EOF
 }
 
 
 compute_rate() {
-  local sizeB="$1"
-  local durationS="$2"
+	local sizeB="$1"
+	local durationS="$2"
 
-  awk --assign DURATION_S="$durationS" --assign SIZE_B="$sizeB" --file - <<'EOF'
-    BEGIN { print (SIZE_B / (1024^2 * DURATION_S)); }
+	awk --assign DURATION_S="$durationS" --assign SIZE_B="$sizeB" --file - <<'EOF'
+BEGIN { print (SIZE_B / (1024^2 * DURATION_S)); }
 EOF
 }
 
