@@ -34,6 +34,8 @@ Options:
  -S, --sizes SIZE-1,SIZE-2,...  the sizes of the files with units in a form
                                 accepted by \`truncate\`, e.g., 2MiB gives a two
                                 mebibyte file. The default is 1GiB.
+ -T, --max-threads MAX-THREADS  limit the number of transfer threads to
+                                MAX-THREADS
  -V, --version                  show version and exit
  -v, --verbose                  output status messages
 
@@ -103,7 +105,7 @@ EOF
 
 set -o nounset -o pipefail
 
-readonly VERSION=1
+readonly VERSION=2
 readonly DEFAULT_NUM_RUNS=30
 readonly EXEC_ABS_PATH=$(readlink --canonicalize "$0")
 readonly EXEC_NAME=$(basename "$EXEC_ABS_PATH")
@@ -119,6 +121,7 @@ main() {
 		[version]=''
 		[verbose]=''
 		[client-dir]="${TMPDIR:-$PWD}/throughput-$TEST_TIME"
+		[max-threads]=''
 		[num-runs]="$DEFAULT_NUM_RUNS"
 		[server-coll]=''
 		[sizes]=1GiB
@@ -157,7 +160,12 @@ main() {
 
 	ReportLog="${optMap[log]}"
 
-	do_test "${optMap[num-runs]}" "${optMap[sizes]}" "${optMap[client-dir]}" "${optMap[server-coll]}"
+	do_test \
+		"${optMap[num-runs]}" \
+		"${optMap[sizes]}" \
+		"${optMap[client-dir]}" \
+		"${optMap[server-coll]}" \
+		"${optMap[max-threads]}"
 }
 
 
@@ -208,6 +216,10 @@ map_opts() {
 				eval "$mapVar""[sizes]='$2'"
 				shift 2
 				;;
+			-T|--max-threads)
+				eval "$mapVar""[max-threads]='$2'"
+				shift 2
+				;;
 			--)
 				shift
 				break
@@ -221,12 +233,12 @@ map_opts() {
 
 
 fmt_opts() {
-	getopt \
-		--name "$EXEC_NAME" \
-		--longoptions help,verbose,version,client-dir:,log:,num-runs:,server-coll:,sizes: \
-		--options hVvD:L:N:S:C: \
-		-- \
-		"$@"
+	local longOpts=(
+		help verbose version client-dir: log: max-threads: num-runs: server-coll: sizes: )
+
+	local longOptsStr
+	longOptsStr="$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)"
+	getopt --name="$EXEC_NAME" --longoptions="$longOptsStr" --options=hVvD:L:T:N:S:C: -- "$@"
 }
 
 
@@ -235,6 +247,7 @@ do_test() {
 	local sizes="$2"
 	local clientDir="$3"
 	local svrColl="$4"
+	local maxThreads="$5"
 
 	if ! ensure_irods_sess
 	then
@@ -269,9 +282,9 @@ do_test() {
 	local size
 	for size in ${sizes//,/ }
 	do
-		measure_downloads "$numRuns" "$size" "$svrColl" "$clientDir"
-		measure_uploads "$numRuns" "$size" "$clientDir" "$svrColl"
-	done | gen_report > "$ReportLog"
+		measure_downloads "$numRuns" "$size" "$svrColl" "$clientDir" "$maxThreads"
+		measure_uploads "$numRuns" "$size" "$clientDir" "$svrColl" "$maxThreads"
+	done | gen_report "$maxThreads" > "$ReportLog"
 
 	printf 'Finished test\n' >> "$StatusLog"
 }
@@ -320,6 +333,7 @@ measure_downloads() {
 	local reqSize="$2"
 	local srcColl="$3"
 	local destDir="$4"
+	local maxThreads="$5"
 
 	local srcObj
 	srcObj=$(setup_download "$reqSize" "$srcColl" "$destDir")
@@ -340,7 +354,7 @@ measure_downloads() {
 		local file
 		printf -v file '%s/%s-download-%02d' "$destDir" "$reqSize" "$attempt"
 
-		perform_download "$reqSize" "$actSize" "$attempt" "$srcObj" "$file" \
+		perform_download "$maxThreads" "$reqSize" "$actSize" "$attempt" "$srcObj" "$file" \
 			| tee --append "$StatusLog"
 
 		rm --force "$file"
@@ -396,6 +410,7 @@ measure_uploads() {
 	local reqSize="$2"
 	local srcDir="$3"
 	local destColl="$4"
+	local maxThreads="$5"
 
 	local srcFile
 	srcFile=$(setup_uploads "$reqSize" "$srcDir")
@@ -412,7 +427,9 @@ measure_uploads() {
 
 		local obj
 		printf -v obj '%s/%s-upload-%02d' "$destColl" "$reqSize" "$attempt"
-		perform_upload "$reqSize" "$actSize" "$attempt" "$srcFile" "$obj" | tee --append "$StatusLog"
+
+		perform_upload "$maxThreads" "$reqSize" "$actSize" "$attempt" "$srcFile" "$obj" \
+			| tee --append "$StatusLog"
 	done
 
 	printf 'Finished %s upload measurements\n' "$reqSize" >> "$StatusLog"
@@ -445,17 +462,25 @@ setup_uploads() {
 
 
 perform_download() {
-	local reqSize="$1"
-	local actSize="$2"
-	local run="$3"
-	local src="$4"
-	local dest="$5"
+	local maxThreads="$1"
+	local reqSize="$2"
+	local actSize="$3"
+	local run="$4"
+	local src="$5"
+	local dest="$6"
+
+	local opts=( -v )
+
+	if [[ -n "$maxThreads" ]]
+	then
+		opts+=( -N "$maxThreads" )
+	fi
 
 	local startTime
 	startTime=$(date --utc --iso-8601=seconds)
 
 	local duration rate
-	IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget -v "$src" "$dest")
+	IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget "${opts[@]}" "$src" "$dest")
 
 	printf 'download %d %s %s %s %s %s\n' \
 	"$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
@@ -463,28 +488,46 @@ perform_download() {
 
 
 perform_upload() {
-	local reqSize="$1"
-	local actSize="$2"
-	local run="$3"
-	local src="$4"
-	local dest="$5"
+	local maxThreads="$1"
+	local reqSize="$2"
+	local actSize="$3"
+	local run="$4"
+	local src="$5"
+	local dest="$6"
+
+	local opts=( -v )
+
+	if [[ -n "$maxThreads" ]]
+	then
+		opts+=( -N "$maxThreads" )
+	fi
 
 	local startTime
 	startTime=$(date --utc --iso-8601=seconds)
 
 	local duration rate
-	IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput -v "$src" "$dest")
+	IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput "${opts[@]}" "$src" "$dest")
 
 	printf 'upload %d %s %s %s %s %s\n' "$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
 }
 
 
 gen_report() {
+	local maxThreads="$1"
+
+	if [[ -z "$maxThreads" ]]
+	then
+		maxThreads='unset'
+	elif (( maxThreads == 0 ))
+	then
+		maxThreads=streaming
+	fi
+
 	local clientReport
 	clientReport=$(gen_client_report)
 
 	local sumReport
-	printf -v sumReport 'Summary'
+	printf -v sumReport 'Summary\n\nTransfer Thread Limit:  %s' "$maxThreads"
 
 	local downDurs=()
 	local upDurs=()
