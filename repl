@@ -466,12 +466,7 @@ select_cohort() {
 
 	local cohortList
 	cohortList="$(mktemp)"
-
-	if [[ -n "$maxSizeB" ]]; then
-		partition "$minSizeB" "$maxSizeB"
-	else
-		partition "$minSizeB"
-	fi > "$cohortList"
+	partition "$minSizeB" "$maxSizeB" > "$cohortList"
 
 	local subTotal
 	subTotal="$(count <"$cohortList")"
@@ -660,13 +655,7 @@ select_cohort_by_size() {
 
 	local cohortList
 	cohortList="$(mktemp)"
-
-	if [[ -n "$maxSizeMiB" ]]; then
-		local maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
-		partition "$minSizeB" "$maxSizeB"
-	else
-		partition "$minSizeB"
-	fi > "$cohortList"
+	partition "$minSizeB" "$maxSizeB" > "$cohortList"
 
 	local subTotal
 	subTotal="$(count < "$cohortList")"
@@ -738,11 +727,7 @@ max_procs() {
 
 partition() {
 	local minSizeB="$1"
-
-	local maxSizeB=
-	if (( $# >= 2 )); then
-		maxSizeB="$2"
-	fi
+	local maxSizeB="$2"
 
 	local size
 	if [[ -n "$maxSizeB" ]]; then
