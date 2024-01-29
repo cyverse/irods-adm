@@ -305,16 +305,6 @@ compute_until_timestamp() {
 	fi
 }
 
-count() {
-	local tot=0
-
-	while read -r -d ''; do
-		: $(( tot++ ))
-	done
-
-	echo "$tot"
-}
-
 get_data_to_repl() {
 	local age="$1"
 	local srcResc="$2"
@@ -414,8 +404,6 @@ replicate_streaming() {
 	local totObjs="$5"
 	local objCache="$6"
 
-	local cnt=0
-
 	if ! CHECK_TIME "$untilTS"; then
 		return "$TIMEDOUT"
 	fi
@@ -447,11 +435,52 @@ replicate_streaming() {
 				< "$cohortList" \
 				2>&"$LOG" \
 			| tee >(cat >&"$LOG") \
-			| track_prog "$cnt" "$totObjs" "$subTotal" \
+			| track_prog 0 "$totObjs" "$subTotal" \
 			> /dev/null
 	fi
 
 	rm --force "$cohortList"
+}
+
+disp_cohort_info() {
+	local cohortSize="$1"
+	local maxProcs="$2"
+	local maxArgs="$3"
+	local minObjSizeMiB="$4"
+	local maxObjSizeMiB="$5"
+
+	local includeMin=''
+	if (( $# >= 6 )); then
+		includeMin="$6"
+	fi
+
+	if [[ -z "$minSizeMiB" ]] || (( ${minSizeMiB-0} < 0 )); then
+		minSizeMiB=0
+	fi
+
+	local objSizeInfo
+	if [[ -z "$maxObjSizeMiB" ]]; then
+		if [[ -n "$includeMin" ]]; then
+			if (( minObjSizeMiB == 0 )); then
+				objSizeInfo=''
+			else
+				printf -v objSizeInfo 'with size >= %s MiB' "$minObjSizeMiB"
+			fi
+		else
+			printf -v objSizeInfo 'with size > %s MiB' "$minObjSizeMiB"
+		fi
+	elif (( minObjSizeMiB < maxObjSizeMiB )); then
+		if [[ -n "$includeMin" ]]; then
+			printf -v objSizeInfo 'with size in [%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
+		else
+			printf -v objSizeInfo 'with size in (%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
+		fi
+	else
+		printf -v objSizeInfo 'with size %s MiB' "$minObjSizeMiB"
+	fi
+
+	printf 'Replicating %s files %s (%s procs, %s objects/proc)\n' \
+		"$cohortSize" "$objSizeInfo" "$maxProcs" "$maxArgs"
 }
 
 div_ceil() {
@@ -495,6 +524,34 @@ compute_min_size_bytes() {
 	else
 		echo $(( minSizeMiB * 1024 ** 2 ))
 	fi
+}
+
+track_prog() {
+	local cnt="$1"
+	local tot="$2"
+	local subTot="$3"
+
+	local subCnt=0
+
+	local msg
+	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+
+	printf '%s' "$msg" >&2
+
+	while read -r; do
+		if [[ "$REPLY" != 'cliReconnManager: '* ]]; then
+			: $(( subCnt++ ))
+			: $(( cnt++ ))
+			printf '\r%*s\r' ${#msg} '' >&2
+			msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+			printf '%s' "$msg" >&2
+		fi
+	done
+
+	printf '\r%*s\r' ${#msg} '' >&2
+	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+	printf '%s\n' "$msg" >&2
+	printf '%s' "$cnt"
 }
 
 replicate_threaded() {
@@ -632,6 +689,18 @@ validate_repl_conds() {
 	fi
 }
 
+
+
+count() {
+	local tot=0
+
+	while read -r -d ''; do
+		: $(( tot++ ))
+	done
+
+	echo "$tot"
+}
+
 max_args_per_irepl() {
 	local threadsPerDataObj="$1"
 
@@ -689,47 +758,6 @@ select_cohort_by_size() {
 	rm --force "$cohortList"
 }
 
-disp_cohort_info() {
-	local cohortSize="$1"
-	local maxProcs="$2"
-	local maxArgs="$3"
-	local minObjSizeMiB="$4"
-	local maxObjSizeMiB="$5"
-
-	local includeMin=''
-	if (( $# >= 6 )); then
-		includeMin="$6"
-	fi
-
-	if [[ -z "$minSizeMiB" ]] || (( ${minSizeMiB-0} < 0 )); then
-		minSizeMiB=0
-	fi
-
-	local objSizeInfo
-	if [[ -z "$maxObjSizeMiB" ]]; then
-		if [[ -n "$includeMin" ]]; then
-			if (( minObjSizeMiB == 0 )); then
-				objSizeInfo=''
-			else
-				printf -v objSizeInfo 'with size >= %s MiB' "$minObjSizeMiB"
-			fi
-		else
-			printf -v objSizeInfo 'with size > %s MiB' "$minObjSizeMiB"
-		fi
-	elif (( minObjSizeMiB < maxObjSizeMiB )); then
-		if [[ -n "$includeMin" ]]; then
-			printf -v objSizeInfo 'with size in [%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
-		else
-			printf -v objSizeInfo 'with size in (%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
-		fi
-	else
-		printf -v objSizeInfo 'with size %s MiB' "$minObjSizeMiB"
-	fi
-
-	printf 'Replicating %s files %s (%s procs, %s objects/proc)\n' \
-		"$cohortSize" "$objSizeInfo" "$maxProcs" "$maxArgs"
-}
-
 max_procs() {
 	local threadsPerDataObj="$1"
 	local procMult="$2"
@@ -765,34 +793,6 @@ threads_to_min_MiB() {
 	local threads="$1"
 
 	echo $(( (threads - 1) * TRANSFER_BUF_SZ ))
-}
-
-track_prog() {
-	local cnt="$1"
-	local tot="$2"
-	local subTot="$3"
-
-	local subCnt=0
-
-	local msg
-	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
-
-	printf '%s' "$msg" >&2
-
-	while read -r; do
-		if [[ "$REPLY" != 'cliReconnManager: '* ]]; then
-			: $(( subCnt++ ))
-			: $(( cnt++ ))
-			printf '\r%*s\r' ${#msg} '' >&2
-			msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
-			printf '%s' "$msg" >&2
-		fi
-	done
-
-	printf '\r%*s\r' ${#msg} '' >&2
-	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
-	printf '%s\n' "$msg" >&2
-	printf '%s' "$cnt"
 }
 
 mk_prog_msg() {
