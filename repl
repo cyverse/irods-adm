@@ -414,14 +414,44 @@ replicate_streaming() {
 	local totObjs="$5"
 	local objCache="$6"
 
+	local cnt=0
+
+	if ! CHECK_TIME "$untilTS"; then
+		return "$TIMEDOUT"
+	fi
+
 	local maxProcs=$(( MAX_THREADS * procMult ))
 
 	local maxIreplArgs
 	maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" "$STREAMING_IREPL_ARG_FRAC")"
 
-	select_cohort 0 "$totObjs" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" -1 "$untilTS" \
-		< "$objCache" \
-		> /dev/null
+	local cohortList
+	cohortList="$(mktemp)"
+	select_cohort -1 < "$objCache" > "$cohortList"
+
+	local subTotal
+	subTotal="$(count <"$cohortList")"
+
+	if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
+	elif (( minSizeMiB <= 0 )); then
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
+	else
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
+	fi >&2
+
+	if (( subTotal > 0 )); then
+		parallel --line-buffer --no-notice --null \
+					--halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+					REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
+				< "$cohortList" \
+				2>&"$LOG" \
+			| tee >(cat >&"$LOG") \
+			| track_prog "$cnt" "$totObjs" "$subTotal" \
+			> /dev/null
+	fi
+
+	rm --force "$cohortList"
 }
 
 div_ceil() {
@@ -432,18 +462,7 @@ div_ceil() {
 }
 
 select_cohort() {
-	local cnt="$1"
-	local tot="$2"
-	local srcResc="$3"
-	local destResc="$4"
-	local maxProcs="$5"
-	local maxArgs="$6"
-	local transThreads="$7"
-	local untilTS="$8"
-
-	if ! CHECK_TIME "$untilTS"; then
-		return "$TIMEDOUT"
-	fi
+	local transThreads="$1"
 
 	local maxSizeB maxSizeMiB minSizeB minSizeMiB
 	if (( transThreads == -1 )); then
@@ -464,34 +483,7 @@ select_cohort() {
 		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
 	fi
 
-	local cohortList
-	cohortList="$(mktemp)"
 	partition "$minSizeB" "$maxSizeB" > "$cohortList"
-
-	local subTotal
-	subTotal="$(count <"$cohortList")"
-
-	if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
-		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
-	elif (( minSizeMiB <= 0 )); then
-		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
-	else
-		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
-	fi >&2
-
-	if (( subTotal > 0 )); then
-		parallel --line-buffer --no-notice --null \
-					--halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
-					REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
-				< "$cohortList" \
-				2>&"$LOG" \
-			| tee >(cat >&"$LOG") \
-			| track_prog "$cnt" "$tot" "$subTotal"
-	else
-		printf '%s\n' "$cnt"
-	fi
-
-	rm --force "$cohortList"
 }
 
 compute_min_size_bytes() {
@@ -519,20 +511,40 @@ replicate_threaded() {
 	# Small file transfers
 	local threadsPerDataObj
 	for (( threadsPerDataObj=1; threadsPerDataObj<maxThreads; threadsPerDataObj++ )); do
+			if ! CHECK_TIME "$untilTS"; then
+			return "$TIMEDOUT"
+		fi
+
 		local maxIreplArgs maxProcs
 		maxProcs="$(max_procs "$threadsPerDataObj" "$procMult")"
 		maxIreplArgs="$(max_args_per_irepl "$threadsPerDataObj")"
 
-		cnt="$(select_cohort \
-				"$cnt" \
-				"$totObjs" \
-				"$srcResc" \
-				"$destResc" \
-				"$maxProcs" \
-				"$maxIreplArgs" \
-				"$threadsPerDataObj" \
-				"$untilTS" \
-			< "$objCache" )"
+		local cohortList
+		cohortList="$(mktemp)"
+		select_cohort "$threadsPerDataObj" < "$objCache" > "$cohortList"
+
+		local subTotal
+		subTotal="$(count <"$cohortList")"
+
+		if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
+			disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
+		elif (( minSizeMiB <= 0 )); then
+			disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
+		else
+			disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
+		fi >&2
+
+		if (( subTotal > 0 )); then
+			cnt="$(parallel --line-buffer --no-notice --null \
+						--halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+						REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
+					< "$cohortList" \
+					2>&"$LOG" \
+				| tee >(cat >&"$LOG") \
+				| track_prog "$cnt" "$totObjs" "$subTotal" )"
+		fi
+
+		rm --force "$cohortList"
 	done
 
 	# Large file transfers
