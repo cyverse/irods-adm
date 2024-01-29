@@ -413,9 +413,13 @@ replicate_streaming() {
 	local maxIreplArgs
 	maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" "$STREAMING_IREPL_ARG_FRAC")"
 
+	local minSizeMiB maxSizeMiB
+	minSizeMiB="$(threads_to_min_MiB -1)"
+	maxSizeMiB="$(threads_to_max_MiB -1)"
+
 	local cohortList
 	cohortList="$(mktemp)"
-	select_cohort -1 < "$objCache" > "$cohortList"
+	select_cohort "$minSizeMiB" "$maxSizeMiB" < "$objCache" > "$cohortList"
 
 	local subTotal
 	subTotal="$(count <"$cohortList")"
@@ -430,7 +434,7 @@ replicate_streaming() {
 
 	if (( subTotal > 0 )); then
 		parallel --line-buffer --no-notice --null \
-					--halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+					--halt 2 --max-args "$maxIreplArgs" --max-procs "$maxProcs" \
 					REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$LOG" \
@@ -491,38 +495,38 @@ div_ceil() {
 }
 
 select_cohort() {
-	local transThreads="$1"
+	local minSizeMiB="$1"
+	local maxSizeMiB="$2"
 
-	local maxSizeB maxSizeMiB minSizeB minSizeMiB
-	if (( transThreads == -1 )); then
-		transThreads=0
-		minSizeMiB=0
+	local maxSizeB minSizeB
+	if [[ -z "$maxSizeMiB" ]]; then
 		minSizeB=0
-		maxSizeMiB=
 		maxSizeB=
-	elif (( transThreads == 0 )); then
-		minSizeMiB=0
+	elif (( maxSizeMiB == 0 )); then
 		minSizeB=0
-		maxSizeMiB=0
 		maxSizeB=1
 	else
-		minSizeMiB="$(threads_to_min_MiB "$transThreads")"
-		minSizeB="$(compute_min_size_bytes "$minSizeMiB")"
-		maxSizeMiB="$(threads_to_min_MiB $(( transThreads + 1 )))"
+		if (( minSizeMiB == 0 )); then
+			minSizeB=1
+		else
+			minSizeB=$(( minSizeMiB * 1024 ** 2 ))
+		fi
+
 		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
 	fi
 
 	partition "$minSizeB" "$maxSizeB" > "$cohortList"
 }
 
-compute_min_size_bytes() {
-	local minSizeMiB="$1"
+threads_to_max_MiB() {
+	local transThreads="$1"
 
-	# zero byte files are handled later
-	if (( minSizeMiB == 0 )); then
-		echo 1
+	if (( transThreads == -1 )); then
+		echo ''
+	elif (( transThreads == 0 )); then
+		echo 0
 	else
-		echo $(( minSizeMiB * 1024 ** 2 ))
+		threads_to_min_MiB $(( transThreads + 1 ))
 	fi
 }
 
@@ -576,9 +580,13 @@ replicate_threaded() {
 		maxProcs="$(max_procs "$threadsPerDataObj" "$procMult")"
 		maxIreplArgs="$(max_args_per_irepl "$threadsPerDataObj")"
 
+		local minSizeMiB maxSizeMiB
+		minSizeMiB="$(threads_to_min_MiB "$threadsPerDataObj")"
+		maxSizeMiB="$(threads_to_max_MiB "$threadsPerDataObj")"
+
 		local cohortList
 		cohortList="$(mktemp)"
-		select_cohort "$threadsPerDataObj" < "$objCache" > "$cohortList"
+		select_cohort "$minSizeMiB" "$maxSizeMiB" < "$objCache" > "$cohortList"
 
 		local subTotal
 		subTotal="$(count <"$cohortList")"
@@ -593,7 +601,7 @@ replicate_threaded() {
 
 		if (( subTotal > 0 )); then
 			cnt="$(parallel --line-buffer --no-notice --null \
-						--halt 2 --max-args "$maxArgs" --max-procs "$maxProcs" \
+						--halt 2 --max-args "$maxIreplArgs" --max-procs "$maxProcs" \
 						REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
 					< "$cohortList" \
 					2>&"$LOG" \
@@ -647,10 +655,33 @@ replicate_threaded() {
 	maxProcs="$(div_ceil $(( MAX_THREADS * procMult )) 2)"
 	maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 2)"
 
+	local minSizeMiB=0
+	local maxSizeMiB=0
+
+	local cohortList
+	cohortList="$(mktemp)"
+	select_cohort 0 0 < "$objCache" > "$cohortList"
+
+	local subTotal
+	subTotal="$(count < "$cohortList")"
+
+	disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
+
 	cnt="$(select_cohort \
 			"$cnt" "$totObjs" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" 0 "$untilTS" \
 		< "$objCache" )"
 
+	if (( subTotal > 0 )); then
+		cnt="$(parallel --line-buffer --no-notice --null \
+					--halt 2 --max-args "$maxIreplArgs" --max-procs "$maxProcs" \
+					REPL_BATCH "'$srcResc'" "'$destResc'" "'$transThreads'" "'$untilTS'" \
+				< "$cohortList" \
+				2>&"$LOG" \
+			| tee >(cat >&"$LOG") \
+			| track_prog "$cnt" "$totObjs" "$subTotal" )"
+	fi
+
+	rm --force "$cohortList"
 	echo "$cnt"
 }
 
@@ -792,7 +823,11 @@ partition() {
 threads_to_min_MiB() {
 	local threads="$1"
 
-	echo $(( (threads - 1) * TRANSFER_BUF_SZ ))
+	if (( threads <= 0 )); then
+		echo 0
+	else
+		echo $(( (threads - 1) * TRANSFER_BUF_SZ ))
+	fi
 }
 
 mk_prog_msg() {
