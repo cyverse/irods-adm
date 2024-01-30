@@ -527,7 +527,17 @@ threads_to_max_MiB() {
 	elif (( transThreads == 0 )); then
 		echo 0
 	else
-		threads_to_min_MiB $(( transThreads + 1 ))
+		echo $(( threads * TRANSFER_BUF_SZ ))
+	fi
+}
+
+threads_to_min_MiB() {
+	local threads="$1"
+
+	if (( threads <= 0 )); then
+		echo 0
+	else
+		echo $(( (threads - 1) * TRANSFER_BUF_SZ ))
 	fi
 }
 
@@ -558,6 +568,9 @@ track_prog() {
 	printf '%s\n' "$msg" >&2
 	printf '%s' "$cnt"
 }
+
+
+
 
 replicate_threaded() {
 	local maxThreads="$1"
@@ -819,16 +832,6 @@ partition() {
 				printf '%s\0' "${REPLY#* }"
 			fi
 		done
-	fi
-}
-
-threads_to_min_MiB() {
-	local threads="$1"
-
-	if (( threads <= 0 )); then
-		echo 0
-	else
-		echo $(( (threads - 1) * TRANSFER_BUF_SZ ))
 	fi
 }
 
