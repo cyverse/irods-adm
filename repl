@@ -425,11 +425,12 @@ replicate_streaming() {
 	subTotal="$(count <"$cohortList")"
 
 	if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
-		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" 0 '' includeMin
 	elif (( minSizeMiB <= 0 )); then
-		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
+		disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB"
 	else
-		disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
+		disp_cohort_info \
+			"$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
 	fi >&2
 
 	if (( subTotal > 0 )); then
@@ -592,11 +593,12 @@ replicate_threaded() {
 		subTotal="$(count <"$cohortList")"
 
 		if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
-			disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" 0 '' includeMin
+			disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" 0 '' includeMin
 		elif (( minSizeMiB <= 0 )); then
-			disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
+			disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB"
 		else
-			disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
+			disp_cohort_info \
+				"$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
 		fi >&2
 
 		if (( subTotal > 0 )); then
@@ -665,7 +667,7 @@ replicate_threaded() {
 	local subTotal
 	subTotal="$(count < "$cohortList")"
 
-	disp_cohort_info "$subTotal" "$maxProcs" "$maxArgs" "$minSizeMiB" "$maxSizeMiB"
+	disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB"
 
 	cnt="$(select_cohort \
 			"$cnt" "$totObjs" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" 0 "$untilTS" \
