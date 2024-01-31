@@ -516,7 +516,7 @@ select_cohort() {
 		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
 	fi
 
-	partition "$minSizeB" "$maxSizeB" > "$cohortList"
+	partition "$minSizeB" "$maxSizeB"
 }
 
 threads_to_max_MiB() {
