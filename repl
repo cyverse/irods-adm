@@ -519,6 +519,32 @@ select_cohort() {
 	partition "$minSizeB" "$maxSizeB"
 }
 
+partition() {
+	local minSizeB="$1"
+	local maxSizeB="$2"
+
+	local size
+	if [[ -n "$maxSizeB" ]]; then
+		while IFS= read -r -d ''; do
+			size="${REPLY%% *}"
+
+			if (( size >= minSizeB && size < maxSizeB )); then
+				printf '%s\0' "${REPLY#* }"
+			fi
+		done
+	else
+		while IFS= read -r -d ''; do
+			size="${REPLY%% *}"
+
+			if (( size >= minSizeB )); then
+				printf '%s\0' "${REPLY#* }"
+			fi
+		done
+	fi
+}
+
+
+
 threads_to_max_MiB() {
 	local threads="$1"
 
@@ -809,30 +835,6 @@ max_procs() {
 	local procMult="$2"
 
 	div_ceil $(( MAX_THREADS * procMult )) "$threadsPerDataObj"
-}
-
-partition() {
-	local minSizeB="$1"
-	local maxSizeB="$2"
-
-	local size
-	if [[ -n "$maxSizeB" ]]; then
-		while IFS= read -r -d ''; do
-			size="${REPLY%% *}"
-
-			if (( size >= minSizeB && size < maxSizeB )); then
-				printf '%s\0' "${REPLY#* }"
-			fi
-		done
-	else
-		while IFS= read -r -d ''; do
-			size="${REPLY%% *}"
-
-			if (( size >= minSizeB )); then
-				printf '%s\0' "${REPLY#* }"
-			fi
-		done
-	fi
 }
 
 mk_prog_msg() {
