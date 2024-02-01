@@ -708,10 +708,6 @@ replicate_threaded() {
 
 	disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB"
 
-	cnt="$(select_cohort \
-			"$cnt" "$totObjs" "$srcResc" "$destResc" "$maxProcs" "$maxIreplArgs" 0 "$untilTS" \
-		< "$objCache" )"
-
 	if (( subTotal > 0 )); then
 		cnt="$(parallel --line-buffer --no-notice --null \
 					--halt 2 --max-args "$maxIreplArgs" --max-procs "$maxProcs" \
