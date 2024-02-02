@@ -3,19 +3,19 @@
 # Usage:
 #  missing-repl-replacements
 #
-# Given a set of data objects that are missing their replicas, it looks for 
+# Given a set of data objects that are missing their replicas, it looks for
 # other data objects that have replicas with the same checksum. It reads the set
-# of data objects from stdin, one per line. Each entry is expected to be an 
+# of data objects from stdin, one per line. Each entry is expected to be an
 # absolute, logical path. The candidate list is written to stdout, one candidate
 # per line. A candidate is a tab-separated list having the following form.
 #
 # <data obj>	<bad resc>	<bad repl>	<candidate resc>	<candidate repl>
 #
 # Here <data obj> is the absolute, logical path to the data object read from
-# stdin; <bad resc> is the name of the storage resource hosting the bad replica; 
-# <bad repl> is the absolute, physical path to the bad replica; <candidate resc> 
-# is the name of the storage resource hosting a candidate replica; and 
-# <candidate repl> is a replica that has the same checksum as the bad replica.   
+# stdin; <bad resc> is the name of the storage resource hosting the bad replica;
+# <bad repl> is the absolute, physical path to the bad replica; <candidate resc>
+# is the name of the storage resource hosting a candidate replica; and
+# <candidate repl> is a replica that has the same checksum as the bad replica.
 
 set -o errexit -o nounset -o pipefail
 
@@ -32,11 +32,11 @@ main() {
 
 	local selfCandidates
 	selfCandidates="$(find_self_candidates)"
-	
+
 	local candidates
 	readarray -t candidates <<< "$(comm -23 <(sort <<< "$sameFiles") <(sort <<< "$selfCandidates"))"
 
-	if [[ -n "${candidates[@]}" ]]; then
+	if [[ -n "${candidates[*]}" ]]; then
 		local obj needyResc missingRepl
 		local selectedResc=''
 		local selectedRepl=''
@@ -46,10 +46,10 @@ main() {
 		for candidate in "${candidates[@]}"; do
 			local chksum resc repl
 			IFS=$'\t' read -r chksum resc repl <<< "$candidate"
-			
+
 			obj="${ObjForChksum[$chksum]}"
 			needyResc="${RescOf[$obj]}"
- 
+
 			if [[ "$obj" != "$lastObj" && -n "$lastObj" ]]; then
 				show_selected_mapping \
 					"$lastObj" \
@@ -66,7 +66,7 @@ main() {
 				selectedResc="$resc"
 				selectedRepl="$repl"
 			fi
-			
+
 			lastObj="$obj"
 		done
 
@@ -102,7 +102,7 @@ map_checksum() {
 	local coll objName
 	coll="$(dirname "$objPath")"
 	objName="$(basename "$objPath")"
-	
+
 	local chksum resc repl
 	if IFS=$'\t' read -r chksum resc repl <<< "$(retrieve_chksum_and_loc "$coll" "$objName")"; then
 		if [[ -n "$chksum" && -n "$resc" && -n "$repl" ]]; then
@@ -118,7 +118,7 @@ retrieve_chksum_and_loc() {
 	local dataName="$2"
 
 	quest $'%s\t%s\t%s' <<EOF
-select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH 
+select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH
 where COLL_NAME = '$collPath' and DATA_NAME = '$dataName'
 EOF
 }
@@ -127,7 +127,7 @@ select_copy() {
 	local needyResc="$1"
 	local curCopyResc="$2"
 	local candidateResc="$3"
- 
+
 	[[ "$candidateResc" == "$needyResc" ]] \
 		|| [[ "$candidateResc" != corral4 && "$curCopyResc" != "$needyResc" ]] \
 		|| [[ "$candidateResc" == corral4 && -z "$curCopyResc" ]]
