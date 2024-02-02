@@ -83,14 +83,20 @@ main() {
 }
 
 find_copies() {
-	local chksumList
-	chksumList="$(mk_query_list "${!ObjForChksum[@]}")"
+	local chunkLen=1000
 
-	local query
-	printf -v query \
-		'select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH where DATA_CHECKSUM in (%s)\n' "$chksumList"
+	local chunkStart
+	for chunkStart in $(seq 0 "$chunkLen" ${#ObjForChksum[@]}); do
+		local chksumList
+		chksumList="$(mk_query_list "${!ObjForChksum[@]:"$chunkStart":"$chunkLen"}")"
 
-	quest $'%s\t%s\t%s' <<< "$query"
+		local query
+		printf -v query \
+			'select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH where DATA_CHECKSUM in (%s)\n' \
+			"$chksumList"
+
+		quest $'%s\t%s\t%s' <<< "$query"
+	done
 }
 
 find_self_candidates() {
