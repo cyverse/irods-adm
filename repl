@@ -519,6 +519,7 @@ select_cohort() {
 	partition "$minSizeB" "$maxSizeB"
 }
 
+
 partition() {
 	local minSizeB="$1"
 	local maxSizeB="$2"
@@ -800,7 +801,11 @@ select_cohort_by_size() {
 	fi
 
 	local minSizeB=$(( minSizeMiB * 1024 ** 2 ))
-	local maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
+
+	local maxSizeB=
+	if [[ -n "$maxSizeMiB" ]]; then
+		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
+	fi
 
 	local cohortList
 	cohortList="$(mktemp)"
