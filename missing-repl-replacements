@@ -89,7 +89,7 @@ find_copies() {
 	local chunkStart
 	for chunkStart in $(seq 0 "$chunkLen" ${#chksums[@]}); do
 		local chksumList
-		chksumList="$(mk_query_list "${chksums[@]:"$chunkStart":"$chunkLen"}")"
+		chksumList="$(mk_query_list "${chksums[@]:$chunkStart:$chunkLen}")"
 
 		local query
 		printf -v query \
