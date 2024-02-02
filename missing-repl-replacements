@@ -22,20 +22,25 @@ set -o errexit -o nounset -o pipefail
 declare -A ObjForChksum RescOf ReplOf
 
 main() {
+	printf 'Looking up checkums\n' >&2
 	local obj
 	while IFS= read -r obj; do
 		map_checksum "$obj"
 	done
 
+	printf 'Finding copies\n' >&2
 	local sameFiles
 	sameFiles="$(find_copies)"
 
+	printf 'Finding self candidates\n' >&2
 	local selfCandidates
 	selfCandidates="$(find_self_candidates)"
 
+	printf 'Eliminating selves from candidates\n' >&2
 	local candidates
 	readarray -t candidates <<< "$(comm -23 <(sort <<< "$sameFiles") <(sort <<< "$selfCandidates"))"
 
+	printf 'Resolving replicas\n' >&2
 	if [[ -n "${candidates[*]}" ]]; then
 		local obj needyResc missingRepl
 		local selectedResc=''
