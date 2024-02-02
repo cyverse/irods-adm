@@ -21,6 +21,8 @@ set -o errexit -o nounset -o pipefail
 
 declare -A ObjForChksum RescOf ReplOf
 
+readonly CHKSUM_CHUNK_LEN=500
+
 main() {
 	printf 'Looking up checkums\n' >&2
 	local obj
@@ -83,13 +85,12 @@ main() {
 }
 
 find_copies() {
-	local chunkLen=1000
 	local chksums=("${!ObjForChksum[@]}")
 
 	local chunkStart
-	for chunkStart in $(seq 0 "$chunkLen" ${#chksums[@]}); do
+	for chunkStart in $(seq 0 "$CHKSUM_CHUNK_LEN" ${#chksums[@]}); do
 		local chksumList
-		chksumList="$(mk_query_list "${chksums[@]:$chunkStart:$chunkLen}")"
+		chksumList="$(mk_query_list "${chksums[@]:$chunkStart:$CHKSUM_CHUNK_LEN}")"
 
 		local query
 		printf -v query \
