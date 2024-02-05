@@ -526,7 +526,7 @@ partition() {
 	local objEntry
 	while IFS= read -r -d '' objEntry; do
 		local size="${objEntry%% *}"
-		local path="{$objEntry#* }"
+		local path="${objEntry#* }"
 
 		if ([[ -z "$maxSizeB" ]] && (( size >= minSizeB ))) \
 			|| (( size >= minSizeB && size < maxSizeB ))
