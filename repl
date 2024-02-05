@@ -519,29 +519,21 @@ select_cohort() {
 	partition "$minSizeB" "$maxSizeB"
 }
 
-
 partition() {
 	local minSizeB="$1"
 	local maxSizeB="$2"
 
-	local size
-	if [[ -n "$maxSizeB" ]]; then
-		while IFS= read -r -d ''; do
-			size="${REPLY%% *}"
+	local objEntry
+	while IFS= read -r -d '' objEntry; do
+		local size="${objEntry%% *}"
+		local path="{$objEntry#* }"
 
-			if (( size >= minSizeB && size < maxSizeB )); then
-				printf '%s\0' "${REPLY#* }"
-			fi
-		done
-	else
-		while IFS= read -r -d ''; do
-			size="${REPLY%% *}"
-
-			if (( size >= minSizeB )); then
-				printf '%s\0' "${REPLY#* }"
-			fi
-		done
-	fi
+		if ([[ -z "$maxSizeB" ]] && (( size >= minSizeB ))) \
+			|| (( size >= minSizeB && size < maxSizeB ))
+		then
+			printf '%s\0' "$path"
+		fi
+	done
 }
 
 
