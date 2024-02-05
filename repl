@@ -707,7 +707,7 @@ replicate_threaded() {
 	local subTotal
 	subTotal="$(count < "$cohortList")"
 
-	disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB"
+	disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB" >&2
 
 	if (( subTotal > 0 )); then
 		cnt="$(parallel --line-buffer --no-notice --null \
