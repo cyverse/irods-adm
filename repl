@@ -536,8 +536,6 @@ partition() {
 	done
 }
 
-
-
 threads_to_max_MiB() {
 	local threads="$1"
 
@@ -568,8 +566,8 @@ track_prog() {
 	local subCnt=0
 
 	local msg
-	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
 
+	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
 	printf '%s' "$msg" >&2
 
 	while read -r; do
