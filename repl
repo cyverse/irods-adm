@@ -575,18 +575,23 @@ track_prog() {
 		if [[ "$event" != 'cliReconnManager: '* ]]; then
 			: $(( subCnt++ ))
 			: $(( cnt++ ))
-			printf '\r%*s\r' ${#msg} '' >&2
+			clear_msg "$msg" >&2
 			msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
 			printf '%s' "$msg" >&2
 		fi
 	done
 
-	printf '\r%*s\r' ${#msg} '' >&2
+	clear_msg "$msg" >&2
 	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
 	printf '%s\n' "$msg" >&2
 	printf '%s' "$cnt"
 }
 
+clear_msg() {
+	local msg="$1"
+
+	printf '\r%*s\r' ${#msg} ''
+}
 
 
 
