@@ -570,8 +570,9 @@ track_prog() {
 	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
 	printf '%s' "$msg" >&2
 
-	while read -r; do
-		if [[ "$REPLY" != 'cliReconnManager: '* ]]; then
+	local event
+	while read -r event; do
+		if [[ "$event" != 'cliReconnManager: '* ]]; then
 			: $(( subCnt++ ))
 			: $(( cnt++ ))
 			printf '\r%*s\r' ${#msg} '' >&2
