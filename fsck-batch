@@ -53,6 +53,7 @@ main() {
 
 	eval set -- "$opts"
 
+	local jobs resc
 	while true; do
 		case "$1" in
 		-h | --help)
@@ -60,11 +61,11 @@ main() {
 			exit 0
 			;;
 		-J | --jobs)
-			readonly JOBS="$2"
+			jobs="$2"
 			shift 2
 			;;
 		-R | --resource)
-			readonly RESC="$2"
+			resc="$2"
 			shift 2
 			;;
 		-v | --version)
@@ -89,11 +90,11 @@ main() {
 
 	ParallelOpts=(--eta --no-notice --null --max-args=1)
 
-	if [ -n "${JOBS-}" ]; then
-		ParallelOpts+=(--jobs="$JOBS")
+	if [ -n "${jobs-}" ]; then
+		ParallelOpts+=(--jobs="$jobs")
 	fi
 
-	parallel "${ParallelOpts[@]}" CHECK_OBJ "${RESC-}" | log
+	parallel "${ParallelOpts[@]}" CHECK_OBJ "${resc-}" | log
 }
 
 exit_with_help() {
