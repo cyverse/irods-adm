@@ -587,10 +587,21 @@ track_prog() {
 	printf '%s' "$cnt"
 }
 
+
 clear_msg() {
 	local msg="$1"
 
 	printf '\r%*s\r' ${#msg} ''
+}
+
+mk_prog_msg() {
+	local count="$1"
+	local total="$2"
+	local subCount="$3"
+	local subTotal="$4"
+
+	printf 'cohort: %0*d/%d, all: %0*d/%d' \
+		${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
 }
 
 
@@ -832,16 +843,6 @@ max_procs() {
 	local procMult="$2"
 
 	div_ceil $(( MAX_THREADS * procMult )) "$threadsPerDataObj"
-}
-
-mk_prog_msg() {
-	local count="$1"
-	local total="$2"
-	local subCount="$3"
-	local subTotal="$4"
-
-	printf 'cohort: %0*d/%d, all: %0*d/%d' \
-		${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
 }
 
 REPL_BATCH() {
