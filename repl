@@ -729,19 +729,19 @@ replicate_small_files() {
 		fi >&2
 
 		if (( subTotal > 0 )); then
-			parallel --line-buffer --no-notice --null \
+			replCnt="$(parallel --line-buffer --no-notice --null \
 						--halt 2 --max-args "$maxIreplArgs" --max-procs "$maxProcs" \
 						REPL_BATCH "'$srcResc'" "'$destResc'" "'$threadsPerDataObj'" "'$untilTS'" \
 					< "$cohortList" \
 					2>&"$LOG" \
 				| tee >(cat >&"$LOG") \
-				| track_prog "$replCnt" "$totObjs" "$subTotal"
-		else
-			echo "$replCnt"
+				| track_prog "$replCnt" "$totObjs" "$subTotal" )"
 		fi
 
 		rm --force "$cohortList"
 	done
+
+	echo "$replCnt"
 }
 
 
