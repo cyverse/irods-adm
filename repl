@@ -587,7 +587,6 @@ track_prog() {
 	printf '%s' "$cnt"
 }
 
-
 clear_msg() {
 	local msg="$1"
 
@@ -617,49 +616,8 @@ replicate_threaded() {
 
 	local cnt=0
 
-	# Small file transfers
-	local threadsPerDataObj
-	for (( threadsPerDataObj=1; threadsPerDataObj<maxThreads; threadsPerDataObj++ )); do
-			if ! CHECK_TIME "$untilTS"; then
-			return "$TIMEDOUT"
-		fi
-
-		local maxIreplArgs maxProcs
-		maxProcs="$(max_procs "$threadsPerDataObj" "$procMult")"
-		maxIreplArgs="$(max_args_per_irepl "$threadsPerDataObj")"
-
-		local minSizeMiB maxSizeMiB
-		minSizeMiB="$(threads_to_min_MiB "$threadsPerDataObj")"
-		maxSizeMiB="$(threads_to_max_MiB "$threadsPerDataObj")"
-
-		local cohortList
-		cohortList="$(mktemp)"
-		select_cohort "$minSizeMiB" "$maxSizeMiB" < "$objCache" > "$cohortList"
-
-		local subTotal
-		subTotal="$(count <"$cohortList")"
-
-		if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
-			disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" 0 '' includeMin
-		elif (( minSizeMiB <= 0 )); then
-			disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB"
-		else
-			disp_cohort_info \
-				"$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
-		fi >&2
-
-		if (( subTotal > 0 )); then
-			cnt="$(parallel --line-buffer --no-notice --null \
-						--halt 2 --max-args "$maxIreplArgs" --max-procs "$maxProcs" \
-						REPL_BATCH "'$srcResc'" "'$destResc'" "'$threadsPerDataObj'" "'$untilTS'" \
-					< "$cohortList" \
-					2>&"$LOG" \
-				| tee >(cat >&"$LOG") \
-				| track_prog "$cnt" "$totObjs" "$subTotal" )"
-		fi
-
-		rm --force "$cohortList"
-	done
+	cnt="$(replicate_small_files \
+		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
 
 	# Large file transfers
 	local minSize
@@ -729,6 +687,65 @@ replicate_threaded() {
 	rm --force "$cohortList"
 	echo "$cnt"
 }
+
+replicate_small_files() {
+	local maxThreads="$1"
+	local procMult="$2"
+	local srcResc="$3"
+	local destResc="$4"
+	local untilTS="$5"
+	local totObjs="$6"
+	local objCache="$7"
+	local replCnt="$8"
+
+	local threadsPerDataObj
+	for (( threadsPerDataObj=1; threadsPerDataObj<maxThreads; threadsPerDataObj++ )); do
+		if ! CHECK_TIME "$untilTS"; then
+			return "$TIMEDOUT"
+		fi
+
+		local maxIreplArgs maxProcs
+		maxProcs="$(max_procs "$threadsPerDataObj" "$procMult")"
+		maxIreplArgs="$(max_args_per_irepl "$threadsPerDataObj")"
+
+		local minSizeMiB maxSizeMiB
+		minSizeMiB="$(threads_to_min_MiB "$threadsPerDataObj")"
+		maxSizeMiB="$(threads_to_max_MiB "$threadsPerDataObj")"
+
+		local cohortList
+		cohortList="$(mktemp)"
+		select_cohort "$minSizeMiB" "$maxSizeMiB" < "$objCache" > "$cohortList"
+
+		local subTotal
+		subTotal="$(count <"$cohortList")"
+
+		if (( minSizeMiB <= 0 )) && [[ -z "$maxSizeMiB" ]]; then
+			disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" 0 '' includeMin
+		elif (( minSizeMiB <= 0 )); then
+			disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB"
+		else
+			disp_cohort_info \
+				"$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB" includeMin
+		fi >&2
+
+		if (( subTotal > 0 )); then
+			parallel --line-buffer --no-notice --null \
+						--halt 2 --max-args "$maxIreplArgs" --max-procs "$maxProcs" \
+						REPL_BATCH "'$srcResc'" "'$destResc'" "'$threadsPerDataObj'" "'$untilTS'" \
+					< "$cohortList" \
+					2>&"$LOG" \
+				| tee >(cat >&"$LOG") \
+				| track_prog "$replCnt" "$totObjs" "$subTotal"
+		else
+			echo "$replCnt"
+		fi
+
+		rm --force "$cohortList"
+	done
+}
+
+
+
 
 validate_repl_conds() {
 	local procMult="$1"
