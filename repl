@@ -605,6 +605,7 @@ mk_prog_msg() {
 
 
 
+
 replicate_threaded() {
 	local maxThreads="$1"
 	local procMult="$2"
@@ -619,44 +620,8 @@ replicate_threaded() {
 	cnt="$(replicate_small_files \
 		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
 
-	# Large file transfers
-	local minSize
-	minSize="$(threads_to_min_MiB "$maxThreads")"
-
-	local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (MAX_THREADS - 1) ))
-
-	maxIreplArgs="$(max_args_per_irepl "$maxThreads")"
-
-	# still small enough that they wouldn't default to using MAX_THREADS
-	if (( minSize < lastCohortMinSz )); then
-		cnt="$(select_cohort_by_size \
-				"$cnt" \
-				"$totObjs" \
-				"$srcResc" \
-				"$destResc" \
-				"$procMult" \
-				"$maxThreads" \
-				"$maxIreplArgs" \
-				"$untilTS" \
-				"$minSize" \
-				"$lastCohortMinSz" \
-			< "$objCache" )"
-	fi
-
-	# transfer files that would default to using MAX_THREADS
-	maxIreplArgs=1
-
-	cnt="$(select_cohort_by_size \
-			"$cnt" \
-			"$totObjs" \
-			"$srcResc" \
-			"$destResc" \
-			"$procMult" \
-			"$maxThreads" \
-			"$maxIreplArgs" \
-			"$untilTS" \
-			"$lastCohortMinSz" \
-		< "$objCache" )"
+	cnt="$(replicate_large_files \
+		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
 
 	# zero byte files
 	maxProcs="$(div_ceil $(( MAX_THREADS * procMult )) 2)"
@@ -686,6 +651,57 @@ replicate_threaded() {
 
 	rm --force "$cohortList"
 	echo "$cnt"
+}
+
+replicate_large_files() {
+	local maxThreads="$1"
+	local procMult="$2"
+	local srcResc="$3"
+	local destResc="$4"
+	local untilTS="$5"
+	local totObjs="$6"
+	local objCache="$7"
+	local replCnt="$8"
+
+	local minSize
+	minSize="$(threads_to_min_MiB "$maxThreads")"
+
+	local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (MAX_THREADS - 1) ))
+
+	maxIreplArgs="$(max_args_per_irepl "$maxThreads")"
+
+	# still small enough that they wouldn't default to using MAX_THREADS
+	if (( minSize < lastCohortMinSz )); then
+		replCnt="$(select_cohort_by_size \
+				"$replCnt" \
+				"$totObjs" \
+				"$srcResc" \
+				"$destResc" \
+				"$procMult" \
+				"$maxThreads" \
+				"$maxIreplArgs" \
+				"$untilTS" \
+				"$minSize" \
+				"$lastCohortMinSz" \
+			< "$objCache" )"
+	fi
+
+	# transfer files that would default to using MAX_THREADS
+	maxIreplArgs=1
+
+	replCnt="$(select_cohort_by_size \
+			"$replCnt" \
+			"$totObjs" \
+			"$srcResc" \
+			"$destResc" \
+			"$procMult" \
+			"$maxThreads" \
+			"$maxIreplArgs" \
+			"$untilTS" \
+			"$lastCohortMinSz" \
+		< "$objCache" )"
+
+	echo "$replCnt"
 }
 
 replicate_small_files() {
