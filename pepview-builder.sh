@@ -44,8 +44,8 @@ write_pepview_header() {
 # argument value logging can be enabled or disabled. It can also be configured
 # to not interfere with the execution of existing policies.
 #
-# pepview provides an implementation for every dynamic PEP in stock iRODS 4.2.8.
-# See https://docs.irods.org/4.2.8/plugins/dynamic_policy_enforcement_points/
+# pepview provides an implementation for every dynamic PEP in stock iRODS 4.2.12.
+# See https://docs.irods.org/4.2.12/plugins/dynamic_policy_enforcement_points/
 # for exactly which ones.
 #
 # For pepview to function properly, it must be setup as its own iRODS rule
@@ -54,7 +54,7 @@ write_pepview_header() {
 # instance is called before any others. The pepview engine instance should have
 # no RE data variable or function name mappings. If servers are configured with
 # more the one iRODS rule language engine instance, make sure that the two
-# instances  have different names and different shared memory instances.
+# instances have different names and different shared memory instances.
 #
 # Here's an exmple entry for the plugin_configuration.rule_engines array in
 # server_config.json.
