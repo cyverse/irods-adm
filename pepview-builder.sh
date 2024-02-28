@@ -128,7 +128,7 @@ pepview_STAGES_SHOWN = pepview_ALL_STAGES
 # 'compact' means that the arguments will be displayed one per line. The ones
 # with structured values will have all fields displayed on that line with fields
 # separated by '++++'.  A value of 'expanded' is similar to 'compact', except
-# that the fields of structured values will also be diplsayed one per line. A
+# that the fields of structured values will also be displayed one per line. A
 # value of 'none' (or any other value) means the argument values will not be
 # displayed.
 
