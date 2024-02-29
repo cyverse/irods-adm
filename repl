@@ -623,7 +623,23 @@ replicate_threaded() {
 	cnt="$(replicate_large_files \
 		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
 
-	# zero byte files
+	cnt="$(replicate_empty_files \
+		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
+
+	echo "$cnt"
+}
+
+replicate_empty_files() {
+	local maxThreads="$1"
+	local procMult="$2"
+	local srcResc="$3"
+	local destResc="$4"
+	local untilTS="$5"
+	local totObjs="$6"
+	local objCache="$7"
+	local replCnt="$8"
+
+	local maxProcs maxIreplArgs
 	maxProcs="$(div_ceil $(( MAX_THREADS * procMult )) 2)"
 	maxIreplArgs="$(div_ceil "$MAX_DATA_OBJS_PER_IREPL" 2)"
 
@@ -640,17 +656,17 @@ replicate_threaded() {
 	disp_cohort_info "$subTotal" "$maxProcs" "$maxIreplArgs" "$minSizeMiB" "$maxSizeMiB" >&2
 
 	if (( subTotal > 0 )); then
-		cnt="$(parallel --line-buffer --no-notice --null \
+		replCnt="$(parallel --line-buffer --no-notice --null \
 					--halt 2 --max-args "$maxIreplArgs" --max-procs "$maxProcs" \
 					REPL_BATCH "'$srcResc'" "'$destResc'" "'$maxThreads'" "'$untilTS'" \
 				< "$cohortList" \
 				2>&"$LOG" \
 			| tee >(cat >&"$LOG") \
-			| track_prog "$cnt" "$totObjs" "$subTotal" )"
+			| track_prog "$replCnt" "$totObjs" "$subTotal" )"
 	fi
 
 	rm --force "$cohortList"
-	echo "$cnt"
+	echo "$replCnt"
 }
 
 replicate_large_files() {
@@ -668,6 +684,7 @@ replicate_large_files() {
 
 	local lastCohortMinSz=$(( TRANSFER_BUF_SZ * (MAX_THREADS - 1) ))
 
+	local maxIreplArgs
 	maxIreplArgs="$(max_args_per_irepl "$maxThreads")"
 
 	# still small enough that they wouldn't default to using MAX_THREADS
