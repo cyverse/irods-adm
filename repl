@@ -447,78 +447,6 @@ replicate_streaming() {
 	rm --force "$cohortList"
 }
 
-disp_cohort_info() {
-	local cohortSize="$1"
-	local maxProcs="$2"
-	local maxArgs="$3"
-	local minObjSizeMiB="$4"
-	local maxObjSizeMiB="$5"
-
-	local includeMin=''
-	if (( $# >= 6 )); then
-		includeMin="$6"
-	fi
-
-	if [[ -z "$minSizeMiB" ]] || (( ${minSizeMiB-0} < 0 )); then
-		minSizeMiB=0
-	fi
-
-	local objSizeInfo
-	if [[ -z "$maxObjSizeMiB" ]]; then
-		if [[ -n "$includeMin" ]]; then
-			if (( minObjSizeMiB == 0 )); then
-				objSizeInfo=''
-			else
-				printf -v objSizeInfo 'with size >= %s MiB' "$minObjSizeMiB"
-			fi
-		else
-			printf -v objSizeInfo 'with size > %s MiB' "$minObjSizeMiB"
-		fi
-	elif (( minObjSizeMiB < maxObjSizeMiB )); then
-		if [[ -n "$includeMin" ]]; then
-			printf -v objSizeInfo 'with size in [%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
-		else
-			printf -v objSizeInfo 'with size in (%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
-		fi
-	else
-		printf -v objSizeInfo 'with size %s MiB' "$minObjSizeMiB"
-	fi
-
-	printf 'Replicating %s files %s (%s procs, %s objects/proc)\n' \
-		"$cohortSize" "$objSizeInfo" "$maxProcs" "$maxArgs"
-}
-
-div_ceil() {
-	local numerator="$1"
-	local denominator="$2"
-
-	echo $(( 1 + (numerator - 1) / denominator ))
-}
-
-select_cohort() {
-	local minSizeMiB="$1"
-	local maxSizeMiB="$2"
-
-	local maxSizeB minSizeB
-	if [[ -z "$maxSizeMiB" ]]; then
-		minSizeB=0
-		maxSizeB=
-	elif (( maxSizeMiB == 0 )); then
-		minSizeB=0
-		maxSizeB=1
-	else
-		if (( minSizeMiB == 0 )); then
-			minSizeB=1
-		else
-			minSizeB=$(( minSizeMiB * 1024 ** 2 ))
-		fi
-
-		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
-	fi
-
-	partition "$minSizeB" "$maxSizeB"
-}
-
 partition() {
 	local minSizeB="$1"
 	local maxSizeB="$2"
@@ -556,35 +484,6 @@ threads_to_min_MiB() {
 	else
 		echo $(( (threads - 1) * TRANSFER_BUF_SZ ))
 	fi
-}
-
-track_prog() {
-	local cnt="$1"
-	local tot="$2"
-	local subTot="$3"
-
-	local subCnt=0
-
-	local msg
-
-	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
-	printf '%s' "$msg" >&2
-
-	local event
-	while read -r event; do
-		if [[ "$event" != 'cliReconnManager: '* ]]; then
-			: $(( subCnt++ ))
-			: $(( cnt++ ))
-			clear_msg "$msg" >&2
-			msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
-			printf '%s' "$msg" >&2
-		fi
-	done
-
-	clear_msg "$msg" >&2
-	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
-	printf '%s\n' "$msg" >&2
-	printf '%s' "$cnt"
 }
 
 clear_msg() {
@@ -827,10 +726,82 @@ count() {
 	echo "$tot"
 }
 
+disp_cohort_info() {
+	local cohortSize="$1"
+	local maxProcs="$2"
+	local maxArgs="$3"
+	local minObjSizeMiB="$4"
+	local maxObjSizeMiB="$5"
+
+	local includeMin=''
+	if (( $# >= 6 )); then
+		includeMin="$6"
+	fi
+
+	if [[ -z "$minSizeMiB" ]] || (( ${minSizeMiB-0} < 0 )); then
+		minSizeMiB=0
+	fi
+
+	local objSizeInfo
+	if [[ -z "$maxObjSizeMiB" ]]; then
+		if [[ -n "$includeMin" ]]; then
+			if (( minObjSizeMiB == 0 )); then
+				objSizeInfo=''
+			else
+				printf -v objSizeInfo 'with size >= %s MiB' "$minObjSizeMiB"
+			fi
+		else
+			printf -v objSizeInfo 'with size > %s MiB' "$minObjSizeMiB"
+		fi
+	elif (( minObjSizeMiB < maxObjSizeMiB )); then
+		if [[ -n "$includeMin" ]]; then
+			printf -v objSizeInfo 'with size in [%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
+		else
+			printf -v objSizeInfo 'with size in (%s, %s) MiB' "$minObjSizeMiB" "$maxObjSizeMiB"
+		fi
+	else
+		printf -v objSizeInfo 'with size %s MiB' "$minObjSizeMiB"
+	fi
+
+	printf 'Replicating %s files %s (%s procs, %s objects/proc)\n' \
+		"$cohortSize" "$objSizeInfo" "$maxProcs" "$maxArgs"
+}
+
+div_ceil() {
+	local numerator="$1"
+	local denominator="$2"
+
+	echo $(( 1 + (numerator - 1) / denominator ))
+}
+
 max_args_per_irepl() {
 	local threadsPerDataObj="$1"
 
 	div_ceil "$MAX_DATA_OBJS_PER_IREPL" $(( threadsPerDataObj * threadsPerDataObj ))
+}
+
+select_cohort() {
+	local minSizeMiB="$1"
+	local maxSizeMiB="$2"
+
+	local maxSizeB minSizeB
+	if [[ -z "$maxSizeMiB" ]]; then
+		minSizeB=0
+		maxSizeB=
+	elif (( maxSizeMiB == 0 )); then
+		minSizeB=0
+		maxSizeB=1
+	else
+		if (( minSizeMiB == 0 )); then
+			minSizeB=1
+		else
+			minSizeB=$(( minSizeMiB * 1024 ** 2 ))
+		fi
+
+		maxSizeB=$(( maxSizeMiB * 1024 ** 2 ))
+	fi
+
+	partition "$minSizeB" "$maxSizeB"
 }
 
 # This is intended for large files.
@@ -893,6 +864,35 @@ max_procs() {
 	local procMult="$2"
 
 	div_ceil $(( MAX_THREADS * procMult )) "$threadsPerDataObj"
+}
+
+track_prog() {
+	local cnt="$1"
+	local tot="$2"
+	local subTot="$3"
+
+	local subCnt=0
+
+	local msg
+
+	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+	printf '%s' "$msg" >&2
+
+	local event
+	while read -r event; do
+		if [[ "$event" != 'cliReconnManager: '* ]]; then
+			: $(( subCnt++ ))
+			: $(( cnt++ ))
+			clear_msg "$msg" >&2
+			msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+			printf '%s' "$msg" >&2
+		fi
+	done
+
+	clear_msg "$msg" >&2
+	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+	printf '%s\n' "$msg" >&2
+	printf '%s' "$cnt"
 }
 
 REPL_BATCH() {
