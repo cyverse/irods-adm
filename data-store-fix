@@ -357,7 +357,7 @@ inject_debug_newline() {
 }
 
 inject_debug_stmt() {
-	local stmt="$*"
+	local stmt="$1"
 
 	if [[ -n "${DEBUG-}" ]]; then
 		printf '%s\n' "$stmt"
