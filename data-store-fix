@@ -57,8 +57,8 @@ set -o errexit -o nounset -o pipefail
 
 export PGHOST PGPORT PGUSER
 
-readonly COLL_TABLE_TITLE='Collection Repair Attempts'
-readonly DATA_TABLE_TITLE='Data Object Repair Attempts'
+readonly COLL_TABLE_HEADING='Collection Repair Attempts'
+readonly DATA_TABLE_HEADING='Data Object Repair Attempts'
 readonly DEFAULT_AGE=0
 readonly MAX_LOG_SIZE=12582912  # 12 MiB
 
@@ -217,7 +217,7 @@ $(inject_uuid_probs_tables "$zone" "$cutoffTS")
 $(inject_checksum_probs_table "$cutoffTS")
 
 $(inject_debug_newline)
-$(inject_set_title "$COLL_TABLE_TITLE")
+$(inject_heading "$COLL_TABLE_HEADING")
 SELECT
 	coll_id IN (SELECT * FROM coll_perm_probs)                           AS "Permission Issue",
 	COALESCE((SELECT cu.uuid_count FROM coll_uuid_probs AS cu WHERE cu.coll_id = c.coll_id), 1)
@@ -234,7 +234,7 @@ ORDER BY modify_ts;
 
 \echo ''
 
-$(inject_set_title "$DATA_TABLE_TITLE")
+$(inject_heading "$DATA_TABLE_HEADING")
 SELECT
 	d.data_id IN (SELECT * FROM data_perm_probs)     AS "Permission Issue",
 	d.data_checksum IS NULL OR d.data_checksum = ''  AS "Missing Checksum",
@@ -345,6 +345,14 @@ CREATE INDEX idx_data_uuid_probs ON data_uuid_probs(data_id);
 EOF
 }
 
+inject_heading() {
+	local title="$1"
+
+	inject_debug_quiet on
+	printf $'\pset title \'%s\'\n' "$title"
+	inject_debug_quiet off
+}
+
 inject_debug_msg() {
 	local msg="$1"
 
@@ -364,14 +372,6 @@ inject_debug_stmt() {
 	fi
 }
 
-inject_set_title() {
-	local title="$*"
-
-	inject_debug_quiet on
-	printf $'\pset title \'%s\'\n' "$title"
-	inject_debug_quiet off
-}
-
 inject_debug_quiet() {
 	local state="$1"
 
@@ -383,10 +383,10 @@ fix_problems() {
 		printf '%s\n' "$REPLY"
 
 		case "$REPLY" in
-			*"$COLL_TABLE_TITLE")
+			*"$COLL_TABLE_HEADING")
 				fix_collection_problems
 				;;
-			*"$DATA_TABLE_TITLE")
+			*"$DATA_TABLE_HEADING")
 				fix_object_problems
 				;;
 			*)
