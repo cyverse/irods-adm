@@ -159,6 +159,9 @@ fix() {
 	trap rm_temp_files EXIT
 
 	TempFiles+=("$(mktemp)")
+	local errorLog="${TempFiles[-1]}"
+
+	TempFiles+=("$(mktemp)")
 	local problems="${TempFiles[-1]}"
 
 	local zone
@@ -167,15 +170,20 @@ fix() {
 	local cutoffTime
 	cutoffTime="$(date --iso-8601 --date "$age days ago")"
 
-	find_problems "$zone" "$(date --date="$cutoffTime" '+%s')" | strip_noise > "$problems"
+	if ! (
+		find_problems "$zone" "$(date --date="$cutoffTime" '+%s')" 2>> "$errorLog" \
+			| strip_noise > "$problems" )
+	then
+		print_report_title "$cutoffTime"
+		printf 'The following errors occurred while accessing the ICAT DB.\n\n'
+		cat "$errorLog"
+		echo "$?"
+	fi
 
 	trap 'if [[ "${FUNCNAME[0]-}" != main ]]; then return; fi' SIGINT SIGTERM
 
 	TempFiles+=("$(mktemp)")
 	local fixLog="${TempFiles[-1]}"
-
-	TempFiles+=("$(mktemp)")
-	local errorLog="${TempFiles[-1]}"
 
 	fix_problems < "$problems" > "$fixLog" 2> "$errorLog" || true
 	generate_report "$cutoffTime" "$fixLog" "$errorLog"
@@ -729,7 +737,7 @@ generate_report() {
 	local fixLog="$2"
 	local errLog="$3"
 
-	printf '\t%s DATA STORE REPAIR REPORT\n\n\n' "$cutoffTime"
+	print_report_title "$cutoffTime"
 	printf 'ITEMIZED REPAIR ATTEMPTS\n\n'
 
 	local fixLogSize
@@ -769,6 +777,12 @@ generate_report() {
 	else
 		printf 'All problems were fixed.\n'
 	fi
+}
+
+print_report_title() {
+	local cutoffTime="$1"
+
+	printf '\t%s DATA STORE REPAIR REPORT\n\n\n' "$cutoffTime"
 }
 
 strip_noise() {
