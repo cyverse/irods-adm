@@ -60,7 +60,7 @@ filter_old_stales() {
 			slice=$(( numStales - idx ))
 		fi
 
-		printf 'processing %s - %s\n' $idx $(( idx + slice - 1 )) >&2
+		printf 'processing %s - %s\n' $(( idx + 1 )) $(( idx + slice )) >&2
 
 		local idList
 		idList="$(fmt_query_list "${allStales[@]:$idx:$slice}")"
@@ -91,7 +91,7 @@ map_resources() {
 			slice=$(( numStales - idx ))
 		fi
 
-		printf 'processing %s - %s\n' $idx $(( idx + slice - 1 )) >&2
+		printf 'processing %s - %s\n' $(( idx + 1 )) $(( idx + slice )) >&2
 
 		local idList
 		idList="$(fmt_query_list "${oldStales[@]:$idx:$slice}")"
