@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+show_help() {
+	cat <<EOF
+
+$EXEC_NAME version $VERSION
+
+Usage:
+ $EXEC_NAME
+ $EXEC_NAME (-h|--help)
+ $EXEC_NAME (-v|--version)
+
+Updates the checksums stored in the iRODS catalog.
+
+This script updates the checksum values stored in the iRODS catalog for a set of
+data objects. Each replica of each data object is updated. It reads the list of
+data objects from stdin with each data object being on its own line.
+
+Options:
+ -h, --help     show help and exit
+ -v, --version  show version and exit
+
+Prerequisites:
+ 1) iRODS iCommands version 4.2.8+ must be installed.
+ 2) The user must be initialized with iRODS as an admin user.
+
+© 2024, The Arizona Board of Regents on behalf of The University of Arizona. For
+license information, see https://cyverse.org/license.
+EOF
+}
+
+set -o errexit -o nounset -o pipefail
+
+readonly VERSION=1
+
+EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
+readonly EXEC_NAME
+
+main() {
+	local opts
+	if ! opts="$(getopt --name="$EXEC_NAME" --options=hv --longoptions=help,version -- "$@")"; then
+		printf '\n' >&2
+		show_help >&2
+		return 1
+	fi
+
+	eval set -- "$opts"
+
+	while true; do
+		case "$1" in
+			-h|--help)
+				show_help
+				return 0
+				;;
+			-v|--version)
+				printf '%s\n' "$VERSION"
+				return 0
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				show_help >&2
+				return 1
+				;;
+		esac
+	done
+
+	xargs --delimiter='\n' ichksum -a -f -M -v
+}
+
+main "$@"
