@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # NB this should follow the Nagios plugin guidelines. See
 # https://nagios-plugins.org/doc/guidelines.html
