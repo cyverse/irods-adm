@@ -14,8 +14,7 @@
 print_usage() {
 	/bin/cat <<EOF
 Usage:
- $EXEC_NAME [-v|--verbose][(-P|--port) PORT][(-S|--service) SERVICE]
-  [(-Z|--zone) ZONE] IES
+ $EXEC_NAME [-v|--verbose][(-P|--port) PORT] IRODS-HOST
  $EXEC_NAME (-h|--help)
  $EXEC_NAME (-?|--usage)
  $EXEC_NAME (-V|--version)
@@ -32,48 +31,35 @@ Parameters:
  HOST  the FQDN or IP address of the server hosting the service
 
 Options:
- -h, --help             show help and exit
- -P, --port PORT        the TCP port the iRODS server listens to on HOST
-                        (default 1247)
- -S, --service SERVICE  the name of the service checking iRODS, identified as
-                        client user to iRODS
- -?, --usage            show a usage message and exit
- -v, --verbose          show additional information, a repeat of this flag will
-                        show the response from the server
- -V, --version          show version and exit
- -Z, --zone ZONE        the name of the zone to tell iRODS this program and
-                        SERVICE belong to.
+ -h, --help       show help and exit
+ -P, --port PORT  the TCP port the iRODS server listens to on HOST (default
+                  1247)
+ -?, --usage      show a usage message and exit
+ -v, --verbose    show additional information, a repeat of this flag will show
+                  the response from the server
+ -V, --version    show version and exit
 
 Output:
- Unless otherwise indicated, it writes the status of the iRODS service on HOST
- to stdout in a form interpretable by nagios. When the plugin successfully
- connects to iRODS, it provides the amount of time it took to connect as a
- performance datum in the form "time=<duration>s" where <duration> is the amount
- of time in seconds.
-
-Side Effects:
- The rodsLog will show a connection from the host where this is run with the
- proxy user set to "$EXEC_NAME". If SERVICE is specified, the client user will
- be set to SERVICE instead. If ZONE is specificed, the zone for both users will
- be ZONE.
-
- If \`ips\` happens to be called while this is program is connected to iRODS,
- \`ips\` will show this program's connection as comming from "$EXEC_NAME".
+ Unless otherwise indicated, it writes the status of the iRODS service on
+ IRODS-HOST to stdout in a form interpretable by nagios. When the plugin
+ successfully connects to iRODS, it provides the amount of time it took to
+ connect as a performance datum in the form "time=<duration>s" where <duration>
+ is the amount of time in seconds.
 
 Exit Status:
  0  connected to iRODS
  2  failed to connect to iRODS
  3  an error occurred or connected to something other than iRODS
 
-© 2019, 2021 The Arizona Board of Regents on behalf of The University of
-Arizona. For license information, see https://cyverse.org/license.
+© 2024 The Arizona Board of Regents on behalf of The University of Arizona. For
+license information, see https://cyverse.org/license.
 EOF
 }
 
 
 set -o errexit -o nounset -o pipefail
 
-readonly VERSION=8
+readonly VERSION=9
 
 readonly DEFAULT_EXEC_NAME=check_irods
 readonly DEFAULT_PORT=1247
@@ -87,7 +73,6 @@ declare -r -r UNKNOWN=3
 # verbosity
 declare -i -r TERSE=0
 #declare -i -r VERBOSE=1   # Not used yet
-declare -i -r CFG_DEBUG=2
 
 declare EXEC_NAME
 
@@ -107,13 +92,11 @@ main() {
 
 	declare -A argMap=(
 		[help]=''
-		[ies]=''
+		[host]=''
 		[port]="$DEFAULT_PORT"
-		[service]="$EXEC_NAME"
 		[usage]=''
 		[verbose]="$TERSE"
-		[version]=''
-		[zone]='' )
+		[version]='' )
 
 	if ! map_args argMap "$@"; then
 		print_usage >&2 || true
@@ -133,20 +116,13 @@ main() {
 			return $UNKNOWN
 		fi
 	else
-		if [[ -z "${argMap[ies]}" ]]; then
-			printf 'IES required\n' >&2 || true
+		if [[ -z "${argMap[host]}" ]]; then
+			printf 'iRODS host required\n' >&2 || true
 			print_usage >&2 || true
 			return $UNKNOWN
 		fi
 
-		ping \
-				"${argMap[ies]}" \
-				"${argMap[port]}" \
-				"${argMap[service]}" \
-				"${argMap[zone]}" \
-				"${argMap[verbose]}" \
-			2> /dev/null
-
+		ping "${argMap[host]}" "${argMap[port]}" "${argMap[verbose]}" 2> /dev/null
 		return
 	fi
 
@@ -180,10 +156,6 @@ map_args() {
 				eval "$mapVar""[port]='$2'"
 				shift 2
 				;;
-			-S|--service)
-				eval "$mapVar""[service]='$2'"
-				shift 2
-				;;
 			-\?|--usage)
 				eval "$mapVar""[usage]=usage"
 				shift
@@ -196,10 +168,6 @@ map_args() {
 				eval "$mapVar""[version]=version"
 				shift
 				;;
-			-Z|--zone)
-				eval "$mapVar""[zone]='$2'"
-				shift 2
-				;;
 			--)
 				shift
 				break
@@ -208,7 +176,7 @@ map_args() {
 	done
 
 	if [[ "$#" -ge 1 ]]; then
-		eval "$mapVar""[ies]='$1'"
+		eval "$mapVar""[host]='$1'"
 	fi
 }
 
@@ -285,58 +253,47 @@ print_version() {
 }
 
 
-# attempt to connect to an IES and time how long it takes to establish a
-# connection
+# attempt to connect to an iRODS server and time how long it takes to establish
+# a connection
 # Arguments:
-#  ies        the IP address or hostname of the server hosting the IES
-#  port       the TCP port the IES listens on
-#  service    the name of service to report as the client user
-#  zone       the zone to report the proxy and service belonging to
-#  verbosity  the verbosity level
+#  host       the IP address or hostname of the server hosting iRODS
+#  port       the TCP port the iRODS listens on
 # Globals:
 #  CRITICAL  return status when failed to connect to iRODS
 #  OK        return status when connected to iRODS
 #  UNKNOWN   return status when an error occurred or connected to something
 #            other than iRODS
 # Output:
-#  it writes the status of the IES to stdout in a form interpretable by nagios.
-#  When the plugin successfully connects to iRODS, it provides the amount of
-#  time it took to connect as a performance datum in the form "time=<duration>s"
-#  where <duration> is the amount of time in seconds.
+#  it writes the status to stdout in a form interpretable by nagios. When the
+#  plugin successfully connects to iRODS, it provides the amount of time it took
+#  to connect as a performance datum in the form "time=<duration>s" where
+#  <duration> is the amount of time in seconds.
 # Return:
 #  OK        connected to iRODS
 #  CRITICAL  failed to connect to iRODS
 #  UNKNOWN   an error occurred or connected to something other than iRODS
 ping() {
-	local ies="$1"
+	local host="$1"
 	local port="$2"
-	local service="$3"
-	local zone="$4"
-	local verbosity="$5"
 
 	local startTime
 	startTime="$(/bin/date +%s.%N)"
 
-	if ! exec 3<>/dev/tcp/"$ies"/"$port"; then
+	if ! exec 3<>/dev/tcp/"$host"/"$port"; then
 		printf 'CRITICAL: down\n' || true
 		return $CRITICAL
 	fi
 
-	trap \
-		'mk_req RODS_DISCONNECT >&3 || true; exec 3<&- || true; exec 3>&- || true; trap - RETURN' \
-		RETURN
+	trap 'exec 3<&- || true; exec 3>&- || true; trap - RETURN' RETURN
 
-	local connMsgBody
-	if ! connMsgBody="$(mk_startup_pack "$service" "$zone")"; then
-		return $UNKNOWN
-	fi
-
-	if ! mk_req RODS_CONNECT "$connMsgBody" >&3; then
+	if ! mk_req HEARTBEAT >&3; then
 		return $UNKNOWN
 	fi
 
 	local respMsg
-	if ! respMsg="$(parse_resp <&3)"; then
+	respMsg="$(cat <&3)"
+
+	if [[ "$respMsg" != HEARTBEAT ]]; then
 		printf 'CRITICAL: not iRODS\n' || true
 		return $UNKNOWN
 	fi
@@ -357,10 +314,6 @@ ping() {
 
 	printf '%s\n' "$status" || true
 
-	if (( verbosity >= CFG_DEBUG )); then
-		printf '%s\n' "$respMsg" || true
-	fi
-
 	return $OK
 }
 
@@ -374,7 +327,7 @@ ping() {
 mk_req() {
 	local msgType="$1"
 
-	local msg=
+	local msg=''
 	if [[ $# -ge 2 ]]; then
 		msg="$2"
 	fi
@@ -386,33 +339,6 @@ mk_req() {
 
 	encode_header_len ${#header}
 	printf '%s%s' "$header" "$msg"
-}
-
-
-# It parses an iRODS protocol response message.
-# Input:
-#  the response
-# Output:
-#  the body of the response
-parse_resp() {
-	local headerLen
-	if ! headerLen="$(decode_header_len)"; then
-		return 1
-	fi
-
-	local header
-	read -r -d '' -n "$headerLen" header
-
-	if ! [[ "$header" =~ ^\<MsgHeader_PI\>.*\<type\>RODS_VERSION\</type\>.*\<msgLen\>[0-9]+\< ]]; then
-		return 1
-	fi
-
-	local msgLen="${header#*<msgLen>}"
-	msgLen="${msgLen%%<*}"
-
-	local msg
-	read -r -d '' -n "$msgLen" msg
-	printf '%s' "$msg"
 }
 
 
@@ -433,34 +359,6 @@ mk_header() {
 	<errorLen>0</errorLen>
 	<bsLen>0</bsLen>
 </MsgHeader_PI>
-EOX
-}
-
-
-# It creates an iRODS protocol startup message body.
-# Arguments:
-#  clientUser  the username of the client to connect as
-#  rcatZone    the zone of the client and proxy to connect as
-# Globals:
-#  EXEC_NAME  used as the username of the proxy and as the option identifying
-#             the client program
-# Output:
-#  It writes the message body to stdout.
-mk_startup_pack() {
-	local clientUser="$1"
-	local rcatZone="$2"
-
-	/bin/cat <<EOX
-<StartupPack_PI>
-	<connectCnt>0</connectCnt>
-	<proxyUser>$EXEC_NAME</proxyUser>
-	<proxyRcatZone>$rcatZone</proxyRcatZone>
-	<clientUser>$clientUser</clientUser>
-	<clientRcatZone>$rcatZone</clientRcatZone>
-	<relVersion></relVersion>
-	<apiVersion></apiVersion>
-	<option>$EXEC_NAME</option>
-</StartupPack_PI>
 EOX
 }
 
