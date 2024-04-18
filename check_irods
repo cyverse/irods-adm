@@ -3,13 +3,11 @@
 # NB this should follow the Nagios plugin guidelines. See
 # https://nagios-plugins.org/doc/guidelines.html
 
-# TODO verify system commands aren't symlinks
-# TODO run network connection in separate process and kill it after a certain
-# amount of time. (nagios DEFAULT_SOCKET_TIMEOUT)
+# TODO run network connection in separate process and kill it after a certain amount of time. (nagios DEFAULT_SOCKET_TIMEOUT)
 # TODO switch to using -p (lowercase) for PORT option
 # TODO connecting to something other than iRODS should be a CRITICAL
-# TODO add support for verbosity=1 See
-#  https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
+# TODO add support for verbosity=1 See https://nagios-plugins.org/doc/guidelines.html#VERBOSELEVELS
+
 
 print_usage() {
 	/bin/cat <<EOF
@@ -84,6 +82,8 @@ main() {
 		exec 2>&1
 	fi
 
+	verify_sys_cmds
+
 	if ! EXEC_NAME="$(/usr/bin/basename "$(/usr/bin/realpath --canonicalize-missing "$0")")"; then
 		printf 'cannot determine executable name, using %s\n' "$DEFAULT_EXEC_NAME" >&2 || true
 		EXEC_NAME="$DEFAULT_EXEC_NAME"
@@ -127,6 +127,30 @@ main() {
 	fi
 
 	return $OK
+}
+
+
+# This checks to see if the system commands used by this script are symbolic links.
+# Output:
+#  For each command that is a symbolic link, it writes a warning message to stderr.
+verify_sys_cmds() {
+	local cmds=(
+		/bin/cat
+		/bin/date
+		/usr/bin/basename
+		/usr/bin/bc
+		/usr/bin/getopt
+		/usr/bin/od
+		/usr/bin/realpath
+		/usr/bin/tr
+		/usr/bin/xxd )
+
+	local cmd
+	for cmd in "${cmds[@]}"; do
+		if [[ -L "$cmd" ]]; then
+			printf 'Warning: system command %s is a symbolic link.\n' "$cmd" >&2
+		fi
+	done
 }
 
 
@@ -291,7 +315,7 @@ ping() {
 	fi
 
 	local respMsg
-	respMsg="$(cat <&3)"
+	respMsg="$(/bin/cat <&3)"
 
 	if [[ "$respMsg" != HEARTBEAT ]]; then
 		printf 'CRITICAL: not iRODS\n' || true
