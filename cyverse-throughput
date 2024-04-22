@@ -102,7 +102,6 @@ Size 10GiB Downloads
 EOF
 }
 
-
 set -o nounset -o pipefail
 
 readonly VERSION=2
@@ -113,7 +112,6 @@ readonly TEST_TIME="$(date --utc --iso-8601=seconds)"
 
 declare ReportLog
 declare StatusLog
-
 
 main() {
 	declare -A optMap=(
@@ -167,7 +165,6 @@ main() {
 		"${optMap[server-coll]}" \
 		"${optMap[max-threads]}"
 }
-
 
 map_opts() {
 	local mapVar="$1"
@@ -231,7 +228,6 @@ map_opts() {
 	done
 }
 
-
 fmt_opts() {
 	local longOpts=(
 		help verbose version client-dir: log: max-threads: num-runs: server-coll: sizes: )
@@ -240,7 +236,6 @@ fmt_opts() {
 	longOptsStr="$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)"
 	getopt --name="$EXEC_NAME" --longoptions="$longOptsStr" --options=hVvD:L:T:N:S:C: -- "$@"
 }
-
 
 do_test() {
 	local numRuns="$1"
@@ -289,7 +284,6 @@ do_test() {
 	printf 'Finished test\n' >> "$StatusLog"
 }
 
-
 clean_up() {
 	local clientDir="$1"
 	local svrColl="$2"
@@ -306,7 +300,6 @@ clean_up() {
 	printf 'Finished\n' >> "$StatusLog"
 	return 0
 }
-
 
 ensure_irods_sess() {
 	local authFile
@@ -326,7 +319,6 @@ ensure_irods_sess() {
 		fi
 	fi
 }
-
 
 measure_downloads() {
 	local numRuns="$1"
@@ -362,7 +354,6 @@ measure_downloads() {
 
 	printf 'Finished %s download measurements\n' "$reqSize" >> "$StatusLog"
 }
-
 
 setup_download() {
 	local size="$1"
@@ -404,7 +395,6 @@ setup_download() {
 	fi
 }
 
-
 measure_uploads() {
 	local numRuns="$1"
 	local reqSize="$2"
@@ -438,7 +428,6 @@ measure_uploads() {
 	rm --force "$srcFile"
 }
 
-
 setup_uploads() {
 	local size="$1"
 	local srcDir="$2"
@@ -459,7 +448,6 @@ setup_uploads() {
 
 	echo "$srcFile"
 }
-
 
 perform_download() {
 	local maxThreads="$1"
@@ -486,7 +474,6 @@ perform_download() {
 	"$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
 }
 
-
 perform_upload() {
 	local maxThreads="$1"
 	local reqSize="$2"
@@ -510,7 +497,6 @@ perform_upload() {
 
 	printf 'upload %d %s %s %s %s %s\n' "$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
 }
-
 
 gen_report() {
 	local maxThreads="$1"
@@ -586,7 +572,6 @@ gen_report() {
 	printf '%s' "$report"
 }
 
-
 gen_client_report() {
 	local irodsVer numCores totMem
 	numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
@@ -613,7 +598,6 @@ get_irods_version() {
 
 	printf '%s' "$version"
 }
-
 
 append_size_summary() {
 	local report="$1"
@@ -652,7 +636,6 @@ append_size_summary() {
 	printf '%s\n\n%s\n' "$report" "$summary"
 }
 
-
 gen_stat() {
 	local geoMean="$1"
 	local geoDev="$2"
@@ -665,7 +648,6 @@ gen_stat() {
 	printf '%s [%s, %s]' "$expectedVal" "$likelyLB" "$likelyUB"
 }
 
-
 compute_geomean() {
 	awk --file - <(printf '%s\n' "$@") <<'EOF'
 BEGIN { totLn = 0.0; }
@@ -673,7 +655,6 @@ BEGIN { totLn = 0.0; }
 END { print exp(totLn / NR); }
 EOF
 }
-
 
 compute_geodev() {
 	local geoMean="$1"
@@ -687,7 +668,6 @@ END { print exp(sqrt(totSqrLnScaled / NR)); }
 EOF
 }
 
-
 compute_high_bound() {
 	local geoMean="$1"
 	local geoDev="$2"
@@ -696,7 +676,6 @@ compute_high_bound() {
 BEGIN { printf "%0.3f", GEOMEAN * GEODEV; }
 EOF
 }
-
 
 compute_low_bound() {
 	local geoMean="$1"
@@ -707,7 +686,6 @@ BEGIN { printf "%0.3f", GEOMEAN / GEODEV; }
 EOF
 }
 
-
 compute_rate() {
 	local sizeB="$1"
 	local durationS="$2"
@@ -716,6 +694,5 @@ compute_rate() {
 BEGIN { print (SIZE_B / (1024^2 * DURATION_S)); }
 EOF
 }
-
 
 main "$@"
