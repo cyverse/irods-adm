@@ -387,10 +387,11 @@ inject_debug_quiet() {
 }
 
 fix_problems() {
-	while IFS= read -r; do
-		printf '%s\n' "$REPLY"
+	local line
+	while IFS= read -r line; do
+		printf '%s\n' "$line"
 
-		case "$REPLY" in
+		case "$line" in
 			*"$COLL_TABLE_HEADING")
 				fix_collection_problems
 				;;
@@ -495,10 +496,11 @@ complete_fix_objs() {
 }
 
 pass_hdr_thru() {
-	while read -r; do
-		printf '%s\n' "$REPLY"
+	local line
+	while read -r line; do
+		printf '%s\n' "$line"
 
-		if [[ "$REPLY" =~ ^- ]]; then
+		if [[ "$line" =~ ^- ]]; then
 			break
 		fi
 	done
@@ -786,15 +788,16 @@ print_report_title() {
 }
 
 strip_noise() {
-	while IFS= read -r; do
+	local line
+	while IFS= read -r line; do
 		if [[ -n "${DEBUG-}" ]]; then
-			printf '%s\n' "$REPLY"
+			printf '%s\n' "$line"
 		else
-			case "$REPLY" in
+			case "$line" in
 				BEGIN|CREATE*|SELECT*|ROLLBACK)
 					;;
 				*)
-					printf '%s\n' "$REPLY"
+					printf '%s\n' "$line"
 					;;
 			esac
 		fi
