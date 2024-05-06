@@ -190,13 +190,8 @@ fix() {
 }
 
 check_existing_instance() {
-	local pidofExec
-	if ! pidofExec="$(command -v pidof)"; then
-		pidofExec=/sbin/pidof
-	fi
-
 	local pid
-	for pid in $("$pidofExec" -x "$EXEC_NAME"); do
+	for pid in $(pgrep --full "$EXEC_NAME"); do
 		if (( pid != $$ )); then
 			printf "%s already running with PID %s\n" "$EXEC_NAME" "$pid" 1>&2
 			return 1
