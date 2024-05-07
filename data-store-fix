@@ -192,7 +192,7 @@ fix() {
 check_existing_instance() {
 	local pid
 	for pid in $(pgrep --full "$EXEC_NAME"); do
-		if (( pid != $$ )); then
+		if (( pid != $$ && pid != PPID )); then
 			printf "%s already running with PID %s\n" "$EXEC_NAME" "$pid" 1>&2
 			return 1
 		fi
@@ -473,6 +473,8 @@ fix_object_problems() {
 		: $(( ObjCnt++ ))
 	done
 }
+
+
 
 complete_fix_coll() {
 	local funcName="$1"
