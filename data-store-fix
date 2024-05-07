@@ -434,14 +434,6 @@ fix_collection_problems() {
 	done
 }
 
-complete_fix_coll() {
-	local funcName="$1"
-
-	if [[ "$funcName" == fix_collection_problems ]]; then
-		printf '(%d collections)' "$CollCnt"
-	fi
-}
-
 fix_object_problems() {
 	pass_hdr_thru
 
@@ -480,6 +472,14 @@ fix_object_problems() {
 
 		: $(( ObjCnt++ ))
 	done
+}
+
+complete_fix_coll() {
+	local funcName="$1"
+
+	if [[ "$funcName" == fix_collection_problems ]]; then
+		printf '(%d collections)' "$CollCnt"
+	fi
 }
 
 complete_fix_objs() {
