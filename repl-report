@@ -152,7 +152,7 @@ prep_opts() {
 
 mk_report() {
 	local age="$1"
-	local collection="$2"
+	local coll="$2"
 
 	psql --quiet ICAT <<EOSQL
 \\pset footer off
@@ -162,10 +162,10 @@ $(inject_debug_quiet off)
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 $(inject_table_storage_root_mapping)
-$(inject_table_unreplicated_data "$collection")
+$(inject_table_unreplicated_data "$coll")
 $(inject_table_unreplicated_replicas "$age")
 $(inject_table_stale_data)
-$(inject_stale_replicas "$age")
+$(inject_table_stale_replicas "$age")
 
 \\echo
 
@@ -228,7 +228,7 @@ EOSQL
 }
 
 inject_table_stale_data() {
-	cat <<'EOF'
+	cat <<EOF
 $(inject_debug_msg 'Gathering stale data')
 
 CREATE TEMPORARY TABLE stale_data(id) ON COMMIT DROP AS
@@ -238,7 +238,7 @@ CREATE INDEX idx_stale_data ON stale_data(id);
 EOF
 }
 
-inject_stale_replicas() {
+inject_table_stale_replicas() {
 	local age="$1"
 
 	cat <<EOF
@@ -258,7 +258,7 @@ EOF
 }
 
 inject_table_storage_root_mapping() {
-	cat <<'EOF'
+	cat <<EOF
 $(inject_debug_msg 'Creating storage to root resource mapping')
 
 CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
@@ -315,13 +315,13 @@ EOF
 
 inject_collection_restriction() {
 	local table="$1"
-	local collection="$2"
+	local coll="$2"
 
-	if [[ -n "$collection" ]]; then
+	if [[ -n "$coll" ]]; then
 		local collQuery
 		printf -v collQuery \
 			$'SELECT coll_id FROM r_coll_main WHERE coll_name = \'%s\' OR coll_name LIKE \'%s/%%\'' \
-			"$collection" "$collection"
+			"$coll" "$coll"
 
 		printf '%s.coll_id IN (%s)' "$table" "$collQuery"
 	else
