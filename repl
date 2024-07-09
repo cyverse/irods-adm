@@ -255,7 +255,10 @@ replicate() {
 	ObjCache="$(mktemp)"
 
 	printf 'retrieving data objects to replicate...\n' >&2
-	get_data_to_repl "$age" "$srcResc" "$destResc" "$baseColl" > "$ObjCache"
+	if ! get_data_to_repl "$age" "$srcResc" "$destResc" "$baseColl" > "$ObjCache"; then
+		printf 'failed to retrieve data objects\n' >&2
+		return 1
+	fi
 
 	if [[ -n "$DEBUG" ]]; then
 		printf 'DEBUG: object list in %s\n' "$ObjCache" >&2
@@ -314,14 +317,9 @@ get_data_to_repl() {
 	local replQuery
 	replQuery="$(mk_repl_query "$age" "$baseColl" "$srcResc" "$destResc")"
 
-	if ! psql \
-		--no-align --tuples-only --record-separator-zero \
+	psql --no-align --tuples-only --record-separator-zero \
 		--command="$replQuery" --field-separator=' ' \
 		ICAT
-	then
-		printf 'failed to retrieve data objects\n' >&2
-		return 1
-	fi
 }
 
 mk_repl_query() {
