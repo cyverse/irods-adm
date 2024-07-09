@@ -154,66 +154,18 @@ mk_report() {
 	local age="$1"
 	local collection="$2"
 
-	psql --quiet ICAT \
-<<EOSQL
+	psql --quiet ICAT <<EOSQL
 \\pset footer off
 $(inject_debug_stmt '\timing on')
 $(inject_debug_quiet off)
 
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
-$(inject_debug_msg 'Creating storage to root resource mapping')
-
-CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
-WITH RECURSIVE child_mapping AS (
-	SELECT
-			resc_id AS id,
-			resc_name AS name,
-			(resc_net != 'EMPTY_RESC_HOST') AS storage,
-			resc_name AS root
-		FROM r_resc_main
-		WHERE resc_parent = '' AND resc_name != 'bundleResc'
-	UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root
-		FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent )
-SELECT id, name, root FROM child_mapping WHERE storage;
-CREATE INDEX idx_storage_root_mapping_storage_id ON storage_root_mapping(storage_id);
-
-$(inject_debug_msg 'Gathering unreplicated data')
-
-CREATE TEMPORARY TABLE unreplicated_data(id) ON COMMIT DROP AS
-SELECT data_id
-FROM r_data_main
-WHERE ( $(inject_collection_restriction r_data_main "$collection") )
-GROUP BY data_id
-HAVING COUNT(*) = 1;
-CREATE INDEX idx_unreplicated_data_id ON unreplicated_data(id);
-
-$(inject_debug_msg 'Gathering unreplicated replicas')
-
-CREATE TEMPORARY TABLE unreplicated_replicas(root_resc, store_resc, size) ON COMMIT DROP AS
-SELECT s.root_name, s.storage_name, d.data_size
-FROM storage_root_mapping AS s JOIN r_data_main AS d ON d.resc_id = s.storage_id
-WHERE d.data_id IN (SELECT id FROM unreplicated_data)
-	AND ( $(inject_time_restriction d create_ts "$age") );
-CREATE INDEX idx_unreplicated_replicas_root_resc ON unreplicated_replicas(root_resc);
-CREATE INDEX idx_unreplicated_replicas_store_resc ON unreplicated_replicas(store_resc);
-
-$(inject_debug_msg 'Gathering stale data')
-
-CREATE TEMPORARY TABLE stale_data(id) ON COMMIT DROP AS
-SELECT DISTINCT data_id FROM r_data_main WHERE data_is_dirty = 0;
-CREATE INDEX idx_stale_data ON stale_data(id);
-
-$(inject_debug_msg 'Gathering stale replicas')
-
-CREATE TEMPORARY TABLE stale_replicas(root_resc, store_resc, size) ON COMMIT DROP AS
-SELECT s.root_name, s.storage_name, d.data_size
-FROM storage_root_mapping AS s JOIN r_data_main AS d ON d.resc_id = s.storage_id
-WHERE d.data_id IN (SELECT id FROM stale_data)
-	AND d.data_is_dirty = 1
-	AND ( $(inject_time_restriction d modify_ts "$age") );
-CREATE INDEX idx_stale_replicas_root_resc ON stale_replicas(root_resc);
-CREATE INDEX idx_stale_replicas_store_resc ON stale_replicas(store_resc);
+$(inject_table_storage_root_mapping)
+$(inject_table_unreplicated_data "$collection")
+$(inject_table_unreplicated_replicas "$age")
+$(inject_table_stale_data)
+$(inject_stale_replicas "$age")
 
 \\echo
 
@@ -273,6 +225,92 @@ $(inject_debug_newline)
 $(inject_debug_newline)
 ROLLBACK;
 EOSQL
+}
+
+inject_table_stale_data() {
+	cat <<'EOF'
+$(inject_debug_msg 'Gathering stale data')
+
+CREATE TEMPORARY TABLE stale_data(id) ON COMMIT DROP AS
+SELECT DISTINCT data_id FROM r_data_main WHERE data_is_dirty = 0;
+
+CREATE INDEX idx_stale_data ON stale_data(id);
+EOF
+}
+
+inject_stale_replicas() {
+	local age="$1"
+
+	cat <<EOF
+$(inject_debug_msg 'Gathering stale replicas')
+
+CREATE TEMPORARY TABLE stale_replicas(root_resc, store_resc, size) ON COMMIT DROP AS
+SELECT s.root_name, s.storage_name, d.data_size
+FROM storage_root_mapping AS s JOIN r_data_main AS d ON d.resc_id = s.storage_id
+WHERE d.data_id IN (SELECT id FROM stale_data)
+	AND d.data_is_dirty = 1
+	AND ( $(inject_time_restriction d modify_ts "$age") );
+
+CREATE INDEX idx_stale_replicas_root_resc ON stale_replicas(root_resc);
+
+CREATE INDEX idx_stale_replicas_store_resc ON stale_replicas(store_resc);
+EOF
+}
+
+inject_table_storage_root_mapping() {
+	cat <<'EOF'
+$(inject_debug_msg 'Creating storage to root resource mapping')
+
+CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
+WITH RECURSIVE child_mapping AS (
+	SELECT
+			resc_id AS id,
+			resc_name AS name,
+			(resc_net != 'EMPTY_RESC_HOST') AS storage,
+			resc_name AS root
+		FROM r_resc_main
+		WHERE resc_parent = '' AND resc_name != 'bundleResc'
+	UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root
+		FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent )
+SELECT id, name, root FROM child_mapping WHERE storage;
+
+CREATE INDEX idx_storage_root_mapping_storage_id ON storage_root_mapping(storage_id);
+EOF
+}
+
+inject_table_unreplicated_data() {
+	local coll="$1"
+
+	cat <<EOF
+$(inject_debug_msg 'Gathering unreplicated data')
+
+CREATE TEMPORARY TABLE unreplicated_data(id) ON COMMIT DROP AS
+SELECT data_id
+FROM r_data_main
+WHERE ( $(inject_collection_restriction r_data_main "$coll") )
+GROUP BY data_id
+HAVING COUNT(*) = 1;
+
+CREATE INDEX idx_unreplicated_data_id ON unreplicated_data(id);
+EOF
+}
+
+inject_table_unreplicated_replicas() {
+	local age="$1"
+
+	cat<<EOF
+$(inject_debug_msg 'Gathering unreplicated replicas')
+
+CREATE TEMPORARY TABLE unreplicated_replicas(root_resc, store_resc, size) ON COMMIT DROP AS
+SELECT s.root_name, s.storage_name, d.data_size
+FROM storage_root_mapping AS s JOIN r_data_main AS d ON d.resc_id = s.storage_id
+WHERE d.data_id IN (SELECT id FROM unreplicated_data)
+	AND ( $(inject_time_restriction d create_ts "$age") );
+
+CREATE INDEX idx_unreplicated_replicas_root_resc ON unreplicated_replicas(root_resc);
+
+CREATE INDEX idx_unreplicated_replicas_store_resc ON unreplicated_replicas(store_resc);
+EOF
 }
 
 inject_collection_restriction() {
