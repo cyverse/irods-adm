@@ -29,7 +29,7 @@ Options:
  -A, --age AGE              how long ago a collection or data object
                             modification must have occurred before it will be
                             considered, default is 0
- -U, --db-user DB-USER      the account used to authorized the connection to the
+ -U, --db-user DB-USER      the account used to authorize the connection to the
                             ICAT database
  -H, --dbms-host DBMS-HOST  the domain name or IP address of the server hosting
                             the PostgreSQL DBMS containing the DB
