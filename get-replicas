@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-show_help()
-{
+show_help() {
   cat << EOF
 $EXEC_NAME version $VERSION
 
@@ -41,14 +40,12 @@ readonly EXEC_NAME
 readonly VERSION=1
 
 
-show_version()
-{
+show_version() {
   printf '%s\n' "$VERSION"
 }
 
 
-show_help_and_error_out()
-{
+show_help_and_error_out() {
   show_help >&2
   exit 1
 }
@@ -97,8 +94,7 @@ fi
 
 readonly OBJ_PATH="$*"
 
-ask_irods()
-{
+ask_irods() {
   local resc="$1"
 
   local collPath
@@ -123,8 +119,7 @@ ask_irods()
 }
 
 
-filter_resc()
-{
+filter_resc() {
   local resc="$1"
 
   if [[ -z "$resc" ]]
