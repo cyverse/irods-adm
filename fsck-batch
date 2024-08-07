@@ -47,9 +47,10 @@ readonly EXEC_NAME
 
 main() {
 	if ! opts="$(format_opts "$@")"; then
-		printf '\n' >&2
-		exit_with_help
-	fi
+		printf '\n'
+		show_help
+		return 1
+	fi >&2
 
 	eval set -- "$opts"
 
@@ -77,13 +78,15 @@ main() {
 			break
 			;;
 		*)
-			exit_with_help
+			show_help >&2
+			return 1
 			;;
 		esac
 	done
 
 	if [ "$#" -lt 1 ]; then
-		exit_with_help
+		show_help >&2
+		return 1
 	fi
 
 	readonly CLASS_BASE="$1"
@@ -95,11 +98,6 @@ main() {
 	fi
 
 	parallel "${ParallelOpts[@]}" CHECK_OBJ "${resc-}" | log
-}
-
-exit_with_help() {
-	show_help >&2
-	exit 1
 }
 
 # formats the command line arguments for getopt style
