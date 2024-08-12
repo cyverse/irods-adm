@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+
+"""This program lists iRODS data objects. See help for details."""
+
+
+import argparse
+from argparse import ArgumentParser
+import os
+from os import environ, path
+import sys
+import textwrap
+from typing import List
+
+from irods.column import Criterion
+from irods.models import Collection, DataObject
+from irods.session import iRODSSession
+
+VERSION = 1
+
+_DEFAULT_IRODS_ENVIRONMENT_FILE = "~/.irods/irods/environment.json"
+
+_COPYRIGHT = (
+    "© 2024, The Arizona Board of Regents on behalf of The University of Arizona. For license"
+    " information, see https://cyverse.org/license.")
+
+_HELP_DESC = (
+    "This program lists all data objects on stdout. The absolute logical path of each data object"
+    " is output. It assumes the caller has an authenticated iRODS session in the execution"
+    " environment.")
+_HELP_ENV_FILE = "the IRODS environment file path (default $IRODS_ENVIRONMENT_FILE)"
+_HELP_NUL = (
+    "indicates that the entries in the output should be separated by NULs instead of line feeds")
+_HELP_RESC = "limits the listed data objects to those that have a replica on this storage resource"
+
+_HELP_IRODS_ENVIRONMENT_FILE = (
+    'provide the default path to the iRODS environment file (default'
+    ' "~/.irods/irods_environment.json")')
+
+
+def _fmt_envvar_help(var, desc, width):
+    offset = ' ' * 2
+    initial_indent = ' ' * 2
+    subsequent_indent = f"{initial_indent}{' ' * len(var)}{offset}"
+    lines = textwrap.wrap(
+        f"{var}{offset}{desc}",
+        width=width,
+        initial_indent=initial_indent,
+        subsequent_indent=subsequent_indent)
+    return '\n'.join(lines)
+
+
+def _mk_help_epilog(width):
+    copyright_text = "\n".join(textwrap.wrap(_COPYRIGHT, width=width))
+    return (
+        f'environment variables:\n'
+        f'{_fmt_envvar_help("IRODS_ENVIRONMENT_FILE", _HELP_IRODS_ENVIRONMENT_FILE, width)}\n'
+        f'\n'
+        f'{copyright_text}\n'
+        f'\n'
+        f'%(prog)s {VERSION}')
+
+
+def _mk_default_env_file():
+    return environ.get("IRODS_ENVIRONMENT_FILE", path.expanduser(_DEFAULT_IRODS_ENVIRONMENT_FILE))
+
+
+def _resolve_opts(args, display_width):
+    parser = ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description='\n'.join(textwrap.wrap(_HELP_DESC, width=display_width)),
+        epilog=_mk_help_epilog(display_width))
+    parser.add_argument("-v", "--version", action='version', version=f"%(prog)s {VERSION}")
+    parser.add_argument(
+        "-0", "--nul",
+        action='store_const',
+        dest='line_sep',
+        const="\0",
+        default="\n",
+        help=_HELP_NUL)
+    parser.add_argument("-E", "--env-file", default=_mk_default_env_file(), help=_HELP_ENV_FILE)
+    parser.add_argument("-R", "--resc", help=_HELP_RESC)
+    return parser.parse_args(args)
+
+
+def main(args: List[str]) -> None:
+    """
+    This is the entrypoint.
+
+    Params:
+        args  these are the command line arguments
+    """
+    term_wid, _ = os.get_terminal_size()
+    opts = _resolve_opts(args, term_wid)
+    with iRODSSession(irods_env_file=opts.env_file) as irods:
+        query = irods.query(Collection.name, DataObject.name)
+        if opts.resc:
+            query = query.filter(Criterion('=', DataObject.resource_name, opts.resc))
+        for result in query:
+            print(f'{result[Collection.name]}/{result[DataObject.name]}', end=opts.line_sep)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
