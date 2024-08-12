@@ -7,6 +7,7 @@ import argparse
 from argparse import ArgumentParser
 import os
 from os import environ, path
+import shutil
 import sys
 import textwrap
 from typing import List
@@ -89,7 +90,7 @@ def main(args: List[str]) -> None:
     Params:
         args  these are the command line arguments
     """
-    term_wid, _ = os.get_terminal_size()
+    term_wid, _ = shutil.get_terminal_size()
     opts = _resolve_opts(args, term_wid)
     with iRODSSession(irods_env_file=opts.env_file) as irods:
         query = irods.query(Collection.name, DataObject.name)
