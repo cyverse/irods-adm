@@ -59,7 +59,7 @@ main() {
 		case "$1" in
 		-h | --help)
 			show_help
-			exit 0
+			return 0
 			;;
 		-J | --jobs)
 			jobs="$2"
@@ -71,7 +71,7 @@ main() {
 			;;
 		-v | --version)
 			show_version
-			exit 0
+			return 0
 			;;
 		--)
 			shift
