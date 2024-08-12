@@ -5,7 +5,6 @@
 
 import argparse
 from argparse import ArgumentParser
-import os
 from os import environ, path
 import shutil
 import sys
