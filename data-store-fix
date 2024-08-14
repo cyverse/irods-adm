@@ -348,14 +348,6 @@ CREATE INDEX idx_data_uuid_probs ON data_uuid_probs(data_id);
 EOF
 }
 
-inject_heading() {
-	local title="$1"
-
-	inject_debug_quiet on
-	printf $'\pset title \'%s\'\n' "$title"
-	inject_debug_quiet off
-}
-
 inject_debug_msg() {
 	local msg="$1"
 
@@ -373,6 +365,14 @@ inject_debug_stmt() {
 	if [[ -n "${DEBUG-}" ]]; then
 		printf '%s\n' "$stmt"
 	fi
+}
+
+inject_heading() {
+	local title="$1"
+
+	inject_debug_quiet on
+	printf $'\pset title \'%s\'\n' "$title"
+	inject_debug_quiet off
 }
 
 inject_debug_quiet() {
