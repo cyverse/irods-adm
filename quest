@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Usage:
+#  quest FMT
+#
+# Arguments:
+#  FMT  the iquest output format string
+#
+# This program makes iquest easier to use. It allows queries to be passed by
+# stdin, and it when there are no results, it returns nothing instead of
+# `CAT_NO_ROWS_FOUND`.
+
+set -o errexit -o nounset
+
+filter_no_results() {
+
+	local firstLine
+	IFS= read -r firstLine
+
+	if [[ -z "$firstLine" ]]; then
+		return 1
+	fi
+	if [[ "$firstLine" =~ ^CAT_NO_ROWS_FOUND: ]]; then
+		return 0
+	fi
+
+	echo "$firstLine"
+	cat
+}
+
+
+main() {
+	local fmt="$1"
+
+	local query
+	query="$(cat)"
+
+	iquest --no-page "$fmt"  "${query//$'\t'/ }" | filter_no_results
+}
+
+main "$@"

@@ -19,9 +19,12 @@
 
 set -o errexit -o nounset -o pipefail
 
-declare -A ObjForChksum RescOf ReplOf
+EXEC_DIR="$(dirname "$(realpath --canonicalize-existing "$@")")"
+readonly EXEC_DIR
 
 readonly CHKSUM_CHUNK_LEN=500
+
+declare -A ObjForChksum RescOf ReplOf
 
 main() {
 	printf 'Looking up checkums\n' >&2
@@ -97,7 +100,7 @@ find_copies() {
 			'select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH where DATA_CHECKSUM in (%s)\n' \
 			"$chksumList"
 
-		quest $'%s\t%s\t%s' <<< "$query"
+		"$EXEC_DIR"/quest $'%s\t%s\t%s' <<< "$query"
 	done
 }
 
@@ -130,7 +133,7 @@ retrieve_chksum_and_loc() {
 	local collPath="$1"
 	local dataName="$2"
 
-	quest $'%s\t%s\t%s' <<EOF
+	"$EXEC_DIR"/quest $'%s\t%s\t%s' <<EOF
 select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH
 where COLL_NAME = '$collPath' and DATA_NAME = '$dataName'
 EOF
@@ -161,15 +164,6 @@ mk_query_list() {
 	local elmts=("$@")
 
 	printf $'\'%s\'\n' "${elmts[@]}" | paste --serial --delimiter=,
-}
-
-quest() {
-	local fmt="$1"
-
-	local query
-	query="$(cat)"
-
-	iquest --no-page "$fmt" "${query//$'\t'/ }" | sed '/^CAT_NO_ROWS_FOUND: /d'
 }
 
 main "$@"
