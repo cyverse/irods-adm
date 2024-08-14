@@ -62,8 +62,12 @@ readonly DATA_TABLE_HEADING='Data Object Repair Attempts'
 readonly DEFAULT_AGE=0
 readonly MAX_LOG_SIZE=12582912  # 12 MiB
 
-EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
-readonly EXEC_NAME
+EXEC_PATH="$(realpath --canonicalize-existing "$0")"
+readonly EXEC_PATH
+
+EXEC_DIR="$(dirname "$EXEC_PATH")"
+EXEC_NAME="$(basename "$EXEC_PATH")"
+readonly EXEC_DIR EXEC_NAME
 
 declare DEBUG
 
@@ -399,6 +403,8 @@ fix_problems() {
 	done
 }
 
+
+
 fix_collection_problems() {
 	pass_hdr_thru
 
@@ -473,8 +479,6 @@ fix_object_problems() {
 		: $(( ObjCnt++ ))
 	done
 }
-
-
 
 complete_fix_coll() {
 	local funcName="$1"
@@ -552,7 +556,13 @@ process_chksum_issue() {
 
 		if [[ "$err" =~ 'does not exist' ]]; then
 			printf '%s' "${issue/%  /👻 }"
-		elif (( retCode == 0 )) && [[ -z "$err" ]]; then
+			return
+		elif [[ "$err" =~ HIERARCHY_ERROR ]]; then
+			err="$(fix_archive_chksum "$repl" "$obj")"
+			retCode=$?
+		fi
+
+		if (( retCode == 0 )) && [[ -z "$err" ]]; then
 			printf '%s' "${issue/%  /✓ }"
 		else
 			if [[ -n "$err" ]]; then
@@ -565,6 +575,58 @@ process_chksum_issue() {
 	else
 		printf '%s' "$issue"
 	fi
+}
+
+fix_archive_chksum() {
+	local repl="$1"
+	local dataPath="$2"
+
+	local collPath dataName
+	collPath="$(dirname "$dataPath")"
+	dataName="$(basename "$dataPath")"
+
+	local parentContext
+	parentContext="$(get_parent_resc_context "$repl" "$collPath" "$dataName")"
+
+	if [[ "$parentContext" != archive ]]; then
+		printf 'Replica %s of %s is not stored in an archival resource\n' "$repl" "$dataPath" >&2
+		return 1
+	fi
+
+	local chksum
+	chksum="$(get_sibling_chksum "$collPath" "$dataName")"
+
+	if [[ -z "$chksum" ]]; then
+		printf 'Cannot copy checksum from other replica to archival replica %s of %s\n' \
+				"$repl" "$dataPath" \
+			>&2
+
+		return 1
+	fi
+
+	iadmin modrepl logical_path "$dataPath" replica_number "$repl" DATA_CHECKSUM "$chksum" \
+		> /dev/null
+}
+
+get_parent_resc_context() {
+	local repl="$1"
+	local collPath="$2"
+	local dataName="$3"
+
+	"$EXEC_DIR"/quest %s <<EOF
+select RESC_PARENT_CONTEXT
+where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_REPL_NUM = '$repl'
+EOF
+}
+
+get_sibling_chksum() {
+	local collPath="$1"
+	local dataName="$2"
+
+	"$EXEC_DIR"/quest %s <<EOF
+select DATA_CHECKSUM
+where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_CHECKSUM != ''
+EOF
 }
 
 process_perm_issue() {
