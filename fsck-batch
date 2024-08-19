@@ -16,9 +16,13 @@ Parameters:
 
 Options:
  -h, --help           display help text and exit
+ -H, --host HOST      connect to the ICAT's DBMS on the host HOST instead of the
+                      PostgreSQL default
  -J, --jobs N         perform N checks simultaneously, default is the number of
                       CPUs
  -R, --resource RESC  only check replicas on the storage resource RESC
+ -U, --user USER      authorize the DBMS connection as user USER instead of the
+                      default
  -v, --version        display version and exit
 
 Summary:
@@ -33,7 +37,17 @@ will be logged per line.
 \`CLASS-BASE.bad_chksum\` and \`CLASS-BASE.bad_size\` file entries have the form
 '<rescource hierarchy> <data object path>'.
 
-© 2021, The Arizona Board of Regents on behalf of The University of Arizona. For
+Environment Variables:
+ PGHOST  the default PostgreSQL host
+ PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection
+
+Prerequisites:
+ 1) iRODS 4.2.8 or later
+ 2) The user must be initialized with iRODS as an admin user.
+ 3) The user must be able to connect to the ICAT DB without providing a
+    password.
+
+© 2024, The Arizona Board of Regents on behalf of The University of Arizona. For
 license information, see https://cyverse.org/license.
 EOF
 }
@@ -41,6 +55,8 @@ EOF
 readonly VERSION=5
 
 set -o errexit -o nounset -o pipefail
+
+export PGHOST PGUSER
 
 EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly EXEC_NAME
@@ -61,12 +77,20 @@ main() {
 			show_help
 			return 0
 			;;
+		-H | --host)
+			PGHOST="$2"
+			shift 2
+			;;
 		-J | --jobs)
 			jobs="$2"
 			shift 2
 			;;
 		-R | --resource)
 			resc="$2"
+			shift 2
+			;;
+		-U | --user)
+			PGUSER="$2"
 			shift 2
 			;;
 		-v | --version)
@@ -107,7 +131,12 @@ main() {
 # Output:
 #   The formatted arguments
 format_opts() {
-	getopt --name "$EXEC_NAME" --options hJ:R:v --longoptions help,jobs:,resource:,version -- "$@"
+	getopt \
+		--name "$EXEC_NAME" \
+		--options hH:J:R:U:v \
+		--longoptions help,host:,jobs:,resource:,user:,version \
+		-- \
+		"$@"
 }
 
 log() {
@@ -132,7 +161,8 @@ log() {
 #            resource
 # Output:
 #  To stdout, it writes one line per replica. Each line as the form
-#  `<size> <checksum> <resource hierarchy> <file path>`.
+#  `<size>\t<checksum>\t<storage resource name>\t<file path>`. Each line is NUL
+#  terminated.
 GET_CAT_INFO() {
 	local dataObj="$1"
 	local rescName="${2-}"
@@ -141,15 +171,33 @@ GET_CAT_INFO() {
 	collName="$(dirname "$dataObj")"
 	dataName="$(basename "$dataObj")"
 
-	local query="
-		select DATA_SIZE, DATA_CHECKSUM, DATA_RESC_HIER, DATA_PATH
-		where COLL_NAME = '$collName' and DATA_NAME = '$dataName'"
+	query_icat() {
+		local collPath="$1"
+		local dataName="$2"
+		local rescName="$3"
 
-	if [[ -n "$rescName" ]]; then
-		query+=" and DATA_RESC_NAME = '$rescName'"
-	fi
+		psql --no-align --quiet --record-separator-zero --tuples-only --field-separator=$'\t' ICAT \
+<<EOF
+SELECT d.data_size, d.data_checksum, r.resc_name, d.data_path
+FROM r_data_main AS d JOIN r_resc_main AS r ON r.resc_id = d.resc_id
+WHERE d.data_name = '$dataName'
+	AND d.coll_id = (SELECT coll_id FROM r_coll_main WHERE coll_name = '$collPath')
+	AND ($(inject_resc_cond r "$rescName"))
+EOF
+	}
 
-	iquest '%s %s %s %s' "$query" | sed '/CAT_NO_ROWS_FOUND/d'
+	inject_resc_cond() {
+		local rescTab="$1"
+		local rescName="$2"
+
+		if [[ -n "$rescName" ]]; then
+			printf $'%s.resc_name = \'%s\'' "$rescTab" "$rescName"
+		else
+			printf 'TRUE'
+		fi
+	}
+
+	query_icat "$collName" "$dataName" "$rescName"
 }
 export -f GET_CAT_INFO
 
@@ -183,15 +231,15 @@ CHECK_OBJ() {
 
 	local catInfo
 	{
-		readarray -t catInfo < <(GET_CAT_INFO "$objPath" "$resc")
+		readarray -d '' catInfo < <(GET_CAT_INFO "$objPath" "$resc")
 	} 2>&1
 
 	for replInfo in "${catInfo[@]}"; do
-		local replSize replChksum rescHier filePath
-		read -r replSize replChksum rescHier filePath <<<"$replInfo"
+		local replSize replChksum rescName filePath
+		IFS=$'\t' read -r replSize replChksum rescName filePath <<<"$replInfo"
 
 		local storeHost
-		storeHost="$(iquest '%s' "select RESC_LOC where RESC_NAME = '${rescHier##*;}'")"
+		storeHost="$(iquest '%s' "select RESC_LOC where RESC_NAME = '$rescName'")"
 
 		local fileSize fileChksum
 		read -r fileSize fileChksum < <(GET_STORE_INFO "$storeHost" "$filePath")
@@ -204,7 +252,7 @@ CHECK_OBJ() {
 		fi
 
 		if [[ -n "$reason" ]]; then
-			printf '%s %s %s\n' "$reason" "$rescHier" "$objPath"
+			printf '%s %s %s\n' "$reason" "$rescName" "$objPath"
 		fi
 	done 2>&1
 
