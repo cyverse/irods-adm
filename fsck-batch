@@ -70,7 +70,7 @@ main() {
 			shift 2
 			;;
 		-v | --version)
-			show_version
+			printf '%s\n' "$VERSION"
 			return 0
 			;;
 		--)
@@ -122,10 +122,6 @@ log() {
 			printf '%s %s\n' "$reason" "$entry" >> "$CLASS_BASE".errors
 		fi
 	done
-}
-
-show_version() {
-	printf '%s\n' "$VERSION"
 }
 
 # For a given data object, this fuction retrieves the size, checksum, resource,
