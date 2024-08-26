@@ -238,7 +238,7 @@ CHECK_OBJ() {
 
 	for replInfo in "${catInfo[@]}"; do
 		local replSize replChksum rescName filePath
-		IFS=$'\t' read -r replSize replChksum rescName filePath <<<"$replInfo"
+		IFS=$'\t' read -r -d '' replSize replChksum rescName filePath <<<"$replInfo"
 
 		local storeHost
 		storeHost="$(iquest '%s' "select RESC_LOC where RESC_NAME = '$rescName'")"
