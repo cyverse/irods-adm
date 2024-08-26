@@ -263,6 +263,12 @@ split_out_conn_errs() {
 	local cnt=0
 
 	: $((cnt += $(split_out_tool_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$classFile")))
+
+	local copyCnt
+	copyCnt="$(split_out_tool_class
+		"$errorsFile" -27110 'SYS_COPY_LEN_ERR, Connection timed out' "$classFile")"
+
+	: $((cnt += copyCnt))
 	: $((cnt += $(split_out_tool_class "$errorsFile" -38000 SYS_AGENT_INIT_ERR "$classFile")))
 	: $((cnt += $(split_out_tool_class "$errorsFile" -115000 SYS_SOCK_READ_TIMEDOUT "$classFile")))
 
