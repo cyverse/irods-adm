@@ -115,13 +115,13 @@ main() {
 
 	local classBase="$1"
 
-	ParallelOpts=(--eta --no-notice --null --max-args=1)
+	local parallelOpts=(--eta --no-notice --null --max-args=1)
 
 	if [[ -n "${jobs-}" ]]; then
-		ParallelOpts+=(--jobs="$jobs")
+		parallelOpts+=(--jobs="$jobs")
 	fi
 
-	parallel "${ParallelOpts[@]}" CHECK_OBJ "${resc-}" | log "$classBase"
+	parallel "${parallelOpts[@]}" CHECK_OBJ "${resc-}" | log "$classBase"
 }
 
 # formats the command line arguments for getopt style
