@@ -216,15 +216,16 @@ GET_STORE_INFO() {
 	local storeHost="$1"
 	local filePath="$2"
 
+	# NOTE: The fd redirection gymanistics is to silence TACC's greeting message
 	#shellcheck disable=SC2087
-	ssh -q -t "$storeHost" <<EOSSH
-if ! size="\$(stat --format '%s' '$filePath' 2> /dev/null)" \\
-	|| ! chksum="\$(md5sum '$filePath' 2> /dev/null)"
+	ssh -q -t "$storeHost" 2>&1 > /dev/null <<EOSSH
+if ! size="\$(sudo --user=irods stat --format=%s '$filePath' 2> /dev/null)" \
+	|| ! chksum="\$(sudo --user=irods md5sum '$filePath' 2> /dev/null)"
 then
 	exit 1
 fi
 
-printf '%s %s\n' "\$size" "\${chksum%% *}"
+printf '%s %s\n' "\$size" "\${chksum%% *}" >&2
 EOSSH
 }
 export -f GET_STORE_INFO
@@ -240,7 +241,7 @@ CHECK_OBJ() {
 
 	for replInfo in "${catInfo[@]}"; do
 		local replSize replChksum rescName filePath
-		IFS=$'\t' read -r -d '' replSize replChksum rescName filePath <<<"$replInfo"
+		IFS=$'\t' read -r -d '' replSize replChksum rescName filePath < <(printf '%s' "$replInfo")
 
 		local storeHost
 		storeHost="$(iquest '%s' "select RESC_LOC where RESC_NAME = '$rescName'")"
