@@ -123,7 +123,7 @@ main() {
 		parallelOpts+=(--jobs="$jobs")
 	fi
 
-	parallel "${parallelOpts[@]}" CHECK_OBJ "${resc-}" | log "$classBase"
+	parallel "${parallelOpts[@]}" CHECK_OBJ "${resc-''}" | log "$classBase"
 }
 
 # formats the command line arguments for getopt style
