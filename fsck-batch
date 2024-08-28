@@ -110,6 +110,8 @@ main() {
 
 	if (( $# < 1 )); then
 		show_help >&2
+		printf '\n' >&2
+		printf 'The base name for the error files needs to be provided.\n' >&2
 		return 1
 	fi
 
