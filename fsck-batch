@@ -155,10 +155,12 @@ log() {
 	while read -r reason entry; do
 		if [[ "$reason" == Completed ]]; then
 			printf 'Completed %s\n' "$entry"
-		elif [[ "$reason" == size ]]; then
-			printf '%s\n' "$entry" >> "$classBase".bad_size
 		elif [[ "$reason" == checksum ]]; then
 			printf '%s\n' "$entry" >> "$classBase".bad_chksum
+		elif [[ "$reason" == missing ]]; then
+			printf '%s\n' "$entry" >> "$classBase".missing
+		elif [[ "$reason" == size ]]; then
+			printf '%s\n' "$entry" >> "$classBase".bad_size
 		else
 			printf '%s %s\n' "$reason" "$entry" >> "$classBase".errors
 		fi
@@ -259,7 +261,9 @@ CHECK_OBJ() {
 		read -r fileSize fileChksum < <(GET_STORE_INFO "$storeHost" "$filePath")
 
 		local reason
-		if [[ "$replSize" != "$fileSize" ]]; then
+		if [[ -z "$fileSize" ]] || [[ -z "$fileChksum" ]]; then
+			reason=missing
+		elif [[ "$replSize" != "$fileSize" ]]; then
 			reason=size
 		elif [[ "$replChksum" != "$fileChksum" ]]; then
 			reason=checksum
