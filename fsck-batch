@@ -242,9 +242,6 @@ CHECK_OBJ() {
 	local resc="$1"
 	local objPath="$2"
 
-	local escPath
-	escPath="$(printf '%s' "$objPath" | sed --null-data 's/\n/\\n/g')"
-
 	local catInfo
 	{
 		readarray -d '' catInfo < <(GET_CAT_INFO "$objPath" "$resc")
@@ -270,11 +267,11 @@ CHECK_OBJ() {
 		fi
 
 		if [[ -n "$reason" ]]; then
-			printf '%s\t%s\t%s\n' "$reason" "$rescName" "$escPath"
+			printf '%s\t%s\t%q\n' "$reason" "$rescName" "$objPath"
 		fi
 	done 2>&1
 
-	printf 'Completed %s\n' "$escPath"
+	printf 'Completed %q\n' "objPath"
 }
 export -f CHECK_OBJ
 
