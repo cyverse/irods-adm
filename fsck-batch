@@ -271,7 +271,7 @@ CHECK_OBJ() {
 		fi
 	done 2>&1
 
-	printf 'Completed %q\n' "objPath"
+	printf 'Completed %q\n' "$objPath"
 }
 export -f CHECK_OBJ
 
