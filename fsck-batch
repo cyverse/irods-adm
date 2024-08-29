@@ -222,7 +222,7 @@ GET_STORE_INFO() {
 if size="\$(sudo --user=irods stat --format=%s '$filePath' 2> /dev/null)" \
 	&& chksum="\$(sudo --user=irods md5sum '$filePath' 2> /dev/null)"
 then
-	printf '%s %s\n' "\$size" "\${chksum%% *}" >&2
+	printf '%s\t%s\n' "\$size" "\${chksum%% *}" >&2
 fi
 EOSSH
 }
@@ -231,6 +231,9 @@ export -f GET_STORE_INFO
 CHECK_OBJ() {
 	local resc="$1"
 	local objPath="$2"
+
+	local escPath
+	escPath="$(printf '%s' "$objPath" | sed --null-data 's/\n/\\n/g')"
 
 	local catInfo
 	{
@@ -255,11 +258,11 @@ CHECK_OBJ() {
 		fi
 
 		if [[ -n "$reason" ]]; then
-			printf '%s %s %s\n' "$reason" "$rescName" "$objPath"
+			printf '%s\t%s\t%s\n' "$reason" "$rescName" "$escPath"
 		fi
 	done 2>&1
 
-	printf 'Completed %s\n' "$objPath"
+	printf 'Completed %s\n' "$escPath"
 }
 export -f CHECK_OBJ
 
