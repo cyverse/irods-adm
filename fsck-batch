@@ -117,13 +117,7 @@ main() {
 
 	local classBase="$1"
 
-	local parallelOpts=(--eta --no-notice --null --max-args=1)
-
-	if [[ -n "${jobs-}" ]]; then
-		parallelOpts+=(--jobs="$jobs")
-	fi
-
-	parallel "${parallelOpts[@]}" CHECK_OBJ "${resc-''}" | log "$classBase"
+	fsck "$classBase" "${resc-''}" "${jobs-''}"
 }
 
 # formats the command line arguments for getopt style
@@ -139,6 +133,20 @@ format_opts() {
 		--longoptions help,host:,jobs:,resource:,user:,version \
 		-- \
 		"$@"
+}
+
+fsck() {
+	local classBase="$1"
+	local resc="$2"
+	local jobs="$3"
+
+	local parallelOpts=(--eta --no-notice --null --max-args=1)
+
+	if [[ -n "$jobs" ]]; then
+		parallelOpts+=(--jobs="$jobs")
+	fi
+
+	parallel "${parallelOpts[@]}" CHECK_OBJ "$resc" | log "$classBase"
 }
 
 log() {
