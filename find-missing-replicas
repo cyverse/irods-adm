@@ -12,6 +12,9 @@
 
 set -o nounset -o errexit -o pipefail
 
+EXEC_DIR="$(dirname "$(realpath --canonicalize-existing "$0")")"
+readonly EXEC_DIR
+
 main() {
 	local dataPath
 	while IFS= read -r dataPath; do
@@ -49,8 +52,7 @@ find_real_path() {
 	local expChksum="$4"
 
 	# shellcheck disable=SC2087
-	ssh -q -t "$server" \
-<<EOF
+	ssh -q -t "$server" <<EOF
 check() {
 	local root="\$1"
 
@@ -88,22 +90,16 @@ EOF
 get_physical_attributes() {
 	local dataPath="$1"
 
-	local collPath
-	collPath="$(dirname "$dataPath")"
-
-	local dataName
-	dataName="$(basename "$dataPath")"
-
-	local query="select DATA_RESC_HIER, DATA_SIZE, DATA_CHECKSUM, DATA_PATH
-						where COLL_NAME = '$collPath' and DATA_NAME = '$dataName'"
-
-	quest $'"%s"\t"%s"\t"%s"\t"%s"' "$query"
+	"$EXEC_DIR"/quest $'"%s"\t"%s"\t"%s"\t"%s"' <<EOF
+select DATA_RESC_HIER, DATA_SIZE, DATA_CHECKSUM, DATA_PATH
+where COLL_NAME = '$(dirname "$dataPath")' and DATA_NAME = '$(basename "$dataPath")'
+EOF
 }
 
 get_server() {
 	local resc="$1"
 
-	quest '%s' "select RESC_LOC where RESC_NAME = '$resc'"
+	"$EXEC_DIR"/quest %s <<<"select RESC_LOC where RESC_NAME = '$resc'"
 }
 
 restore_path() {
@@ -116,20 +112,6 @@ restore_path() {
 <<EOF
 mv --no-clobber "$foundPath" "$missingPath"
 EOF
-}
-
-quest() {
-	local fmt="$1"
-	local query="$2"
-
-	local result
-	result="$(iquest --no-page "$fmt" "$(trim_all "$query")")"
-
-	if [[ "$result" =~ ^CAT_NO_ROWS_FOUND: ]]; then
-		return 1
-	fi
-
-	echo "$result"
 }
 
 trim_all() {
