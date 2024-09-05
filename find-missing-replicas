@@ -41,6 +41,10 @@ main() {
 				continue
 			fi
 
+			if [[ "$foundPath" == "$formerFilePath" ]]; then
+				continue
+			fi
+
 			if ! restore_path "$server" "$foundPath" "$formerFilePath"; then
 				printf 'Cannot restore physical file for %s: found %s\n' "$dataPath" "$foundPath" >&2
 				continue
