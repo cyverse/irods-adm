@@ -19,7 +19,7 @@
 
 set -o errexit -o nounset -o pipefail
 
-EXEC_DIR="$(dirname "$(realpath --canonicalize-existing "$@")")"
+EXEC_DIR="$(dirname "$(realpath --canonicalize-existing "$0")")"
 readonly EXEC_DIR
 
 readonly CHKSUM_CHUNK_LEN=500
