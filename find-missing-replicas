@@ -8,7 +8,7 @@
 # This script attempts to locate physical files for replicas that have bad
 # paths. It reads a list of data objects from stdin whose only replica has a bad
 # path. Each data object is specified by its absolute, logical path, one per
-# line. The script assumes each data object has only one replica.
+# line.
 
 set -o nounset -o errexit -o pipefail
 
@@ -20,28 +20,32 @@ main() {
 	while IFS= read -r dataPath; do
 		printf '%s\n' "$dataPath"
 
-		local rescHier size chksum formerFilePath
-		IFS=$'\t' read -r rescHier size chksum formerFilePath \
-			<<<"$(get_physical_attributes "$dataPath")"
+		local attrs_per_repl
+		readarray attrs_per_repl < <(get_physical_attributes "$dataPath")
 
-		rescHier="${rescHier//\"/}"
-		size="${size//\"/}"
-		chksum="${chksum//\"/}"
-		formerFilePath="${formerFilePath//\"/}"
+		local attrs
+		for attrs in "${attrs_per_repl[@]}"; do
+			local rescHier size chksum formerFilePath
+			IFS=$'\t' read -r rescHier size chksum formerFilePath <<<"$attrs"
+			rescHier="${rescHier//\"/}"
+			size="${size//\"/}"
+			chksum="${chksum//\"/}"
+			formerFilePath="${formerFilePath//\"/}"
 
-		local server
-		server="$(get_server "${rescHier##*;}")"
+			local server
+			server="$(get_server "${rescHier##*;}")"
 
-		local foundPath
-		if ! foundPath="$(find_real_path "$server" "$formerFilePath" "$size" "$chksum")"; then
-			printf 'Cannot locate physical file for %s\n' "$dataPath" >&2
-			continue
-		fi
+			local foundPath
+			if ! foundPath="$(find_real_path "$server" "$formerFilePath" "$size" "$chksum")"; then
+				printf 'Cannot locate physical file for %s\n' "$dataPath" >&2
+				continue
+			fi
 
-		if ! restore_path "$server" "$foundPath" "$formerFilePath"; then
-			printf 'Cannot restore physical file for %s: found %s\n' "$dataPath" "$foundPath" >&2
-			continue
-		fi
+			if ! restore_path "$server" "$foundPath" "$formerFilePath"; then
+				printf 'Cannot restore physical file for %s: found %s\n' "$dataPath" "$foundPath" >&2
+				continue
+			fi
+		done
 	done 2>&1
 }
 
