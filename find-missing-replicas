@@ -37,7 +37,7 @@ main() {
 
 			local foundPath
 			if ! foundPath="$(find_real_path "$server" "$formerFilePath" "$size" "$chksum")"; then
-				printf 'Cannot locate physical file for %s\n' "$dataPath" >&2
+				printf '\tCannot locate physical file in %s for %s\n' "$rescHier" "$dataPath" >&2
 				continue
 			fi
 
@@ -46,8 +46,9 @@ main() {
 			fi
 
 			if ! restore_path "$server" "$foundPath" "$formerFilePath"; then
-				printf 'Cannot restore physical file for %s: found %s\n' "$dataPath" "$foundPath" >&2
-				continue
+				printf '\tCannot restore physical file in %s for %s: found %s\n' \
+						"$rescHier" "$dataPath" "$foundPath" \
+					>&2
 			fi
 		done
 	done 2>&1
@@ -86,7 +87,7 @@ for candidate in "$pathRoot" "\$orphanRoot" "\$replicaRoot"; do
 	if path="\$(check "\$candidate")"; then
 		break
 	fi
-fi
+done
 
 if [[ -n "\$path" ]]; then
 	echo "\$path"
