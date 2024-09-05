@@ -78,8 +78,10 @@ check() {
 orphanRoot="${pathRoot/home/orphan/home}"
 replicaRoot="${pathRoot/home/replica/home}"
 
-if ! path="\$(check "\$orphanRoot")"; then
-	path="\$(check "\$replicaRoot")"
+for candidate in "$pathRoot" "\$orphanRoot" "\$replicaRoot"; do
+	if path="\$(check "\$candidate")"; then
+		break
+	fi
 fi
 
 if [[ -n "\$path" ]]; then
