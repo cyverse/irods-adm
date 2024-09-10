@@ -62,7 +62,7 @@ sync_from_dbms() {
 filter_rsync_msgs() {
 	/usr/bin/awk --assign=DB_BASENAME="$DB_BASENAME" --file - <(/usr/bin/cat) <<'EOF'
 $0 ~ DB_BASENAME "[0-9]+/$" {
-	coll = gensub(".*/(" DB_BASENAME "[0-9]+)/", "\\1", 1, $0)
+	coll = gensub(".*(" DB_BASENAME "[0-9]+)/", "\\1", 1, $0)
 	if ($1 == "deleting") {
 		printf "Deleted old backup %s\n", coll
 	} else {
