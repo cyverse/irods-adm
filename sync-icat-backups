@@ -47,7 +47,7 @@ main() {
 indent() {
 	local line
 	while IFS= read -r line; do
-		printf '\t%s\n' "$line"
+		printf '\t• %s\n' "$line"
 	done
 }
 
