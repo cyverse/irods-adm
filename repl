@@ -272,12 +272,16 @@ replicate() {
 		return 0
 	fi
 
+	local totRepl
 	if (( maxTransThreads > 0 )); then
-		replicate_threaded \
-			"$maxTransThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$ObjCache"
+		totRepl="$(replicate_threaded \
+			"$maxTransThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$ObjCache")"
 	else
-		replicate_streaming "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$ObjCache"
+		totRepl="$(replicate_streaming \
+			"$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$ObjCache")"
 	fi
+
+	printf 'Replicated %s data objects\n' "$totRepl" >&2
 }
 
 finish() {
@@ -439,8 +443,9 @@ replicate_streaming() {
 				< "$cohortList" \
 				2>&"$LOG" \
 			| tee >(cat >&"$LOG") \
-			| track_prog 0 "$totObjs" "$subTotal" \
-			> /dev/null
+			| track_prog 0 "$totObjs" "$subTotal"
+	else
+		echo 0
 	fi
 
 	rm --force "$cohortList"
