@@ -251,7 +251,7 @@ replicate() {
 
 	validate_repl_conds "$procMult" "$srcResc" "$destResc" "$untilTS"
 	prep_logging
-	trap 'finish $?' EXIT
+	trap 'finish "$ObjCache" $?' EXIT
 	ObjCache="$(mktemp)"
 
 	printf 'retrieving data objects to replicate...\n' >&2
@@ -281,10 +281,11 @@ replicate() {
 }
 
 finish() {
-	local exitCode="$1"
+	local objCache="$1"
+	local exitCode="$2"
 
-	if [[ -z "$DEBUG" && -n "${ObjCache-}" ]]; then
-		rm --force "$ObjCache"
+	if [[ -z "$DEBUG" && -n "${objCache-}" ]]; then
+		rm --force "$objCache"
 	fi
 
 	eval "exec 1>&$LOG $LOG>&-"
