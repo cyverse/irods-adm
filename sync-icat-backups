@@ -36,12 +36,40 @@ readonly IRODS_COLL=/iplant/home/ipc_admin/ICAT-backups
 
 readonly NFS_DIR=/nfs_exports/db_backups/ds-db3
 
+readonly MAX_BACKUP_AGE=10
+
+# NOTE: The DBMS primary can failover to the replica, making icat.cyverse.org
+# point to the replica. The replica may not have 10 days worth backups. To
+# prevent backups from being deleted early in this case, old backups are deleted
+# by this script instead of relying on rsync to delete backups.
+
 main() {
+	local backupCutOffDate
+	backupCutOffDate="$(/usr/bin/date --date="$MAX_BACKUP_AGE days ago" +%Y%m%d)"
+
 	/usr/bin/printf 'Syncing backups from DBMS to NFS\n'
 	(sync_from_dbms 2>&1 | indent) || true
+	(delete_old_backups "$backupCutOffDate" 2>&1 | indent) || true
 	/usr/bin/printf '\n'
 	/usr/bin/printf 'Syncing backups from NFS to iRODS\n'
 	(sync_to_irods 2>&1 | indent) || true
+}
+
+delete_old_backups() {
+	local cutOffDate="$1"
+
+	local backups
+	readarray backups < <(find "$NFS_DIR" -mindepth 1 -type d)
+
+	local backup
+	for backup in "${backups[@]}"; do
+		local coll="${backup##*/}"
+
+		if (( ${coll#"$DB_BASENAME"} < cutOffDate )); then
+			rm --force --recursive "$backup"
+			printf 'Deleted old backup %s\n' "$coll"
+		fi
+	done
 }
 
 indent() {
@@ -55,19 +83,14 @@ sync_from_dbms() {
 	local rshCmd="/usr/bin/ssh -q -p $DBMS_SSH_PORT"
 	local src="$DBMS_USER"@"$DBMS_HOST":"$DBMS_DIR"/
 
-	/usr/bin/rsync --archive --delete-delay --verbose --rsh="$rshCmd" "$src" "$NFS_DIR" \
-		| filter_rsync_msgs
+	/usr/bin/rsync --archive --verbose --rsh="$rshCmd" "$src" "$NFS_DIR" | filter_rsync_msgs
 }
 
 filter_rsync_msgs() {
 	/usr/bin/awk --assign=DB_BASENAME="$DB_BASENAME" --file - <(/usr/bin/cat) <<'EOF'
 $0 ~ DB_BASENAME "[0-9]+/$" {
 	coll = gensub(".*(" DB_BASENAME "[0-9]+)/", "\\1", 1, $0)
-	if ($1 == "deleting") {
-		printf "Deleted old backup %s\n", coll
-	} else {
-		printf "Downloaded new backup %s\n", coll
-	}
+	printf "Downloaded new backup %s\n", coll
 }
 EOF
 }
