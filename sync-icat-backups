@@ -65,7 +65,7 @@ delete_old_backups() {
 	for backup in "${backups[@]}"; do
 		local coll="${backup##*/}"
 
-		if (( ${coll#"$DB_BASENAME"} < cutOffDate )); then
+		if (( ${coll#"$DB_BASENAME"} <= cutOffDate )); then
 			rm --force --recursive "$backup"
 			printf 'Deleted old backup %s\n' "$coll"
 		fi
