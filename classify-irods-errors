@@ -208,19 +208,15 @@ classify_tool_errors() {
 	ncCnt="$(split_out_conn_errs "$errorsFile" "$logBase".network)"
 
 	local uCMCnt
-	uCMCnt="$(
-		split_out_tool_class \
-			"$errorsFile" -314000 USER_CHKSUM_MISMATCH "$logBase".chksum_mismatches
-	)"
+	uCMCnt="$(split_out_tool_class \
+		"$errorsFile" -314000 USER_CHKSUM_MISMATCH "$logBase".chksum_mismatches )"
 
 	local uFOEMissingCnt
-	uFOEMissingCnt="$(
-		split_out_tool_class \
-			"$errorsFile" \
-			-510002 \
-			'UNIX_FILE_OPEN_ERR, No such file or directory' \
-			"$logBase".missing_replicas
-	)"
+	uFOEMissingCnt="$(split_out_tool_class \
+		"$errorsFile" \
+		-510002 \
+		'UNIX_FILE_OPEN_ERR, No such file or directory' \
+		"$logBase".missing_replicas )"
 
 	local uFOEFSErrCnt
 	uFOEFSErrCnt="$(split_out_fs_errs "$errorsFile" "$logBase".fs_errors)"
@@ -265,7 +261,7 @@ split_out_conn_errs() {
 	: $((cnt += $(split_out_tool_class "$errorsFile" -4000 SYS_HEADER_READ_LEN_ERR "$classFile")))
 
 	local copyCnt
-	copyCnt="$(split_out_tool_class
+	copyCnt="$(split_out_tool_class \
 		"$errorsFile" -27110 'SYS_COPY_LEN_ERR, Connection timed out' "$classFile")"
 
 	: $((cnt += copyCnt))
@@ -289,8 +285,9 @@ split_out_conn_errs() {
 		"$errorsFile" -305111 'USER_SOCK_CONNECT_ERR, Connection refused' "$classFile")"
 	: $((cnt += connRefuseCnt))
 
-	: $((cnt += \
-	$(split_out_tool_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$classFile")))
+	local connTOCnt
+	connTO="$(split_out_tool_class "$errorsFile" -347000 USER_SOCK_CONNECT_TIMEDOUT "$classFile")"
+	: $((cnt += connTO))
 
 	echo "$cnt"
 }
