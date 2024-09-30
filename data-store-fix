@@ -412,11 +412,7 @@ fix_collection_problems() {
 	trap 'complete_fix_coll "${FUNCNAME[0]-}"; rm_temp_files' EXIT
 	trap 'complete_fix_coll "${FUNCNAME[0]-}"' RETURN
 
-	local permIssue
-	local uuidCnt
-	local owner
-	local createTime
-	local collField
+	local collField createTime permIssue owner uuidCnt
 	while IFS='|' read -r permIssue uuidCnt owner createTime collField; do
 		if [ -z "$collField" ]; then
 			break
