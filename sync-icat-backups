@@ -48,11 +48,11 @@ main() {
 	backupCutOffDate="$(/usr/bin/date --date="$MAX_BACKUP_AGE days ago" +%Y%m%d)"
 
 	/usr/bin/printf 'Syncing backups from DBMS to NFS\n'
-	(sync_from_dbms 2>&1 | indent) || true
-	(delete_old_backups "$backupCutOffDate" 2>&1 | indent) || true
+	sync_from_dbms || true
+	delete_old_backups "$backupCutOffDate" || true
 	/usr/bin/printf '\n'
 	/usr/bin/printf 'Syncing backups from NFS to iRODS\n'
-	(sync_to_irods 2>&1 | indent) || true
+	sync_to_irods || true
 }
 
 delete_old_backups() {
@@ -67,7 +67,7 @@ delete_old_backups() {
 
 		if (( ${coll#"$DB_BASENAME"} <= cutOffDate )); then
 			rm --recursive "$backup" || true
-			printf 'Deleted old backup %s\n' "$coll"
+			printf '• Deleting old backup %s\n' "$coll"
 		fi
 	done
 }
@@ -90,7 +90,7 @@ filter_rsync_msgs() {
 	/usr/bin/awk --assign=DB_BASENAME="$DB_BASENAME" --file - <(/usr/bin/cat) <<'EOF'
 $0 ~ DB_BASENAME "[0-9]+/$" {
 	coll = gensub(".*(" DB_BASENAME "[0-9]+)/", "\\1", 1, $0)
-	printf "Downloaded new backup %s\n", coll
+	printf "• Downloading new backup %s\n", coll
 }
 EOF
 }
@@ -104,12 +104,12 @@ filter_gocmd_msgs() {
 	/usr/bin/awk --assign=DB_BASENAME="$DB_BASENAME" --file - <(/usr/bin/cat) <<'EOF'
 /msg="uploaded a file .*\/toc.dat\\"/ {
 	coll = gensub(".*/(" DB_BASENAME "[0-9]+)/.*", "\\1", 1, $0)
-	printf "Uploaded new backup %s\n", coll
+	printf "• Uploading new backup %s\n", coll
 }
 
 /msg="removing an extra collection / {
 	coll = gensub(".*/(" DB_BASENAME "[0-9]+).*", "\\1", 1, $0)
-	printf "Deleted old backup %s\n", coll
+	printf "• Deleting old backup %s\n", coll
 }
 EOF
 }
