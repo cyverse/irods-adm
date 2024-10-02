@@ -72,13 +72,6 @@ delete_old_backups() {
 	done
 }
 
-indent() {
-	local line
-	while IFS= read -r line; do
-		printf '\t• %s\n' "$line"
-	done
-}
-
 sync_from_dbms() {
 	local rshCmd="/usr/bin/ssh -q -p $DBMS_SSH_PORT"
 	local src="$DBMS_USER"@"$DBMS_HOST":"$DBMS_DIR"/
