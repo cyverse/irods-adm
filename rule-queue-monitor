@@ -9,6 +9,8 @@ It assumes that the iRODS environment has been initialized. It also assumes that
 environment variable SLACK_BOT_TOKEN holds the access token for publishing
 messages, and SLACK_ALERTS_CHANNEL host the "#"-prefixed slack channel receiving
 the message.
+
+It requires the python modules python-irodsclient and slack_sdk.
 """
 
 from datetime import datetime, timedelta, timezone
