@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+"""
+A script for monitoring the iRODS rule queue. When a rule has been in the queue
+at least 24 hours past its scheduled execution time, it publishes a message to
+Slack.
+
+It assumes that the iRODS environment has been initialized. It also assumes that
+environment variable SLACK_BOT_TOKEN holds the access token for publishing
+messages, and SLACK_ALERTS_CHANNEL host the "#"-prefixed slack channel receiving
+the message.
+"""
+
+from datetime import datetime, timedelta, timezone
+import os
+from os import path
+
+from irods.models import RuleExec
+from irods.session import iRODSSession
+
+from slack_sdk import WebClient
+
+_DEFAULT_IRODS_ENV_FILE = "~/.irods/irods_environment.json"
+
+_MAX_LAG_TIME = timedelta(days=1)
+
+
+def _get_lag_time(irods: iRODSSession, now_utc: datetime) -> timedelta:
+    results = irods.query().min(RuleExec.time).execute()
+
+    if len(results):
+        return now_utc - results[0][RuleExec.time].replace(tzinfo=timezone.utc)
+
+    return timedelta.min
+
+
+def _notify_admins(slack: WebClient, channel: str, lag_time: timedelta) -> None:
+    msg = f"The iRODS deferred rule queue is *{lag_time}* behind schedule."
+    fallback = f"The iRODS deferred rule queue is {lag_time} behind schedule."
+
+    slack.chat_postMessage(
+        channel=channel,
+        attachments=[{"color": "warning", "text": msg, "fallback": fallback}])
+
+
+def _main():
+    irods_env_file = path.expanduser(
+        os.environ.get("IRODS_ENVIRONMENT_FILE", _DEFAULT_IRODS_ENV_FILE))
+    slack_token = os.environ["SLACK_BOT_TOKEN"]
+    slack_channel = os.environ["SLACK_ALERTS_CHANNEL"]
+
+    with iRODSSession(irods_env_file=irods_env_file) as irods:
+        lag_time = _get_lag_time(irods, datetime.now(timezone.utc))
+
+    if lag_time > _MAX_LAG_TIME:
+        slack = WebClient(token=slack_token)
+        _notify_admins(slack, slack_channel, lag_time)
+
+
+if __name__ == "__main__":
+    _main()
