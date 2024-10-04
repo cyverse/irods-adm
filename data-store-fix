@@ -60,7 +60,7 @@ export PGHOST PGPORT PGUSER
 readonly COLL_TABLE_HEADING='Collection Repair Attempts'
 readonly DATA_TABLE_HEADING='Data Object Repair Attempts'
 readonly DEFAULT_AGE=0
-readonly MAX_LOG_SIZE=8388608  # 8 MiB
+readonly MAX_LOG_SIZE=4194304  # 4 MiB
 
 EXEC_PATH="$(realpath --canonicalize-existing "$0")"
 readonly EXEC_PATH
@@ -476,6 +476,7 @@ fix_object_problems() {
 		: $(( ObjCnt++ ))
 	done
 }
+
 
 complete_fix_coll() {
 	local funcName="$1"
