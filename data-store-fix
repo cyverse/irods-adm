@@ -414,7 +414,7 @@ fix_collection_problems() {
 
 	local collField createTime permIssue owner uuidCnt
 	while IFS='|' read -r permIssue uuidCnt owner createTime collField; do
-		if [ -z "$collField" ]; then
+		if [[ -z "$collField" ]]; then
 			break
 		fi
 
@@ -445,7 +445,7 @@ fix_object_problems() {
 
 	local permIssue missingChksum uuidCnt owner replField createTime objField
 	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField; do
-		if [ -z "$objField" ]; then
+		if [[ -z "$objField" ]]; then
 			break
 		fi
 
@@ -530,7 +530,7 @@ unescape() {
 
 			escaped=0
 		else
-			if [ "$curChar" = \\ ]; then
+			if [[ "$curChar" == \\ ]]; then
 				escaped=1
 			else
 				entity="$entity$curChar"
@@ -546,7 +546,7 @@ process_chksum_issue() {
 	local repl="$2"
 	local obj="$3"
 
-	if [ "${issue// /}" = t ]; then
+	if [[ "${issue// /}" == t ]]; then
 		local err retCode
 		err="$(ichksum -M --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
 		retCode="$?"
@@ -630,7 +630,7 @@ process_perm_issue() {
 	local issue="$1"
 	local entity="$2"
 
-	if [ "${issue// /}" = t ]; then
+	if [[ "${issue// /}" = t ]]; then
 		local err
 		if err="$(ichmod -M own rodsadmin "$entity" > /dev/null 2>&1)"; then
 			printf '%s' "${issue/%  /✓ }"
@@ -660,7 +660,7 @@ process_uuid_issue() {
 	fi
 
 	local imetaFlag
-	if [ "$entityType" = coll ]; then
+	if [[ "$entityType" == coll ]]; then
 		local imetaFlag=-C
 	else
 		local imetaFlag=-d
