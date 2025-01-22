@@ -149,7 +149,7 @@ format_opts() {
 		-- "$@"
 }
 
-# performs any needed fixes and genertes the report
+# performs any needed fixes and generates the report
 # Arguments:
 #  age  how many days old a collection or data object must be before it will be
 #       considered
@@ -205,7 +205,7 @@ check_existing_instance() {
 }
 
 determine_zone() {
-	iquest '%s' "select ZONE_NAME where ZONE_TYPE = 'local'"
+	"$EXEC_DIR"/quest '%s' <<< "select ZONE_NAME where ZONE_TYPE = 'local'"
 }
 
 find_problems() {
@@ -347,7 +347,7 @@ SELECT DISTINCT d.data_id, COUNT(u.object_id)
 FROM r_data_main AS d LEFT JOIN uuid_attrs AS u ON u.object_id = d.data_id
 WHERE d.modify_ts < '0$cutoffTS'
 GROUP BY d.data_id, d.data_repl_num
-	-- data_repl_num prevents counting uuids for multiple repls in a single count
+	-- data_repl_num prevents counting uuids for multiple replicas in a single count
 HAVING COUNT(u.object_id) != 1;
 CREATE INDEX idx_data_uuid_probs ON data_uuid_probs(data_id);
 EOF
@@ -747,7 +747,7 @@ rm_extra_uuids() {
 	fi
 }
 
-# Retrieve UUIDs for an entity sorted by the metdata's DB Ids
+# Retrieve UUIDs for an entity sorted by the metadata's DB Ids
 get_meta_id_uuid_map() {
 	local entityPath="$1"
 	local imetaFlag="$2"
