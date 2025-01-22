@@ -60,7 +60,7 @@ export PGHOST PGPORT PGUSER
 readonly COLL_TABLE_HEADING='Collection Repair Attempts'
 readonly DATA_TABLE_HEADING='Data Object Repair Attempts'
 readonly DEFAULT_AGE=0
-readonly MAX_LOG_SIZE=4194304  # 4 MiB
+readonly MAX_LOG_MAIL_SIZE=2097152  # 2 MiB
 
 EXEC_PATH="$(realpath --canonicalize-existing "$0")"
 readonly EXEC_PATH
@@ -802,7 +802,7 @@ generate_report() {
 	local fixLogSize
 	fixLogSize="$(stat --format '%s' "$fixLog")"
 
-	if (( fixLogSize > MAX_LOG_SIZE )); then
+	if (( fixLogSize > MAX_LOG_MAIL_SIZE )); then
 		local reportHost
 		reportHost="$(hostname --fqdn)"
 
@@ -821,7 +821,7 @@ generate_report() {
 	local errLogSize
 	errLogSize="$(stat --format '%s' "$errLog")"
 
-	if (( errLogSize > MAX_LOG_SIZE )); then
+	if (( errLogSize > MAX_LOG_MAIL_SIZE )); then
 		local reportHost
 		reportHost="$(hostname --fqdn)"
 
