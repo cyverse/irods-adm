@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python  # pylint: disable=invalid-name
 
-"""
+""" DEPRECATED: We use prometheus to monitor the iRODS deferred rule execution queue.
 A script for monitoring the iRODS rule queue. When a rule has been in the queue
 at least 24 hours past its scheduled execution time, it publishes a message to
 Slack.
