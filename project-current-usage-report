@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # This program generates a report on the amount of public and private data each
-# project has in CyVerseRes.
+# project has in on a given list of root resources.
 
 set -o errexit -o nounset -o pipefail
 
