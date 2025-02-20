@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-# This program generates a report on the amount of public and private data each 
-# project has in CyVerseRes.  
+# This program generates a report on the amount of public and private data each
+# project has in CyVerseRes.
 
 set -o errexit -o nounset -o pipefail
 
@@ -64,7 +64,7 @@ BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 CREATE TEMPORARY TABLE storage_resources (id) ON COMMIT DROP AS
 WITH RECURSIVE resc_hier(resc_id, resc_net) AS (
-	SELECT resc_id, resc_net 
+	SELECT resc_id, resc_net
 		FROM r_resc_main
 		WHERE resc_name IN ($(fmt_sql_list "$rootRescs"))
 	UNION SELECT m.resc_id, m.resc_net
@@ -75,13 +75,13 @@ SELECT resc_id FROM resc_hier;
 CREATE INDEX storage_resources_idx ON storage_resources(id);
 
 
-\\echo Determing project data
+\\echo Determining project data
 
 CREATE TEMPORARY TABLE project_data (project, coll_id, data_id, data_size) ON COMMIT DROP AS
-SELECT 
-	REGEXP_REPLACE(c.coll_name, '/$zone/home/shared/([^/]+).*', E'\\\\1'), 
+SELECT
+	REGEXP_REPLACE(c.coll_name, '/$zone/home/shared/([^/]+).*', E'\\\\1'),
 	d.coll_id,
-	d.data_id, 
+	d.data_id,
 	d.data_size
 FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
 WHERE c.coll_name LIKE '/$zone/home/shared/%'
@@ -119,16 +119,16 @@ CREATE INDEX public_project_data_project_idx ON public_project_data(project);
 DROP TABLE public_objects;
 
 
-\\pset title 'Public and Private Data Volume for Projects'	
+\\pset title 'Public and Private Data Volume for Projects'
 \\echo
 SELECT
 	project AS "Project",
 	ROUND((public_volume / 2^30)::NUMERIC, 3) AS "Public Volume (GiB)",
 	ROUND(((total_volume - public_volume) / 2^30)::NUMERIC, 3) AS "Private Volume (GiB)"
 FROM (
-		SELECT 
-			a.project, 
-			SUM(a.data_size) AS total_volume, 
+		SELECT
+			a.project,
+			SUM(a.data_size) AS total_volume,
 			COALESCE(SUM(p.data_size), 0) AS public_volume
 		FROM project_data AS a LEFT JOIN public_project_data AS p ON p.data_id = a.data_id
 		GROUP BY a.project
