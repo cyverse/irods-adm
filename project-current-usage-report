@@ -2,6 +2,9 @@
 #
 # This program generates a report on the amount of public and private data each
 # project has in on a given list of root resources.
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 set -o errexit -o nounset -o pipefail
 
