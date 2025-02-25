@@ -57,13 +57,13 @@ gen_report() {
 	local rootRescs="$2"
 
 	psql ICAT <<SQL
+\\set QUIET on
 \\pset footer off
-\\timing on
 
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 
-\\echo Determining storage resources
+-- determine storage resources
 
 CREATE TEMPORARY TABLE storage_resources (id) ON COMMIT DROP AS
 WITH RECURSIVE resc_hier(resc_id, resc_net) AS (
@@ -78,7 +78,7 @@ SELECT resc_id FROM resc_hier;
 CREATE INDEX storage_resources_idx ON storage_resources(id);
 
 
-\\echo Determining project collections
+-- determine project collections
 
 CREATE TEMPORARY TABLE project_coll (project, coll_id) ON COMMIT DROP AS
 SELECT REGEXP_REPLACE(coll_name, '/$zone/home/shared/([^/]+).*', E'\\\\1'), coll_id
@@ -88,7 +88,7 @@ FROM r_coll_main WHERE coll_name LIKE '/$zone/home/shared/%'
 CREATE INDEX project_coll_idx ON project_coll(coll_id);
 
 
-\\echo Determining project data
+-- determine project data
 
 CREATE TEMPORARY TABLE project_data (project, coll_id, data_id, data_size) ON COMMIT DROP AS
 SELECT c.project, c.coll_id, d.data_id, d.data_size
@@ -99,7 +99,7 @@ CREATE INDEX project_data_coll_data_idx ON project_data(coll_id, data_id);
 CREATE INDEX project_data_data_idx ON project_data(data_id);
 
 
-\\echo Determining publicly accessible objects
+-- determine publicly accessible objects
 
 CREATE TEMPORARY TABLE public_objects (id) ON COMMIT DROP AS
 SELECT object_id
@@ -109,7 +109,7 @@ WHERE user_id = (SELECT user_id FROM r_user_main WHERE user_name = 'public');
 CREATE INDEX public_objects_idx ON public_objects(id);
 
 
-\\echo Determining public project data
+-- determine public project data
 
 CREATE TEMPORARY TABLE public_project_data (project, data_id, data_size) ON COMMIT DROP AS
 SELECT project, data_id, data_size
@@ -121,7 +121,6 @@ CREATE INDEX public_project_data_project_idx ON public_project_data(project);
 
 
 \\pset title 'Public and Private Data Volume (GiB) per Project'
-\\echo
 SELECT
 	project AS "Project",
 	ROUND((total_volume / 2^30)::NUMERIC, 3) AS "Total",
@@ -136,7 +135,6 @@ FROM (
 		GROUP BY a.project
 	) AS t
 ORDER BY project;
-
 
 ROLLBACK;
 SQL
