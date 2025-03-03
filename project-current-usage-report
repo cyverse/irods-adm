@@ -114,10 +114,10 @@ CREATE INDEX public_project_data_project_idx ON public_project_data(project);
 
 \\pset title 'Public and Private Data Volume (GiB) per Project'
 SELECT
-	project AS "Project",
 	ROUND((total_volume / 2^30)::NUMERIC, 3) AS "Total",
 	ROUND((public_volume / 2^30)::NUMERIC, 3) AS "Public",
-	ROUND(((total_volume - public_volume) / 2^30)::NUMERIC, 3) AS "Private"
+	ROUND(((total_volume - public_volume) / 2^30)::NUMERIC, 3) AS "Private",
+	project AS "Project"
 FROM (
 		SELECT
 			a.project,
