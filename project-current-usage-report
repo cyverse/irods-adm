@@ -6,6 +6,8 @@
 # © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
 # For license information, see https://cyverse.org/license.
 
+# TODO document usage
+
 set -o errexit -o nounset -o pipefail
 
 export PGHOST PGPORT PGUSER
@@ -60,9 +62,84 @@ gen_report() {
 
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
--- determine storage resources
+$(inject_store_resc_tbl "$rootRescs")
+$(inject_proj_coll_tbl "$zone")
+$(inject_proj_data_tbl)
+$(inject_pub_obj_tbl)
+$(inject_pub_proj_data_tbl)
 
-CREATE TEMPORARY TABLE storage_resources (id) ON COMMIT DROP AS
+\\pset title 'Public and Private Data Volume (GiB) per Project'
+SELECT
+	ROUND((tot_vol / 2^30)::NUMERIC, 3) AS "Total",
+	ROUND((pub_vol / 2^30)::NUMERIC, 3) AS "Public",
+	ROUND(((tot_vol - pub_vol) / 2^30)::NUMERIC, 3) AS "Private",
+	proj AS "Project"
+FROM (
+		SELECT a.proj, SUM(a.data_size) AS tot_vol, COALESCE(SUM(p.data_size), 0) AS pub_vol
+		FROM proj_data AS a LEFT JOIN pub_proj_data AS p ON p.data_id = a.data_id
+		GROUP BY a.proj
+	) AS t
+ORDER BY proj;
+
+ROLLBACK;
+SQL
+}
+
+inject_proj_coll_tbl() {
+	local zone="$1"
+
+	cat <<EOF
+CREATE TEMPORARY TABLE proj_coll (proj, coll_id) ON COMMIT DROP AS
+SELECT REGEXP_REPLACE(coll_name, '/$zone/home/shared/([^/]+).*', E'\\\\1'), coll_id
+FROM r_coll_main WHERE coll_name LIKE '/$zone/home/shared/%'
+	AND coll_name NOT SIMILAR TO '/$zone/home/shared/commons_repo(/%)?';
+
+CREATE INDEX proj_coll_idx ON proj_coll(coll_id);
+EOF
+}
+
+inject_proj_data_tbl() {
+	cat <<'EOF'
+CREATE TEMPORARY TABLE proj_data (proj, coll_id, data_id, data_size) ON COMMIT DROP AS
+SELECT c.proj, c.coll_id, d.data_id, d.data_size
+FROM proj_coll AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
+WHERE d.resc_id IN (SELECT id FROM store_resc);
+
+CREATE INDEX proj_data_coll_data_idx ON proj_data(coll_id, data_id);
+
+CREATE INDEX proj_data_data_idx ON proj_data(data_id);
+EOF
+}
+
+inject_pub_obj_tbl() {
+	cat <<'EOF'
+CREATE TEMPORARY TABLE pub_obj (id) ON COMMIT DROP AS
+SELECT object_id
+FROM r_objt_access
+WHERE user_id = (SELECT user_id FROM r_user_main WHERE user_name = 'public');
+
+CREATE INDEX pub_obj_idx ON pub_obj(id);
+EOF
+}
+
+inject_pub_proj_data_tbl() {
+	cat <<'EOF'
+CREATE TEMPORARY TABLE pub_proj_data (proj, data_id, data_size) ON COMMIT DROP AS
+SELECT proj, data_id, data_size
+FROM proj_data
+WHERE coll_id IN (SELECT id FROM pub_obj) AND data_id IN (SELECT id FROM pub_obj);
+
+CREATE INDEX pub_proj_data_data_idx ON pub_proj_data(data_id);
+
+CREATE INDEX pub_proj_data_proj_idx ON pub_proj_data(proj);
+EOF
+}
+
+inject_store_resc_tbl() {
+	local rootRescs="$1"
+
+	cat <<EOF
+CREATE TEMPORARY TABLE store_resc (id) ON COMMIT DROP AS
 WITH RECURSIVE resc_hier(resc_id, resc_net) AS (
 	SELECT resc_id, resc_net
 		FROM r_resc_main
@@ -72,64 +149,8 @@ WITH RECURSIVE resc_hier(resc_id, resc_net) AS (
 		WHERE h.resc_net = 'EMPTY_RESC_HOST' )
 SELECT resc_id FROM resc_hier;
 
-CREATE INDEX storage_resources_idx ON storage_resources(id);
-
--- determine project collections
-
-CREATE TEMPORARY TABLE project_coll (project, coll_id) ON COMMIT DROP AS
-SELECT REGEXP_REPLACE(coll_name, '/$zone/home/shared/([^/]+).*', E'\\\\1'), coll_id
-FROM r_coll_main WHERE coll_name LIKE '/$zone/home/shared/%'
-	AND coll_name NOT SIMILAR TO '/$zone/home/shared/commons_repo(/%)?';
-
-CREATE INDEX project_coll_idx ON project_coll(coll_id);
-
--- determine project data
-
-CREATE TEMPORARY TABLE project_data (project, coll_id, data_id, data_size) ON COMMIT DROP AS
-SELECT c.project, c.coll_id, d.data_id, d.data_size
-FROM project_coll AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
-WHERE d.resc_id IN (SELECT id FROM storage_resources);
-
-CREATE INDEX project_data_coll_data_idx ON project_data(coll_id, data_id);
-CREATE INDEX project_data_data_idx ON project_data(data_id);
-
--- determine publicly accessible objects
-
-CREATE TEMPORARY TABLE public_objects (id) ON COMMIT DROP AS
-SELECT object_id
-FROM r_objt_access
-WHERE user_id = (SELECT user_id FROM r_user_main WHERE user_name = 'public');
-
-CREATE INDEX public_objects_idx ON public_objects(id);
-
--- determine public project data
-
-CREATE TEMPORARY TABLE public_project_data (project, data_id, data_size) ON COMMIT DROP AS
-SELECT project, data_id, data_size
-FROM project_data
-WHERE coll_id IN (SELECT id FROM public_objects) AND data_id IN (SELECT id FROM public_objects);
-
-CREATE INDEX public_project_data_data_idx ON public_project_data(data_id);
-CREATE INDEX public_project_data_project_idx ON public_project_data(project);
-
-\\pset title 'Public and Private Data Volume (GiB) per Project'
-SELECT
-	ROUND((total_volume / 2^30)::NUMERIC, 3) AS "Total",
-	ROUND((public_volume / 2^30)::NUMERIC, 3) AS "Public",
-	ROUND(((total_volume - public_volume) / 2^30)::NUMERIC, 3) AS "Private",
-	project AS "Project"
-FROM (
-		SELECT
-			a.project,
-			SUM(a.data_size) AS total_volume,
-			COALESCE(SUM(p.data_size), 0) AS public_volume
-		FROM project_data AS a LEFT JOIN public_project_data AS p ON p.data_id = a.data_id
-		GROUP BY a.project
-	) AS t
-ORDER BY project;
-
-ROLLBACK;
-SQL
+CREATE INDEX store_resc_idx ON store_resc(id);
+EOF
 }
 
 fmt_sql_list() {
