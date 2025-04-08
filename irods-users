@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""List all unprivileged iRODS user accounts.
+
+This script lists all iRODS users of type "rodsuser" in the iRODS zone. It prints one user per line.
+If the user is in the local zone, it prints the username in the format "username". If the user is in
+a different zone, it prints the username in the format "username#zone".
+
+It assumes that the iRODS environment has been initialized. It also assumes that the environment
+variable IRODS_ENVIRONMENT_FILE holds the path to the iRODS environment file. If this variable is
+not set, it uses the default file at ~/.irods/irods_environment.json.
+
+It requires the python module python-irodsclient. It requires the iRODS server to be running and
+accessible. Finally, it requires the user running the script is a rodsadmin type.
+"""
+
+from os import environ, path
+import sys
+
+from irods.models import User
+from irods.session import iRODSSession, NonAnonymousLoginWithoutPassword
+
+
+_DEFAULT_IRODS_ENV_FILE = "~/.irods/irods_environment.json"
+
+
+def main() -> int:
+    """The entrypoint for the script."""
+    irods_env_file = path.expanduser(environ.get("IRODS_ENVIRONMENT_FILE", _DEFAULT_IRODS_ENV_FILE))
+
+    try:
+        with iRODSSession(irods_env_file=irods_env_file) as irods:
+            query = irods.query(User).filter(User.type == "rodsuser")
+
+            for result in query.order_by(User.zone).order_by(User.name):
+                if result[User.zone] == irods.zone:
+                    print(result[User.name])
+                else:
+                    print(f"{result[User.name]}#{result[User.zone]}")
+
+        return 0
+    except NonAnonymousLoginWithoutPassword as e:
+        print(e, file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
