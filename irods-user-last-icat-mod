@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+show_help() {
+	cat <<EOF
+
+$EXEC_NAME - Report inactive users
+
+Usage:
+ $EXEC_NAME -h|--help
+ $EXEC_NAME [-d|--debug | (-U|--db-user) DB-USER | (-H|--dbms-host) DBMS-HOST |
+    (-P|--dbms-port) DBMS-PORT]
+
+This script determines the set of inactive users. An inactive user is one that
+has at no change related to the user made to the ICAT DB in the last year. The
+strategy used is as follows.
+
+1. For each of the categories, user info, passwords, group memberships,
+   collections, data objects, AVUs, user object permissions, user permissions on
+   objects, user created tickets, and tickets granting users access, find the
+   most recent change for each user.
+2. Combine all these categories, and find the most recent single change for each
+   user.
+
+It generates a CSV report with one row per user, with the following columns:
+username and last modification date. If the user is from another zone, it will
+be reported as "username#zone", otherwise just "username". The last modification
+date will have the form YYYY-MM-DD.
+
+Options:
+ -U, --db-user DB-USER      the account used to authorize the connection to the
+                            ICAT database
+ -H, --dbms-host DBMS-HOST  the domain name or IP address of the server hosting
+                            the PostgreSQL DBMS containing the DB
+ -P, --dbms-port DBMS-PORT  the TCP port the DBMS listens on
+ -d, --debug                will cause the program to display messages
+                            describing what it is doing
+ -h, --help                 show help and exit
+
+Environment Variables:
+ PGHOST  provides the default value for the DBMS host, default is "localhost"
+ PGPORT  provides the default value for the TCP port the DBMS listens on,
+         default is 5432
+ PGUSER  provides the default value for the account used to authorize the
+         connection, default is the user executing this program.
+EOF
+}
+
+set -o errexit -o nounset -o pipefail
+
+export PGHOST PGPORT PGUSER
+
+EXEC_NAME="$(basename "$(realpath --canonicalize-existing "$0")")"
+readonly EXEC_NAME
+
+declare DEBUG
+
+main() {
+	local opts
+	if ! opts="$(format_opts "$@")"; then
+		show_help >&2
+		return 1
+	fi
+
+	eval set -- "$opts"
+
+	local help
+	while true; do
+		case "$1" in
+			-U|--db-user)
+				PGUSER="$2"
+				shift 2
+				;;
+			-H|--dbms-host)
+				PGHOST="$2"
+				shift 2
+				;;
+			-P|--dbms-port)
+				PGPORT="$2"
+				shift 2
+				;;
+			-d|--debug)
+				DEBUG=debug
+				shift
+				;;
+			-h|--help)
+				help=help
+				shift
+				;;
+			--)
+ 				shift
+ 				break
+ 				;;
+		esac
+	done
+
+	readonly DEBUG
+
+	if [[ -n "${help-}" ]]; then
+		show_help
+	else
+			if [[ -n "${DEBUG-}" ]]; then
+			report
+		else
+			report --csv --quiet --tuples-only
+		fi
+	fi
+}
+
+format_opts() {
+	getopt \
+		--name "$EXEC_NAME" \
+		--longoptions db-user:,dbms-host:,dbms-port:,debug,help \
+		--options dH:hP:U: \
+		-- "$@"
+}
+
+report() {
+	psql "$@" ICAT <<EOF
+$(inject_debug_quiet 'off')
+$(inject_debug_stmt '\timing on')
+
+SET work_mem TO '2GB';
+
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+$(inject_users_table)
+$(inject_user_name_collections_table)
+$(inject_user_collections_table)
+$(inject_user_data_table)
+$(inject_user_objects_table)
+$(inject_user_mod_table)
+
+$(inject_heading 'ICAT User Activity Report')
+SELECT u.name AS username, DATE(TO_TIMESTAMP(um.last_modification_time)) AS last_modification_date
+FROM users AS u JOIN user_mods AS um ON um.id = u.id
+ORDER BY u.name;
+
+ROLLBACK;
+EOF
+}
+
+inject_user_collections_table() {
+	cat <<EOF
+$(inject_debug_msg 'Map user ids to collections')
+
+CREATE TEMPORARY TABLE user_collections(user_id, coll_id, modify_time) ON COMMIT DROP AS
+SELECT u.id, c.coll_id, c.modify_time
+FROM users AS u JOIN user_name_collections AS c ON c.user_name = u.name;
+
+CREATE INDEX user_collections_user_id_idx ON user_collections(user_id);
+CREATE INDEX user_collections_coll_id_idx ON user_collections(coll_id);
+EOF
+}
+
+inject_user_mod_table() {
+	cat <<EOF
+$(inject_debug_msg 'Make set of last user modifications')
+
+CREATE TEMPORARY TABLE user_mods(id, last_modification_time) ON COMMIT DROP AS
+SELECT id, MAX(modify_time)
+FROM (
+		-- set of user info changes
+		SELECT id, modify_time from users
+
+		-- set of password changes
+		UNION SELECT u.id, MAX(p.modify_ts) :: BIGINT
+		FROM users AS u JOIN r_user_password AS p ON p.user_id = u.id
+		GROUP BY u.id
+
+		-- set of group membership changes
+		UNION SELECT u.id, MAX(g.modify_ts) :: BIGINT
+		FROM users AS u JOIN r_user_group AS g ON g.user_id = u.id
+		GROUP BY u.id
+
+		-- set of collection changes
+		UNION SELECT user_id, MAX(modify_time) FROM user_collections GROUP BY user_id
+
+		-- set of data object changes
+		UNION SELECT user_id, MAX(modify_time) FROM user_data GROUP BY user_id
+
+		-- set of AVU changes
+		UNION SELECT uo.user_id, GREATEST(MAX(om.modify_ts), MAX(mm.modify_ts)) :: BIGINT
+		FROM user_objects AS uo
+			JOIN r_objt_metamap AS om ON om.object_id = uo.object_id
+			JOIN r_meta_main AS mm ON mm.meta_id = om.meta_id
+		WHERE mm.meta_attr_name NOT LIKE 'ipc%'
+		GROUP BY uo.user_id
+
+		-- set changes to user object permissions
+		UNION SELECT uo.user_id, MAX(oa.modify_ts) :: BIGINT
+		FROM user_objects AS uo JOIN r_objt_access AS oa ON oa.object_id = uo.object_id
+		GROUP BY uo.user_id
+
+		-- set of changes to user permissions on objects
+		UNION SELECT u.id, MAX(oa.modify_ts) :: BIGINT
+		FROM users AS u JOIN r_objt_access AS oa ON oa.user_id = u.id
+		GROUP BY u.id
+
+		-- set of user granted ticket changes
+		UNION SELECT u.id, MAX(t.modify_ts) :: BIGINT
+		FROM users AS u JOIN r_ticket_main AS t ON t.user_id = u.id
+		GROUP BY u.id
+
+		-- set of changes to tickets granted to users
+		UNION SELECT u.id, MAX(tm.modify_ts) :: BIGINT
+		FROM users AS u
+			JOIN r_ticket_allowed_users AS tau ON tau.user_name = u.name
+			JOIN r_ticket_main AS tm ON tm.ticket_id = tau.ticket_id
+		GROUP BY u.id
+	) AS t
+GROUP BY id;
+
+CREATE INDEX user_mods_idx ON user_mods(id, last_modification_time);
+EOF
+}
+
+inject_user_objects_table() {
+	cat <<EOF
+$(inject_debug_msg 'Combine collection and data object mappings')
+
+CREATE TEMPORARY TABLE user_objects(user_id, object_id) ON COMMIT DROP AS
+SELECT user_id, coll_id FROM user_collections UNION SELECT user_id, data_id FROM user_data;
+
+CREATE INDEX user_objects_idx ON user_objects(user_id, object_id);
+EOF
+}
+
+inject_user_data_table() {
+	cat <<EOF
+$(inject_debug_msg 'Map users to data objects')
+
+CREATE TEMPORARY TABLE user_data(user_id, data_id, modify_time) ON COMMIT DROP AS
+SELECT c.user_id, d.data_id, MAX(d.modify_ts) :: BIGINT
+FROM user_collections AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
+WHERE d.coll_id = c.coll_id
+GROUP BY c.user_id, d.data_id;
+
+CREATE INDEX user_data_user_id_idx ON user_data(user_id);
+EOF
+}
+
+inject_user_name_collections_table() {
+	cat <<EOF
+$(inject_debug_msg 'Map user names to collections')
+
+CREATE TEMPORARY TABLE user_name_collections(user_name, coll_id, modify_time) ON COMMIT DROP AS
+SELECT
+	SUBSTRING(coll_name
+		FROM '/'
+			|| (SELECT zone_name FROM r_zone_main WHERE zone_type_name = 'local')
+			|| '(?:/trash)?/home/([^/]*)'),
+	coll_id,
+	modify_ts :: BIGINT
+FROM r_coll_main;
+
+CREATE INDEX user_name_collections_idx ON user_name_collections(user_name);
+EOF
+}
+
+inject_users_table() {
+	cat <<EOF
+$(inject_debug_msg 'Make set of user info changes')
+
+CREATE TEMPORARY TABLE users(id, name, modify_time) ON COMMIT DROP AS
+SELECT
+	u.user_id,
+	CASE
+		WHEN z.zone_type_name = 'local' THEN u.user_name
+		ELSE u.user_name || '#' || u.zone_name END,
+	u.modify_ts :: BIGINT
+FROM r_user_main AS u JOIN r_zone_main AS z ON z.zone_name = u.zone_name
+WHERE u.user_type_name = 'rodsuser';
+
+CREATE INDEX users_id_idx ON users(id);
+CREATE INDEX users_name_idx ON users(name);
+EOF
+}
+
+inject_debug_msg() {
+	local msg="$1"
+
+	inject_debug_newline
+	inject_debug_stmt "\\echo '$msg'"
+}
+
+inject_debug_newline() {
+	inject_debug_stmt "\\echo ''"
+}
+
+inject_heading() {
+	local title="$1"
+
+	inject_debug_quiet on
+	printf $'\pset title \'%s\'\n' "$title"
+	inject_debug_quiet off
+}
+
+inject_debug_quiet() {
+	local state="$1"
+
+	inject_debug_stmt "\\set QUIET $state"
+}
+
+inject_debug_stmt() {
+	local stmt="$1"
+
+	if [[ -n "${DEBUG-}" ]]; then
+		printf '%s\n' "$stmt"
+	fi
+}
+
+main "$@"
