@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# © 2024, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 show_help() {
 	cat <<EOF
@@ -35,20 +38,17 @@ error is written to \`CLASS-BASE\`.errors. In any case, at most one log entry
 will be logged per line.
 
 \`CLASS-BASE.bad_chksum\` and \`CLASS-BASE.bad_size\` file entries have the form
-'<rescource hierarchy> <data object path>'.
+'<resource hierarchy> <data object path>'.
 
 Environment Variables:
  PGHOST  the default PostgreSQL host
- PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection
+ PGUSER  the default PostgreSQL user for authorizing the ICAT DB connection
 
 Prerequisites:
  1) iRODS 4.2.8 or later
  2) The user must be initialized with iRODS as an admin user.
  3) The user must be able to connect to the ICAT DB without providing a
     password.
-
-© 2024, The Arizona Board of Regents on behalf of The University of Arizona. For
-license information, see https://cyverse.org/license.
 EOF
 }
 
@@ -167,7 +167,7 @@ log() {
 	done
 }
 
-# For a given data object, this fuction retrieves the size, checksum, resource,
+# For a given data object, this function retrieves the size, checksum, resource,
 # and file path for each of its replicas.
 # Arguments:
 #  dataObj   the absolute path the the data object
@@ -226,7 +226,7 @@ GET_STORE_INFO() {
 	local storeHost="$1"
 	local filePath="$2"
 
-	# NOTE: The fd redirection gymanistics is to silence TACC's greeting message
+	# NOTE: The fd redirection gymnastics is to silence TACC's greeting message
 	#shellcheck disable=SC2087
 	ssh -q -t "$storeHost" 2>&1 > /dev/null <<EOSSH
 if ! size="\$(sudo --user=irods stat --format=%s '$filePath' 2> /dev/null)"; then
