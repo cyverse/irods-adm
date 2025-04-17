@@ -146,7 +146,7 @@ fsck() {
 		parallelOpts+=(--jobs="$jobs")
 	fi
 
-	parallel "${parallelOpts[@]}" CHECK_OBJ "$resc" | log "$classBase"
+	parallel "${parallelOpts[@]}" CHECK_OBJ "${resc:-''}" | log "$classBase"
 }
 
 log() {
@@ -166,6 +166,43 @@ log() {
 		fi
 	done
 }
+
+CHECK_OBJ() {
+	local resc="$1"
+	local objPath="$2"
+
+	local catInfo
+	{
+		readarray -d '' catInfo < <(GET_CAT_INFO "$objPath" "$resc")
+	} 2>&1
+
+	for replInfo in "${catInfo[@]}"; do
+		local replSize replChksum rescName filePath
+		IFS=$'\t' read -r -d '' replSize replChksum rescName filePath < <(printf '%s' "$replInfo")
+
+		local storeHost
+		storeHost="$(iquest '%s' "select RESC_LOC where RESC_NAME = '$rescName'")"
+
+		local fileSize fileChksum
+		read -r fileSize fileChksum < <(GET_STORE_INFO "$storeHost" "$filePath")
+
+		local reason
+		if [[ "$fileSize" == '-1' ]] && [[ "$fileChksum" == '-1' ]]; then
+			reason=missing
+		elif [[ "$replSize" != "$fileSize" ]]; then
+			reason=size
+		elif [[ "$replChksum" != "$fileChksum" ]]; then
+			reason=checksum
+		fi
+
+		if [[ -n "$reason" ]]; then
+			printf '%s\t%s\t%q\n' "$reason" "$rescName" "$objPath"
+		fi
+	done 2>&1
+
+	printf 'Completed %q\n' "$objPath"
+}
+export -f CHECK_OBJ
 
 # For a given data object, this function retrieves the size, checksum, resource,
 # and file path for each of its replicas.
@@ -243,42 +280,5 @@ printf '%s\t%s\n' "\$size" "\$chksum" >&2
 EOSSH
 }
 export -f GET_STORE_INFO
-
-CHECK_OBJ() {
-	local resc="$1"
-	local objPath="$2"
-
-	local catInfo
-	{
-		readarray -d '' catInfo < <(GET_CAT_INFO "$objPath" "$resc")
-	} 2>&1
-
-	for replInfo in "${catInfo[@]}"; do
-		local replSize replChksum rescName filePath
-		IFS=$'\t' read -r -d '' replSize replChksum rescName filePath < <(printf '%s' "$replInfo")
-
-		local storeHost
-		storeHost="$(iquest '%s' "select RESC_LOC where RESC_NAME = '$rescName'")"
-
-		local fileSize fileChksum
-		read -r fileSize fileChksum < <(GET_STORE_INFO "$storeHost" "$filePath")
-
-		local reason
-		if [[ "$fileSize" == '-1' ]] && [[ "$fileChksum" == '-1' ]]; then
-			reason=missing
-		elif [[ "$replSize" != "$fileSize" ]]; then
-			reason=size
-		elif [[ "$replChksum" != "$fileChksum" ]]; then
-			reason=checksum
-		fi
-
-		if [[ -n "$reason" ]]; then
-			printf '%s\t%s\t%q\n' "$reason" "$rescName" "$objPath"
-		fi
-	done 2>&1
-
-	printf 'Completed %q\n' "$objPath"
-}
-export -f CHECK_OBJ
 
 main "$@"
