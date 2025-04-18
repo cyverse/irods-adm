@@ -186,7 +186,7 @@ CHECK_OBJ() {
 		local fileSize fileChksum
 		read -r fileSize fileChksum < <(GET_STORE_INFO "$storeHost" "$filePath")
 
-		local reason
+		local reason=''
 		if [[ "$fileSize" == '-1' ]] && [[ "$fileChksum" == '-1' ]]; then
 			reason=missing
 		elif [[ "$replSize" != "$fileSize" ]]; then
