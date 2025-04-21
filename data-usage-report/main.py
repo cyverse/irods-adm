@@ -29,6 +29,8 @@ try:
 except KeyError:
     _IRODS_ENV_FILE = path.expanduser('~/.irods/irods_environment.json')
 
+# Find directory of the Python script
+SCRIPT_DIR = path.dirname(path.abspath(__file__))
 
 def find_recent_json_report(max_age_days=2):
     """
@@ -41,7 +43,7 @@ def find_recent_json_report(max_age_days=2):
         Path to the most recent JSON report if it exists and is recent enough, None otherwise
     """
     # Find all report JSON files
-    json_files = glob.glob("data/report_*.json")
+    json_files = glob.glob(f"{SCRIPT_DIR}/data/report_*.json")
     
     if not json_files:
         return None
@@ -168,7 +170,7 @@ def main():
                 report_df = gen_report(engine, local_zone, args.resources)
                 
                 # Save it as a JSON object, and include the date and time of the report in the report filename
-                report_filename = f"data/report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.json"
+                report_filename = f"{SCRIPT_DIR}/data/report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.json"
                 report_df.to_json(report_filename, orient="records")
                 print(f"Report saved as JSON: {report_filename}")
             
@@ -180,7 +182,7 @@ def main():
                 
                 # Save the output in output.html
                 # Make the filename report-YYYY-MM-DD.html
-                html_filename = f"reports/report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.html"
+                html_filename = f"{SCRIPT_DIR}/reports/report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.html"
                 print("Saving the report to HTML file...")
                 with open(html_filename, "w") as f:
                     f.write(html_output)
