@@ -1,0 +1,5 @@
+data/
+logs/
+myenv/
+reports/
+.pgpass
