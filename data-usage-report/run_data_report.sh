@@ -206,6 +206,14 @@ main() {
         echo "[INFO] Virtual environment created and requirements installed." >&2
     fi    
 
+    # if data/, logs/, and reports/ directories are not present, create them
+    for dir in data logs reports; do
+        if [[ ! -d "$SCRIPT_DIR/$dir" ]]; then
+            mkdir -p "$SCRIPT_DIR/$dir"
+            echo "[INFO] Created $dir directory." >&2
+        fi
+    done
+
     # Build command
     local cmd="python3 $SCRIPT_DIR/main.py"
     
