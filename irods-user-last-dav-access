@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""r
+This program determines the most recent WebDAV data access event for each user contained in a stream
+of varnishncsa log events read from stdin. An event is recorded for a user if the user's credentials
+authenticated the request, or if a user's collection our data object was accessed.
+
+It generates a CSV report with one row per user, with the following columns: username and last data
+access event date. If the user is from another zone, the user will be reported as `username#zone`,
+otherwise they will be reported as `username`. The event date will have the form YYYY-MM-DD. Users
+that have no events in the stream are not reported.
+"""
+
+import sys
+import re
+from datetime import datetime
+
+
+class AccessTracker:
+
+    def __init__(self):
+        self._latest_access = {}
+
+    def record(self, ts, username):
+        access = self._latest_access.get(username)
+        if not access or access < ts:
+            self._latest_access[username] = ts
+
+    def __iter__(self):
+        return iter(self._latest_access.items())
+
+
+def main():
+    accesses = AccessTracker()
+
+    for line in sys.stdin:
+        fields = extract_fields_from_log_entry(line.strip())
+
+        if fields:
+            ts, acting_user, accessed_user = fields
+
+            if acting_user:
+                accesses.record(ts, acting_user)
+
+            if accessed_user:
+                accesses.record(ts, accessed_user)
+
+    for username, ts in accesses:
+        print(f"{username},{ts.date()}")
+
+
+def extract_fields_from_log_entry(line):
+    pattern = r'[^ ]* \- ([^ ]*) \[([^ ]*) [^ ]*\] "[^ ]* ([^ ]*) [^"]*".*$'
+    match = re.match(pattern, line)
+
+    if match:
+        return (
+            convert_ts(match.group(2)),
+            convert_actor(match.group(1)),
+            username_from_url(match.group(3)))
+
+    return None
+
+
+def convert_actor(actor):
+    if actor == '-' or actor == 'anonymous':
+        return None
+
+    return actor
+
+
+def convert_ts(ts):
+    # Convert timestamp from Apache log format to ISO format
+    return datetime.strptime(ts, '%d/%b/%Y:%H:%M:%S')
+
+
+def username_from_url(url):
+    parts = url.split('/')
+
+    if len(parts) >= 7:
+        svc, zone, coll, username = parts[3:7]
+
+        if (
+            svc in ['dav', 'dav-anon']
+            and zone == 'iplant'
+            and coll == 'home'
+            and username != 'shared'
+        ):
+            return username
+
+    return None
+
+
+if __name__ == '__main__':
+    main()
