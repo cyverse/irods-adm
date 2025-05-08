@@ -4,7 +4,18 @@
 # © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
 # For license information, see https://cyverse.org/license.
 
-"""List all unprivileged iRODS user accounts.
+""" List all unprivileged iRODS user accounts. """
+
+import argparse
+from os import environ, path
+import sys
+
+from irods.models import User
+from irods.session import iRODSSession, NonAnonymousLoginWithoutPassword
+
+
+_HELP_MSG = '''
+List all unprivileged iRODS user accounts.
 
 This script lists all iRODS users of type "rodsuser" in the iRODS zone. It prints one user per line.
 If the user is in the local zone, it prints the username in the format "username". If the user is in
@@ -16,13 +27,7 @@ not set, it uses the default file at ~/.irods/irods_environment.json.
 
 It requires the python module python-irodsclient. It requires the iRODS server to be running and
 accessible. Finally, it requires the user running the script is a rodsadmin type.
-"""
-
-from os import environ, path
-import sys
-
-from irods.models import User
-from irods.session import iRODSSession, NonAnonymousLoginWithoutPassword
+'''
 
 
 _DEFAULT_IRODS_ENV_FILE = "~/.irods/irods_environment.json"
@@ -30,6 +35,8 @@ _DEFAULT_IRODS_ENV_FILE = "~/.irods/irods_environment.json"
 
 def main() -> int:
     """The entrypoint for the script."""
+    argparse.ArgumentParser(description=_HELP_MSG).parse_args()
+
     irods_env_file = path.expanduser(environ.get("IRODS_ENVIRONMENT_FILE", _DEFAULT_IRODS_ENV_FILE))
 
     try:
