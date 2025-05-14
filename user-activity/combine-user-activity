@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+'''Combines user activity events
+Reading a set of files containing user activity, it keeps track of the most recent activity date
+for each user. When it has finished, it writes to stdout the most recent activity date for each user
+mentioned in the files.
+
+It expects the paths to the files to be provided as arguments. Each the files needs to be CSV
+formatted with the first column being username and the second column being an ISO-8601 date,
+YYYY-MM-DD. It assumes the first row is a header with the first value being `username` and the
+second being `last_activity`.
+
+The output will be CSV formatted with the first column being a username and the second column being
+an ISO-8601 date. The first row will be a header with the first entry being `username` and the
+second being `last_activity`.
+'''
+
+from csv import DictReader, DictWriter
+import sys
+from typing import List
+
+
+class ActivityTracker:
+
+    def __init__(self):
+        self._latest_activity = {}
+
+    def record(self, username, activity_date):
+        latest_activity = self._latest_activity.get(username)
+        if not latest_activity or latest_activity < activity_date:
+            self._latest_activity[username] = activity_date
+
+    def usernames(self):
+        return list(self._latest_activity.keys())
+
+    def last_activity_date(self, username):
+        return self._latest_activity.get(username)
+
+
+def main(activity_files: List[str]):
+    """the entrypoint"""
+    accesses = ActivityTracker()
+
+    for path in activity_files:
+        with open(path) as file:
+            for entry in DictReader(file):
+                accesses.record(entry['username'], entry['last_activity'])
+
+    usernames = accesses.usernames()
+    usernames.sort()
+
+    writer = DictWriter(sys.stdout, ['username', 'last_activity'])
+    writer.writeheader()
+
+    for username in usernames:
+        writer.writerow(
+            {'username': username, 'last_activity': accesses.last_activity_date(username)})
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
