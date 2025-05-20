@@ -39,19 +39,20 @@ fi
 
 # Function to find the latest report file
 find_latest_report() {
+    # shellcheck disable=SC2012
     ls -t "${DATA_DIR}"/report_*.json 2>/dev/null | head -n 1
 }
 
 # Function to get user's full name from LDAP
 get_ldap_fullname() {
     local username="$1"
-    
+
     # Query LDAP for the user's common name (cn)
     local fullname=""
-    
+
     # Attempt LDAP query
     fullname=$(ldapsearch -x -H "$LDAP_SERVER" -b "$LDAP_BASE" "(uid=$username)" cn 2>/dev/null | grep "^cn:" | head -n 1 | sed 's/^cn: //')
-    
+
     # If fullname is empty, use username as fallback
     if [ -z "$fullname" ]; then
         echo "Warning: No LDAP record found for $username, using username as fallback" >&2
@@ -67,7 +68,7 @@ add_avu_if_not_exists() {
     local attr="$2"
     local value="$3"
     local unit="$4"
-    
+
     # Check if AVU with the same attribute and value exists
     if imeta ls -C "$collection" "$attr" | grep -q "value: $value"; then
         echo "AVU already exists for $collection: $attr $value $unit"
@@ -94,42 +95,42 @@ echo "Using latest report: $latest_report"
 jq -c '.[]' "$latest_report" | while read -r project_json; do
     # Extract project name
     project=$(echo "$project_json" | jq -r '.Project')
-    
+
     # Extract owners string and check if it's null
     owners_string=$(echo "$project_json" | jq -r '.Owner')
-    
+
     if [ "$owners_string" = "null" ] || [ -z "$owners_string" ]; then
         echo "No owners found for project: $project"
         continue
     fi
-    
+
     echo "Processing project: $project"
-    
+
     # iRODS collection path
     collection="/iplant/home/shared/$project"
-    
+
     # Check if collection exists
     if ! ils "$collection" &>/dev/null; then
         echo "Warning: Collection $collection does not exist in iRODS. Skipping."
         continue
     fi
-    
+
     # Split the owners string by semicolon
     echo "$owners_string" | tr ';' '\n' | while read -r username; do
         # Remove any leading/trailing whitespace
         username=$(echo "$username" | xargs)
-        
+
         if [ -z "$username" ]; then
             continue
         fi
-        
+
         echo "  Processing owner: $username"
-        
+
         # Get full name from LDAP
         fullname=$(get_ldap_fullname "$username")
-        
+
         echo "    Full name: $fullname"
-        
+
         # Add AVU to collection
         add_avu_if_not_exists "$collection" "ipc::project-owner" "$username" "$fullname"
     done
