@@ -1,3 +1,10 @@
+#!/usr/bin/env --split-string=uv run --script
+# /// script
+# dependencies = [
+#    "python-irodsclient",
+# ]
+# ///
+
 import os
 from irods.meta import iRODSMeta
 from irods.session import iRODSSession
@@ -34,7 +41,7 @@ def add_trash_timestamp(sess: iRODSSession, trash_path: str) -> None:
 		# if collection coll_trash is not home, like orphan, just add timestamp to it.
 			print(f"Examining collections other than 'home' - {coll_trash.path}")
 			add_coll_avu(coll_trash)
-			
+
 
 def add_coll_avu(col) -> None:
 	"""
@@ -43,7 +50,7 @@ def add_coll_avu(col) -> None:
 	print(f" Checking if AVU needs to be added to a collection - {col.path}")
 	if "ipc::trash_timestamp" not in col.metadata.keys():
 		epoch_time = time.time()  # prepend '0' to the epoch timestamp to follow irods convention
-		trash_timestamp_meta = iRODSMeta('ipc::trash_timestamp', "0" + str(int(epoch_time))) 
+		trash_timestamp_meta = iRODSMeta('ipc::trash_timestamp', "0" + str(int(epoch_time)))
 		col.metadata[trash_timestamp_meta.name] = trash_timestamp_meta
 		print(f"Added AVU to a collection - {col.path}")
 
@@ -55,14 +62,14 @@ def add_obj_avu(obj) -> None:
 	if "ipc::trash_timestamp" not in obj.metadata.keys():
 		epoch_time = time.time()  # prepend '0' to the epoch timestamp to follow irods convention
 		trash_timestamp_meta = iRODSMeta('ipc::trash_timestamp', "0" + str(int(epoch_time)))
-		obj.metadata[trash_timestamp_meta.name] = trash_timestamp_meta	
+		obj.metadata[trash_timestamp_meta.name] = trash_timestamp_meta
 		print(f"Added ipc::trash_timestamp AVU to a data object - {obj.path}")
 
 def main():
 	"""
 	Checks if IRODS_ENVIRONMENT_FILE is set, then use the IRODS account to create a session
 	otherwise uses the default file at ~/.irods/irods_environment.json
-	Calls the add_trash_timestamp method to iterate over items in the trash. 
+	Calls the add_trash_timestamp method to iterate over items in the trash.
 	"""
 	if 'IRODS_ENVIRONMENT_FILE' in os.environ:
 		env = os.path.expanduser(os.environ.get('IRODS_ENVIRONMENT_FILE'))
@@ -71,7 +78,7 @@ def main():
 	if (len(sys.argv) >= 2):
 		trash_path = f"/{sys.argv[1]}/trash" # takes zonename as cmd line arg
 	else:
-		print("Supply 'zone' argument, Usage: python3 add_timestamp_avu.py <zone_name>")
+		print("Supply 'zone' argument, Usage: ensure-trash-ts <zone_name>")
 		return
 	with iRODSSession(irods_env_file=env) as sess:
 		add_trash_timestamp(sess, trash_path)
@@ -79,4 +86,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-		
