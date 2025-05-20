@@ -25,8 +25,13 @@ for cmd in jq ldapsearch ils imeta; do
     fi
 done
 
+export IRODS_ENVIRONMENT_FILE
+if [[ -z "$IRODS_ENVIRONMENT_FILE" ]]; then
+    IRODS_ENVIRONMENT_FILE="$HOME/.irods/irods_environment.json"
+fi
+
 # Check for iRODS environment
-if [ ! -f ~/.irods/irods_environment.json ]; then
+if [[ ! -f "$IRODS_ENVIRONMENT_FILE" ]]; then
     echo "Error: iRODS environment file not found. Please configure iRODS first."
     exit 1
 fi
@@ -132,7 +137,7 @@ jq -c '.[]' "$latest_report" | while read -r project_json; do
         echo "    Full name: $fullname"
 
         # Add AVU to collection
-        add_avu_if_not_exists "$collection" "ipc::project-owner" "$username" "$fullname"
+        #add_avu_if_not_exists "$collection" "ipc::project-owner" "$username" "$fullname"
     done
 done
 
