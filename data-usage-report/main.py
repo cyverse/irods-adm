@@ -22,6 +22,7 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.schema import CreateTable
 from typing import List, Optional, Dict
 from irods.session import iRODSSession
+from irods.collection import Collection
 
 
 try:
@@ -71,6 +72,31 @@ def find_recent_json_report(max_age_days=2):
     
     print(f"Most recent report {most_recent} is {age.days} days old, which exceeds the maximum age of {max_age_days} days")
     return None
+
+
+def get_irods_owner_info(proj: str, irods_env_file: Optional[str] = None) -> str:
+    """Get owner information from iRODS metadata."""
+    try:
+        env_file = irods_env_file or _IRODS_ENV_FILE
+        with iRODSSession(irods_env_file=env_file) as session:
+            # Path to the project collection
+            coll_path = f"/iplant/home/shared/{proj}"
+            
+            # Query for metadata with attribute "ipc::project-owner"
+            owners = []
+            try:
+                collection = session.collections.get(coll_path)
+                for meta in collection.metadata.items():
+                    if meta.name == "ipc::project-owner":
+                        # Value is username
+                        owners.append(meta.value)
+            except Exception as e:
+                print(f"Error accessing collection {coll_path}: {e}")
+            
+            return "; ".join(owners) if owners else ""
+    except Exception as e:
+        print(f"Error retrieving owner info for project {proj}: {e}")
+        return ""
 
 
 def main():
@@ -167,12 +193,18 @@ def main():
                 print("\tGenerating the report data...")
                 
                 # Generate report using temporary tables approach
-                report_df = gen_report(engine, local_zone, args.resources)
+                report_df = gen_report(engine, local_zone, args.resources, _IRODS_ENV_FILE)
                 
                 # Save it as a JSON object, and include the date and time of the report in the report filename
                 report_filename = f"{SCRIPT_DIR}/data/report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.json"
                 report_df.to_json(report_filename, orient="records")
                 print(f"Report saved as JSON: {report_filename}")
+            else:
+                # If using a recent report, make sure to get updated owner information from iRODS
+                print("\tUpdating owner information from iRODS metadata...")
+                report_df["Owner"] = report_df["Project"].apply(
+                    lambda proj: get_irods_owner_info(proj, _IRODS_ENV_FILE)
+                )
             
             # Output the report
             if args.html:
@@ -236,7 +268,7 @@ def get_local_zone(engine) -> str:
         return result[0]
 
 
-def gen_report(engine, zone: str, root_resources: List[str]) -> pd.DataFrame:
+def gen_report(engine, zone: str, root_resources: List[str], irods_env_file: Optional[str] = None) -> pd.DataFrame:
     """Generate the report data using temporary tables."""
     metadata = MetaData()
     
@@ -271,16 +303,12 @@ def gen_report(engine, zone: str, root_resources: List[str]) -> pd.DataFrame:
                 ROUND((tot_vol / 2^30)::NUMERIC, 3) AS "Total",
                 ROUND((pub_vol / 2^30)::NUMERIC, 3) AS "Public",
                 ROUND(((tot_vol - pub_vol) / 2^30)::NUMERIC, 3) AS "Private",
-                proj AS "Project",
-                creator AS "Creator",
-                owner AS "Owner"
+                proj AS "Project"
             FROM (
                 SELECT 
                     a.proj, 
                     SUM(a.data_size) AS tot_vol,
-                    COALESCE(SUM(p.data_size), 0) AS pub_vol,
-                    MAX(pc.creator) AS creator,
-                    MAX(pc.owner) AS owner
+                    COALESCE(SUM(p.data_size), 0) AS pub_vol
                 FROM (
                     SELECT DISTINCT proj, data_id, data_size
                     FROM proj_data
@@ -289,14 +317,6 @@ def gen_report(engine, zone: str, root_resources: List[str]) -> pd.DataFrame:
                     SELECT DISTINCT proj, data_id, data_size
                     FROM pub_proj_data
                 ) AS p ON p.data_id = a.data_id AND p.proj = a.proj
-                LEFT JOIN (
-                    SELECT 
-                        proj,
-                        STRING_AGG(DISTINCT creator, '; ') FILTER (WHERE creator IS NOT NULL) AS creator,
-                        STRING_AGG(DISTINCT owner, '; ') FILTER (WHERE owner IS NOT NULL) AS owner
-                    FROM proj_coll
-                    GROUP BY proj
-                ) pc ON pc.proj = a.proj
                 GROUP BY a.proj
             ) AS t
             ORDER BY proj
@@ -307,6 +327,10 @@ def gen_report(engine, zone: str, root_resources: List[str]) -> pd.DataFrame:
         # Clean up - drop all temporary tables at the end of the transaction
         metadata.drop_all(conn)
    
+    # Add owner information from iRODS metadata
+    print("\tAdding owner information from iRODS metadata...")
+    result["Owner"] = result["Project"].apply(lambda proj: get_irods_owner_info(proj, irods_env_file))
+    
     return result
 
 
@@ -346,13 +370,11 @@ def create_store_resc_table(conn, metadata, root_resources: List[str]):
 
 def create_proj_coll_table(conn, metadata, zone: str):
     """Create temporary table for project collections using SQLAlchemy."""
-    # Define the temporary table
+    # Define the temporary table without creator and owner fields
     proj_coll = Table(
         'proj_coll', metadata,
         Column('proj', String),
         Column('coll_id', BigInteger),
-        Column('creator', String),
-        Column('owner', String),
         prefixes=['TEMPORARY']
     )
     
@@ -362,28 +384,18 @@ def create_proj_coll_table(conn, metadata, zone: str):
     # Create index
     Index('proj_coll_idx', proj_coll.c.coll_id).create(conn)
     
-    # Insert data
+    # Insert data without creator and owner
     insert_query = f"""
-        INSERT INTO proj_coll (proj, coll_id, creator, owner)
+        INSERT INTO proj_coll (proj, coll_id)
         SELECT 
             REGEXP_REPLACE(c.coll_name, '/{zone}/home/shared/([^/]+).*', E'\\\\1') AS proj, 
-            c.coll_id,
-            CASE 
-                WHEN c.coll_name ~ '/{zone}/home/shared/[^/]+$' THEN c.coll_owner_name 
-                ELSE NULL 
-            END AS creator,
-            CASE 
-                WHEN c.coll_name ~ '/{zone}/home/shared/[^/]+$' THEN u.user_name 
-                ELSE NULL 
-            END AS owner
+            c.coll_id
         FROM r_coll_main c
-        LEFT JOIN r_objt_access a ON c.coll_id = a.object_id AND a.access_type_id = 1200
-        LEFT JOIN r_user_main u ON a.user_id = u.user_id
         WHERE c.coll_name LIKE '/{zone}/home/shared/%'
         AND c.coll_name NOT SIMILAR TO '/{zone}/home/shared/commons_repo(/%)?'
-        AND u.user_type_name = 'rodsuser'
     """
     conn.execute(text(insert_query))
+    
     # print the number of rows inserted
     count_query = "SELECT COUNT(*) FROM proj_coll"
     count_result = conn.execute(text(count_query)).fetchone()

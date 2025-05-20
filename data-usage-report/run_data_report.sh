@@ -25,7 +25,7 @@ RESOURCES=""
 GENERATE_HTML="false"
 DEBUG="false"
 FORCE_REFRESH="false"
-MAX_REPORT_AGE=2
+MAX_REPORT_AGE=5
 IRODS_UPLOAD_LOCATION="/iplant/home/shared/CyVerse_DSStats/data-products/project-data-usage"
 
 show_help() {
