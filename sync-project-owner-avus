@@ -1,0 +1,162 @@
+#!/usr/bin/env --split-string=uv run --script
+# -*- coding: utf-8 -*-
+#
+# ///
+# dependencies = [
+#    "python-irodsclient",
+#    "python-ldap",
+# ]
+# ///
+#
+# Requires the following system packages:
+#    libldap2-dev
+#    libsasl2-dev
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""Aligns project folder ipc::project-owner AVUs with the users who have own permission.
+
+This script does the following for each collection in /<zone>/home/shared.
+ 1. Extracts the usernames of the users that have own permission on the collection.
+ 3. Queries LDAP to get full names for each owner
+ 4. Updates the (ipc::project-owner, <username>, <full name>) AVUs attached to it.
+
+Usage:
+ sync-project-owner-avus LDAP-URL
+
+Parameters:
+ LDAP-URL  the URL used to access the LDAP server used for resolving full names.
+"""
+
+import os
+from os import path
+import sys
+from typing import Dict, List, Optional
+
+from irods.access import iRODSAccess
+from irods.collection import iRODSCollection
+from irods.exception import CAT_INVALID_AUTHENTICATION
+from irods.models import Collection, CollectionAccess, User
+from irods.session import iRODSSession, NonAnonymousLoginWithoutPassword
+
+import ldap
+from ldap.ldapobject import LDAPObject
+
+
+_LDAP_BASE = "dc=iplantcollaborative,dc=org"
+
+_ATTR = 'ipc::project-owner'
+
+
+def main(args: List[str]) -> int:
+    """The entrypoint"""
+    if len(args) < 1:
+        print("Requires the LDAP URL as the first argument", file=sys.stderr)
+        return 1
+
+    ldap_inst = _init_ldap(args[0])
+    irods_env = _resolve_irods_env()
+
+    if not irods_env:
+        print("The iRODS environment file cannot be found", file=sys.stderr)
+        return 1
+
+    try:
+        with iRODSSession(irods_env_file=irods_env) as irods:
+            if irods.users.get(irods.username, irods.zone).type != 'rodsadmin':
+                print("The authenticated iRODS user needs to be a rodsadmin", file=sys.stderr)
+                return 1
+
+            _sync_avus(ldap_inst, irods)
+    except CAT_INVALID_AUTHENTICATION:
+        print("The iRODS session has not been initialized. Please use `iinit`", file=sys.stderr)
+        return 1
+    except NonAnonymousLoginWithoutPassword:
+        print("The iRODS session has not been initialized. Please use `iinit`", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+def _init_ldap(url: str) -> LDAPObject:
+    ldap_inst = ldap.initialize(url)
+    ldap_inst.simple_bind_s()
+    return ldap_inst
+
+
+def _resolve_irods_env() -> Optional[str]:
+    env = os.environ.get(
+        'IRODS_ENVIRONMENT_FILE', path.expanduser('~/.irods/irods_environment.json'))
+
+    if os.path.isfile(env):
+        return env
+
+
+def _sync_avus(ldap_inst, irods):
+    projects_coll = irods.collections.get(f"/{irods.zone}/home/shared")
+
+    for coll in projects_coll.subcollections:
+        print(f"Processing {coll.path}")
+        owners = _get_owners(ldap_inst, irods, coll)
+        tagged_owners = _get_tagged_owners(coll)
+
+        for username, cn in owners.items():
+            tagged_cn = tagged_owners.get(username)
+
+            if tagged_cn is None:
+                coll.metadata.add(_ATTR, username, cn)
+            elif tagged_cn != cn:
+                coll.metadata.remove(_ATTR, username, tagged_cn)
+                coll.metadata.add(_ATTR, username, cn)
+
+        for username, tagged_cn in tagged_owners.items():
+            cn = owners.get(username)
+
+            if cn is None:
+                coll.metadata.remove(_ATTR, username, cn)
+
+
+def _get_owners(
+    ldap_inst: LDAPObject, irods: iRODSSession, coll: iRODSCollection
+) -> Dict[str, str]:
+    owners = {}
+    owner_id_query = irods.query(CollectionAccess.user_id)
+
+    for owner_id_res in owner_id_query.filter(
+        Collection.name == coll.path, CollectionAccess.type == iRODSAccess['own']
+    ):
+        owner_query = irods.query(User.name)
+
+        for owner_res in owner_query.filter(
+            User.id == owner_id_res[CollectionAccess.user_id], User.type == 'rodsuser'
+        ):
+            owners[owner_res[User.name]] = _resolve_common_name(ldap_inst, owner_res[User.name])
+
+    return owners
+
+
+def _resolve_common_name(ldap_inst: LDAPObject, uid: str) -> str:
+    ldap_res = ldap_inst.search_s(
+        base=_LDAP_BASE,
+        scope=ldap.SCOPE_SUBTREE,
+        filterstr=f"(uid={uid})",
+        attrlist=['cn'])
+
+    if ldap_res:
+        return ldap_res[0][1]['cn'][0].decode('utf-8')
+    else:
+        return ''
+
+
+def _get_tagged_owners(coll: iRODSCollection) -> Dict[str, str]:
+    owners = {}
+
+    for avu in coll.metadata.get_all(_ATTR):
+        owners[avu.value] = avu.units
+
+    return owners
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
