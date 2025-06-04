@@ -1,180 +1,529 @@
-#!/usr/bin/env bash
+#!/usr/bin/env --split-string=uv run --script
+# -*- coding: utf-8 -*-
 #
-# This program generates a report on the amount of public and private data each
-# project has in on a given list of root resources.
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#    "pandas",
+#    "psycopg2-binary",
+#    "python-ldap",
+#    "python-irodsclient",
+#    "SQLAlchemy",
+# ]
+# ///
+#
+# Requires the following system packages:
+#    libldap2-dev
+#    libsasl2-dev
 #
 # © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
 # For license information, see https://cyverse.org/license.
 
-# TODO document usage
+"""Generates a report describing the project data storage usage
 
-set -o errexit -o nounset -o pipefail
+This program generates a report on the amount of public and private data each project has in on a
+given list of root resources.
+"""
 
-export PGHOST PGPORT PGUSER
+import argparse
+from datetime import datetime
+import os
+import sys
+from tempfile import NamedTemporaryFile
+import traceback
+from typing import Dict, List, Optional
 
-EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
-readonly EXEC_NAME
+from irods.exception import iRODSException
+from irods.session import iRODSSession
+import ldap
+from ldap import LDAPError  # pylint: disable=no-name-in-module # type: ignore
+import pandas
+from pandas import DataFrame, Series
+import sqlalchemy
+from sqlalchemy import BigInteger, Connection, MetaData, String, Table
 
-main() {
-	local opts
-	if ! opts="$(prep_opts "$@")"; then
-		return 1
-	fi
 
-	eval set -- "$opts"
+_IRODS_ENV_FILE = os.environ.get(
+    'IRODS_ENVIRONMENT_FILE', os.path.expanduser('~/.irods/irods_environment.json'))
 
-	while true; do
-		case "$1" in
-			-H|--host)
-				PGHOST="$2"
-				shift 2
-				;;
-			-P|--port)
-				PGPORT="$2"
-				shift 2
-				;;
-			-U|--user)
-				PGUSER="$2"
-				shift 2
-				;;
-			--)
-				shift
-				break
-		esac
-	done
+_DS_REPORT_LOC = 'CyVerse_DSStats/data-products/project-data-usage'
 
-	local resources="$*"
+_LDAP_URL = 'ldap://ldap.iplantcollaborative.org'
+_LDAP_BASE = 'dc=iplantcollaborative,dc=org'
 
-	gen_report "$(get_local_zone)" "$resources"
-}
 
-prep_opts() {
-	getopt --longoptions host:,port:,user: --options H:P:U: --name "$EXEC_NAME" -- "$@"
-}
+_REPORT_CSS = """
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        line-height: 1.6;
+    }
+    h1 {
+        color: #333;
+        margin-bottom: 20px;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    th, td {
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
+    tr:hover {
+        background-color: #f5f5f5;
+    }
+    .footer {
+        font-size: 0.8em;
+        color: #666;
+        margin-top: 30px;
+    }
+    .subtable {
+        margin: 0;
+        width: 100%;
+        border: none;
+        margin-top: 5px;
+        border: 1px solid #ddd;
+        border-radius: 0 0 3px 3px;
+    }
+    .subtable td {
+        border: none;
+        padding: 2px 6px;
+    }
+    .subtable tr:hover {
+        background-color: transparent;
+    }
+    .label {
+        font-weight: bold;
+        color: #555;
+    }
+    details {
+        cursor: pointer;
+        margin: 0;
+        padding: 0;
+    }
+    summary {
+        padding: 5px;
+        background-color: #f8f8f8;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        font-weight: bold;
+    }
+    details[open] summary {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+    .separator {
+        height: 1px;
+        background-color: #ddd;
+        padding: 0 !important;
+    }
+    .owner-header {
+        font-weight: bold;
+        padding-top: 8px !important;
+        color: #333;
+    }
+"""
 
-gen_report() {
-	local zone="$1"
-	local rootRescs="$2"
 
-	psql ICAT <<SQL
-\\set QUIET on
-\\pset footer off
+def main():
+    """Main function to parse arguments and generate the report."""
+    try:
+        args = _mk_arg_parser().parse_args()
+        report_date = datetime.now()
+        report_file = f"report_{report_date.strftime('%Y-%m-%d')}.html"
+        fmt_report_date = report_date.strftime('%Y-%m-%d %H:%M:%S')
+        print(f"PROJECT STORAGE USAGE REPORT - GENERATED ON {fmt_report_date}\n")
 
-BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+        with iRODSSession(irods_env_file=_IRODS_ENV_FILE) as irods:
+            with _connect_icat(args.pghost, args.pgport, args.pguser) as icat:
+                _report(report_file, irods, icat, args.resources)
+                print(f"To access report, please visit {_webdav_url(irods, report_file)}")
+    except RuntimeError as e:
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        sys.exit(1)
 
-$(inject_store_resc_tbl "$rootRescs")
-$(inject_proj_coll_tbl "$zone")
-$(inject_proj_data_tbl)
-$(inject_pub_obj_tbl)
-$(inject_pub_proj_data_tbl)
 
-\\pset title 'Public and Private Data Volume (GiB) per Project'
-SELECT
-	ROUND((tot_vol / 2^30)::NUMERIC, 3) AS "Total",
-	ROUND((pub_vol / 2^30)::NUMERIC, 3) AS "Public",
-	ROUND(((tot_vol - pub_vol) / 2^30)::NUMERIC, 3) AS "Private",
-	proj AS "Project"
-FROM (
-		SELECT a.proj, SUM(a.data_size) AS tot_vol, COALESCE(SUM(p.data_size), 0) AS pub_vol
-		FROM proj_data AS a LEFT JOIN pub_proj_data AS p ON p.data_id = a.data_id
-		GROUP BY a.proj
-	) AS t
-ORDER BY proj;
+def _connect_icat(host: str, port: int, user: str) -> Connection:
+    return sqlalchemy.create_engine(f"postgresql://{user}@{host}:{port}/ICAT").connect()
 
-ROLLBACK;
-SQL
-}
 
-inject_proj_coll_tbl() {
-	local zone="$1"
+def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: List[str]):
+    report_df = _gen_report(resources, icat, irods)
 
-	cat <<EOF
-CREATE TEMPORARY TABLE proj_coll (proj, coll_id) ON COMMIT DROP AS
-SELECT REGEXP_REPLACE(coll_name, '/$zone/home/shared/([^/]+).*', E'\\\\1'), coll_id
-FROM r_coll_main WHERE coll_name LIKE '/$zone/home/shared/%'
-	AND coll_name NOT SIMILAR TO '/$zone/home/shared/commons_repo(/%)?';
+    with NamedTemporaryFile(delete_on_close=False) as file:
+        file.write(_fmt_report(report_df).encode())
+        file.close()
 
-CREATE INDEX proj_coll_idx ON proj_coll(coll_id);
-EOF
-}
+        irods.data_objects.put(
+            file.name,
+            os.path.join('/', irods.zone, 'home', 'shared', _DS_REPORT_LOC, report_file))
 
-inject_proj_data_tbl() {
-	cat <<'EOF'
-CREATE TEMPORARY TABLE proj_data (proj, coll_id, data_id, data_size) ON COMMIT DROP AS
-SELECT c.proj, c.coll_id, d.data_id, d.data_size
-FROM proj_coll AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
-WHERE d.resc_id IN (SELECT id FROM store_resc);
 
-CREATE INDEX proj_data_coll_data_idx ON proj_data(coll_id, data_id);
+def _fmt_report(df: DataFrame) -> str:
+    """Format the DataFrame as an HTML report with LDAP info for owners."""
+    return f"""
+        <!DOCTYPE html>
+        <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Public and Private Data Volume (GiB) per Project</title>
+                <style>
+                    {_REPORT_CSS}
+                </style>
+            </head>
+            <body>
+                <h1>Public and Private Data Volume (GiB) per Project</h1>
+                {_fmt_report_table(df)}
+            </body>
+        </html>
+    """
 
-CREATE INDEX proj_data_data_idx ON proj_data(data_id);
-EOF
-}
 
-inject_pub_obj_tbl() {
-	cat <<'EOF'
-CREATE TEMPORARY TABLE pub_obj (id) ON COMMIT DROP AS
-SELECT object_id
-FROM r_objt_access
-WHERE user_id = (SELECT user_id FROM r_user_main WHERE user_name = 'public');
+def _fmt_report_table(df: DataFrame) -> str:
+    table = """
+        <table>
+            <thead>
+                <tr>
+    """
 
-CREATE INDEX pub_obj_idx ON pub_obj(id);
-EOF
-}
+    for lbl in df.columns:
+        table += f"<th>{lbl}</th>"
 
-inject_pub_proj_data_tbl() {
-	cat <<'EOF'
-CREATE TEMPORARY TABLE pub_proj_data (proj, data_id, data_size) ON COMMIT DROP AS
-SELECT proj, data_id, data_size
-FROM proj_data
-WHERE coll_id IN (SELECT id FROM pub_obj) AND data_id IN (SELECT id FROM pub_obj);
+    table += """
+            </tr>
+        </thead>
+        <tbody>
+    """
 
-CREATE INDEX pub_proj_data_data_idx ON pub_proj_data(data_id);
+    for _, row in df.iterrows():
+        table += _fmt_project_row(row, df.columns)
 
-CREATE INDEX pub_proj_data_proj_idx ON pub_proj_data(proj);
-EOF
-}
+    table += """
+            </tbody>
+        </table>
+    """
 
-inject_store_resc_tbl() {
-	local rootRescs="$1"
+    return table
 
-	cat <<EOF
-CREATE TEMPORARY TABLE store_resc (id) ON COMMIT DROP AS
-WITH RECURSIVE resc_hier(resc_id, resc_net) AS (
-	SELECT resc_id, resc_net
-		FROM r_resc_main
-		WHERE resc_name IN ($(fmt_sql_list "$rootRescs"))
-	UNION SELECT m.resc_id, m.resc_net
-		FROM resc_hier AS h JOIN r_resc_main AS m ON m.resc_parent = h.resc_id::TEXT
-		WHERE h.resc_net = 'EMPTY_RESC_HOST' )
-SELECT resc_id FROM resc_hier;
 
-CREATE INDEX store_resc_idx ON store_resc(id);
-EOF
-}
+def _fmt_project_row(row: Series, columns: pandas.Index) -> str:
+    tr = "<tr>"
 
-fmt_sql_list() {
-	local elmts
-	readarray -t elmts <<< "$@"
+    for col in columns:
+        if col == "Owner" and row[col]:
+            tr += _fmt_owner_cell(row[col])
+        else:
+            tr += f"<td>{row[col]}</td>"
 
-	local list=''
+    tr += "</tr>"
+    return tr
 
-	local elmt
-	for elmt in "${elmts[@]}"; do
-		if [[ -n "$list" ]]; then
-			list+=', '
-		fi
 
-		list+="'$elmt'"
-	done
+def _fmt_owner_cell(val: str) -> str:
+    owners = [owner.strip() for owner in val.split("; ")]
+    owners_details = [_resolve_user_info(owner) for owner in owners]
+    summary_line = "; ".join([info['fullname'] for info in owners_details])
 
-	echo "$list"
-}
+    cell = f"""
+        <td>
+            <details>
+                <summary>{summary_line}</summary>
+                <table class="subtable">
+    """
 
-get_local_zone() {
-	psql --no-align --tuples-only \
-		--command="SELECT zone_name FROM r_zone_main WHERE zone_type_name = 'local'" \
-		ICAT
-}
+    for _, owner_info in enumerate(owners_details):
+        cell += _fmt_owner_info(owner_info)
 
-main "$@"
+    cell += """
+                    <tr><td colspan="2" class="separator"></td></tr>
+                </table>
+            </details>
+        </td>
+    """
+
+    return cell
+
+
+def _fmt_owner_info(info: Dict[str, str]) -> str:
+    if info['fullname'] == info['username']:
+        full_name = "???"
+    else:
+        full_name = info['fullname']
+
+    row = f'<tr><td colspan="2" class="owner-header">{full_name} ({info["username"]})</td></tr>'
+
+    if info['username'] == info['fullname']:
+        row += '<tr><td colspan="2">No detailed information available</td></tr>'
+    else:
+        if info['email']:
+            row += f"""
+                <tr>
+                    <td class="label">Email:</td>
+                    <td><a href="mailto:{info['email']}">{info['email']}</a></td>
+                </tr>
+            """
+
+        if info['title']:
+            row += f'<tr><td class="label">Title:</td><td>{info["title"]}</td></tr>'
+
+        if info['department']:
+            row += f'<tr><td class="label">Department:</td><td>{info["department"]}</td></tr>'
+
+        if info['organization']:
+            row += f'<tr><td class="label">Organization:</td><td>{info["organization"]}</td></tr>'
+
+    return row
+
+
+def _resolve_user_info(username: str) -> Dict[str, str]:
+    if username:
+        info = _get_ldap_user_info(username)
+
+        if info:
+            return info
+
+    return {
+        'username': username,
+        'fullname': username,
+        'email': '',
+        'title': '',
+        'department': '',
+        'organization': ''
+    }
+
+
+def _get_ldap_user_info(username: str) -> Optional[Dict]:
+    """Query LDAP for detailed user information."""
+    try:
+        conn = ldap.initialize(_LDAP_URL)
+        conn.set_option(ldap.OPT_REFERRALS, 0)  # pylint: disable=no-member # type: ignore
+
+        result = conn.search_s(
+            _LDAP_BASE,
+            ldap.SCOPE_SUBTREE,  # pylint: disable=no-member # type: ignore
+            f"(uid={username})",
+            ['cn', 'mail', 'title', 'departmentNumber', 'uid', 'o'])
+
+        if result and len(result) > 0:
+            _, attrs = result[0]  # type: ignore
+
+            return {
+                'fullname': attrs.get('cn', [b''])[0].decode('utf-8'),
+                'email': attrs.get('mail', [b''])[0].decode('utf-8'),
+                'title': attrs.get('title', [b''])[0].decode('utf-8'),
+                'department': attrs.get('departmentNumber', [b''])[0].decode('utf-8'),
+                'username': attrs.get('uid', [b''])[0].decode('utf-8'),
+                'organization': attrs.get('o', [b''])[0].decode('utf-8'),
+            }
+
+        conn.unbind()
+    except LDAPError as e:
+        print(f"LDAP error for user {username}: {e}")
+
+    return None
+
+
+def _gen_report(root_resources: List[str], icat: Connection, irods: iRODSSession) -> DataFrame:
+    """Generate the report data using temporary tables."""
+    with icat.begin() as trans:
+        icat.execute(sqlalchemy.text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"))
+        metadata = MetaData()
+        _create_store_resc_table(icat, metadata, root_resources)
+        _create_proj_coll_table(icat, metadata, irods.zone)
+        _create_proj_data_table(icat, metadata)
+        _create_pub_obj_table(icat, metadata)
+        _create_pub_proj_data_table(icat, metadata)
+        result = _get_icat_report_data(icat)
+        trans.rollback()
+
+    result["Owner"] = result["Project"].apply(lambda proj: _get_irods_owner_info(proj, irods))
+    return result
+
+
+def _create_store_resc_table(icat: Connection, metadata: MetaData, root_resources: List[str]):
+    """Create temporary table for storage resources using SQLAlchemy."""
+    store_resc = Table(
+        'store_resc', metadata, sqlalchemy.Column('id', BigInteger), prefixes=['TEMPORARY'])
+
+    store_resc.create(icat)
+    sqlalchemy.Index('store_resc_idx', store_resc.c.id).create(icat)
+    resources_str = ", ".join(f"'{r}'" for r in root_resources)
+
+    recursive_query = f"""
+        WITH RECURSIVE resc_hier(resc_id, resc_net) AS (
+            SELECT resc_id, resc_net
+                FROM r_resc_main
+                WHERE resc_name IN ({resources_str})
+            UNION SELECT m.resc_id, m.resc_net
+                FROM resc_hier AS h JOIN r_resc_main AS m ON m.resc_parent = h.resc_id::TEXT
+                WHERE h.resc_net = 'EMPTY_RESC_HOST')
+        INSERT INTO store_resc (id) SELECT resc_id FROM resc_hier
+    """
+
+    icat.execute(sqlalchemy.text(recursive_query))
+
+
+def _create_proj_coll_table(icat: Connection, metadata: MetaData, zone: str):
+    """Create temporary table for project collections using SQLAlchemy."""
+    proj_coll = Table(
+        'proj_coll',
+        metadata,
+        sqlalchemy.Column('proj', String),
+        sqlalchemy.Column('coll_id', BigInteger),
+        prefixes=['TEMPORARY'])
+
+    proj_coll.create(icat)
+    sqlalchemy.Index('proj_coll_idx', proj_coll.c.coll_id).create(icat)
+
+    insert_query = f"""
+        INSERT INTO proj_coll (proj, coll_id)
+        SELECT
+            REGEXP_REPLACE(c.coll_name, '/{zone}/home/shared/([^/]+).*', E'\\\\1') AS proj,
+            c.coll_id
+        FROM r_coll_main c
+        WHERE c.coll_name LIKE '/{zone}/home/shared/%'
+            AND c.coll_name NOT SIMILAR TO '/{zone}/home/shared/commons_repo(/%)?'
+    """
+
+    icat.execute(sqlalchemy.text(insert_query))
+
+
+def _create_proj_data_table(icat: Connection, metadata: MetaData):
+    """Create temporary table for project data using SQLAlchemy."""
+    proj_data = Table(
+        'proj_data',
+        metadata,
+        sqlalchemy.Column('proj', String),
+        sqlalchemy.Column('coll_id', BigInteger),
+        sqlalchemy.Column('data_id', BigInteger),
+        sqlalchemy.Column('data_size', BigInteger),
+        prefixes=['TEMPORARY'])
+
+    proj_data.create(icat)
+    idx = sqlalchemy.Index('proj_data_coll_data_idx', proj_data.c.coll_id, proj_data.c.data_id)
+    idx.create(icat)
+    sqlalchemy.Index('proj_data_data_idx', proj_data.c.data_id).create(icat)
+
+    insert_query = """
+        INSERT INTO proj_data (proj, coll_id, data_id, data_size)
+        SELECT c.proj, c.coll_id, d.data_id, d.data_size
+        FROM proj_coll AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
+        WHERE d.resc_id IN (SELECT id FROM store_resc)
+    """
+
+    icat.execute(sqlalchemy.text(insert_query))
+
+
+def _create_pub_obj_table(icat: Connection, metadata: MetaData):
+    """Create temporary table for public objects using SQLAlchemy."""
+    pub_obj = Table(
+        'pub_obj', metadata, sqlalchemy.Column('id', BigInteger), prefixes=['TEMPORARY'])
+
+    pub_obj.create(icat)
+    sqlalchemy.Index('pub_obj_idx', pub_obj.c.id).create(icat)
+
+    insert_query = """
+        INSERT INTO pub_obj (id)
+        SELECT object_id
+        FROM r_objt_access
+        WHERE user_id = (SELECT user_id FROM r_user_main WHERE user_name = 'public')
+    """
+
+    icat.execute(sqlalchemy.text(insert_query))
+
+
+def _create_pub_proj_data_table(icat: Connection, metadata: MetaData):
+    """Create temporary table for public project data using SQLAlchemy."""
+    pub_proj_data = Table(
+        'pub_proj_data',
+        metadata,
+        sqlalchemy.Column('proj', String),
+        sqlalchemy.Column('data_id', BigInteger),
+        sqlalchemy.Column('data_size', BigInteger),
+        prefixes=['TEMPORARY'])
+
+    pub_proj_data.create(icat)
+    sqlalchemy.Index('pub_proj_data_data_idx', pub_proj_data.c.data_id).create(icat)
+    sqlalchemy.Index('pub_proj_data_proj_idx', pub_proj_data.c.proj).create(icat)
+
+    insert_query = """
+        INSERT INTO pub_proj_data (proj, data_id, data_size)
+        SELECT proj, data_id, data_size
+        FROM proj_data
+        WHERE coll_id IN (SELECT id FROM pub_obj) AND data_id IN (SELECT id FROM pub_obj)
+    """
+
+    icat.execute(sqlalchemy.text(insert_query))
+
+
+def _get_icat_report_data(icat: Connection) -> DataFrame:
+    query = """
+        SELECT
+            ROUND((tot_vol / 2^30)::NUMERIC, 3) AS "Total",
+            ROUND((pub_vol / 2^30)::NUMERIC, 3) AS "Public",
+            ROUND(((tot_vol - pub_vol) / 2^30)::NUMERIC, 3) AS "Private",
+            proj AS "Project"
+        FROM (
+            SELECT a.proj, SUM(a.data_size) AS tot_vol, COALESCE(SUM(p.data_size), 0) AS pub_vol
+            FROM (SELECT DISTINCT proj, data_id, data_size FROM proj_data) AS a
+                LEFT JOIN (SELECT DISTINCT proj, data_id, data_size FROM pub_proj_data) AS p
+                    ON p.data_id = a.data_id AND p.proj = a.proj
+            GROUP BY a.proj
+        ) AS t
+        ORDER BY proj
+    """
+
+    return pandas.read_sql_query(sqlalchemy.text(query), icat)
+
+
+def _get_irods_owner_info(proj: str, irods: iRODSSession) -> str:
+    """Get owner information from iRODS metadata."""
+    try:
+        coll_path = f"/{irods.zone}/home/shared/{proj}"
+        collection = irods.collections.get(coll_path)
+        owners = []
+
+        if collection:
+            for meta in collection.metadata.items():
+                if meta.name == "ipc::project-owner":
+                    owners.append(meta.value)
+
+        return "; ".join(owners) if owners else ""
+    except iRODSException as e:
+        print(f"Error retrieving owner info for project {proj}: {e}")
+        return ""
+
+
+def _mk_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Generate report on public and private data usage per project.")
+
+    parser.add_argument(
+        "-H", "--pghost", default=os.environ.get('PGHOST', 'localhost'), help="PostgreSQL host")
+
+    parser.add_argument(
+        "-P", "--pgport", default=os.environ.get('PGPORT', 5432), help="PostgreSQL port")
+
+    parser.add_argument(
+        "-U", "--pguser", default=os.environ.get('PGUSER', 'postgres'), help="PostgreSQL user")
+
+    parser.add_argument("resources", nargs="+", help="List of root resources to analyze")
+    return parser
+
+
+def _webdav_url(irods: iRODSSession, report_file: str) -> str:
+    dav_loc = os.path.join("dav", irods.zone, "projects", _DS_REPORT_LOC, report_file)
+    return f"https://{irods.host}/{dav_loc}"
+
+
+if __name__ == "__main__":
+    main()
