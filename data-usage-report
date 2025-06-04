@@ -1,7 +1,8 @@
 #!/usr/bin/env --split-string=uv run --script
 # -*- coding: utf-8 -*-
 #
-# ///
+# /// script
+# requires-python = ">=3.12"
 # dependencies = [
 #    "pandas",
 #    "psycopg2-binary",
@@ -258,7 +259,7 @@ def _fmt_owner_info(info: Dict[str, str]) -> str:
     else:
         full_name = info['fullname']
 
-    row = f'<tr><td colspan="2" class="owner-header">{full_name} ({info['username']})</td></tr>'
+    row = f'<tr><td colspan="2" class="owner-header">{full_name} ({info["username"]})</td></tr>'
 
     if info['username'] == info['fullname']:
         row += '<tr><td colspan="2">No detailed information available</td></tr>'
@@ -272,13 +273,13 @@ def _fmt_owner_info(info: Dict[str, str]) -> str:
             """
 
         if info['title']:
-            row += f'<tr><td class="label">Title:</td><td>{info['title']}</td></tr>'
+            row += f'<tr><td class="label">Title:</td><td>{info["title"]}</td></tr>'
 
         if info['department']:
-            row += f'<tr><td class="label">Department:</td><td>{info['department']}</td></tr>'
+            row += f'<tr><td class="label">Department:</td><td>{info["department"]}</td></tr>'
 
         if info['organization']:
-            row += f'<tr><td class="label">Organization:</td><td>{info['organization']}</td></tr>'
+            row += f'<tr><td class="label">Organization:</td><td>{info["organization"]}</td></tr>'
 
     return row
 
