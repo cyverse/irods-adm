@@ -1,4 +1,4 @@
-#!/usr/bin/env --split-string=uv run --script
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
 # -*- coding: utf-8 -*-
 #
 # /// script
