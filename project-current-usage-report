@@ -28,10 +28,12 @@ given list of root resources.
 import argparse
 from datetime import datetime
 import os
+import shutil
 import sys
 from tempfile import NamedTemporaryFile
+import textwrap
 import traceback
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from irods.exception import iRODSException
 from irods.session import iRODSSession
@@ -132,23 +134,30 @@ _REPORT_CSS = """
 """
 
 
-def main():
-    """Main function to parse arguments and generate the report."""
+def main(args: List[str]) -> int:
+    """Main function to parse arguments and generate the report.
+
+    Params:
+        args: these are the command line arguments
+    """
     try:
-        args = _mk_arg_parser().parse_args()
+        term_wid, _ = shutil.get_terminal_size()
+        opts = _mk_arg_parser(term_wid).parse_args(args)
         report_date = datetime.now()
         report_file = f"report_{report_date.strftime('%Y-%m-%d')}.html"
         fmt_report_date = report_date.strftime('%Y-%m-%d %H:%M:%S')
         print(f"PROJECT STORAGE USAGE REPORT - GENERATED ON {fmt_report_date}\n")
 
         with iRODSSession(irods_env_file=_IRODS_ENV_FILE) as irods:
-            with _connect_icat(args.pghost, args.pgport, args.pguser) as icat:
-                _report(report_file, irods, icat, args.resources)
+            with _connect_icat(opts.pghost, opts.pgport, opts.pguser) as icat:
+                _report(report_file, irods, icat, opts.resources)
                 print(f"To access report, please visit {_webdav_url(irods, report_file)}")
     except RuntimeError as e:
         print(f"ERROR: {str(e)}")
         print(traceback.format_exc())
-        sys.exit(1)
+        return 1
+
+    return 0
 
 
 def _connect_icat(host: str, port: int, user: str) -> Connection:
@@ -503,21 +512,69 @@ def _get_irods_owner_info(proj: str, irods: iRODSSession) -> str:
         return ""
 
 
-def _mk_arg_parser() -> argparse.ArgumentParser:
+def _mk_arg_parser(disp_wid: int) -> argparse.ArgumentParser:
+    desc_lines = textwrap.wrap(
+        "Generate report on public and private data usage per project.", width=disp_wid)
+
     parser = argparse.ArgumentParser(
-        description="Generate report on public and private data usage per project.")
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description='\n'.join(desc_lines),
+        epilog=_desc_env_vars(disp_wid))
 
     parser.add_argument(
-        "-H", "--pghost", default=os.environ.get('PGHOST', 'localhost'), help="PostgreSQL host")
+        "-H", "--pghost",
+        default=os.environ.get('PGHOST', 'localhost'),
+        help="PostgreSQL host if the ICAT DB")
 
     parser.add_argument(
-        "-P", "--pgport", default=os.environ.get('PGPORT', 5432), help="PostgreSQL port")
+        "-P", "--pgport",
+        default=os.environ.get('PGPORT', 5432),
+        help="TCP port used by PostgreSQL")
 
     parser.add_argument(
-        "-U", "--pguser", default=os.environ.get('PGUSER', 'postgres'), help="PostgreSQL user")
+        "-U", "--pguser",
+        default=os.environ.get('PGUSER', 'postgres'),
+        help="PostgreSQL user for authorizing connection")
 
     parser.add_argument("resources", nargs="+", help="List of root resources to analyze")
     return parser
+
+
+def _desc_env_vars(disp_wid: int) -> str:
+    irods_env_file = 'IRODS_ENVIRONMENT_FILE'
+    irods_env_file_desc = (
+        'the path to the iRODS environment file (default: "~/.irods/irods_environment.json")')
+
+    pghost = 'PGHOST'
+    pghost_desc = 'provides the default value for the PostgreSQL host (default: "localhost")'
+
+    pgport = 'PGPORT'
+    pgport_desc = 'provides the default value for the TCP port used by PostgreSQL (default: 5432)'
+
+    pguser = 'PGUSER'
+    pguser_desc = (
+        'provides the default PostgreSQL user for authorizing connection (default: "postgres")')
+
+    desc_inset = 2 + max(len(v) for v in [irods_env_file, pghost, pgport, pguser])
+
+    return (
+        f'environment variables:\n'
+        f'{_fmt_envvar_help(irods_env_file, irods_env_file_desc, desc_inset, disp_wid)}\n'
+        f'{_fmt_envvar_help(pghost, pghost_desc, desc_inset, disp_wid)}\n'
+        f'{_fmt_envvar_help(pgport, pgport_desc, desc_inset, disp_wid)}\n'
+        f'{_fmt_envvar_help(pguser, pguser_desc, desc_inset, disp_wid)}')
+
+
+def _fmt_envvar_help(var: str, desc: str, desc_inset: int, width: int):
+    offset = ' ' * (desc_inset - len(var))
+    initial_indent = ' ' * 2
+    subsequent_indent = f"{initial_indent}{' ' * desc_inset}"
+    lines = textwrap.wrap(
+        f"{var}{offset}{desc}",
+        width=width,
+        initial_indent=initial_indent,
+        subsequent_indent=subsequent_indent)
+    return '\n'.join(lines)
 
 
 def _webdav_url(irods: iRODSSession, report_file: str) -> str:
@@ -526,4 +583,4 @@ def _webdav_url(irods: iRODSSession, report_file: str) -> str:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(sys.argv[1:]))
