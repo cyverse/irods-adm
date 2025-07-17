@@ -1,0 +1,125 @@
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
+# -*- coding: utf-8 -*-
+#
+# /// script
+# dependencies = [
+#    "python-irodsclient",
+# ]
+# ///
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""Removes a set of user accounts from iRODS"""
+
+import argparse
+from csv import DictReader
+from os import environ, path
+import sys
+
+from irods.column import Criterion, Like
+from irods.exception import CAT_COLLECTION_NOT_EMPTY, SYS_NO_API_PRIV, UserDoesNotExist
+from irods.models import Collection, DataObject
+from irods.session import iRODSSession, NonAnonymousLoginWithoutPassword
+
+
+_HELP_MSG = '''
+This program reads a CSV file from stdin that has one column. The column contains the iRODS
+usernames to delete. The first row is assumed to be a header with label 'username'.
+
+It assumes that the iRODS environment has been initialized. It also assumes that the environment
+variable IRODS_ENVIRONMENT_FILE holds the path to the iRODS environment file. If this variable is
+not set, it uses the default file at ~/.irods/irods_environment.json.
+
+It requires the iRODS server to be running and accessible. It also requires the user running the
+script is a rodsadmin type.
+'''
+
+
+_DEFAULT_IRODS_ENV_FILE = "~/.irods/irods_environment.json"
+
+
+def main() -> int:
+    """the entrypoint"""
+    argparse.ArgumentParser(description=_HELP_MSG).parse_args()
+    irods_env_file = path.expanduser(environ.get("IRODS_ENVIRONMENT_FILE", _DEFAULT_IRODS_ENV_FILE))
+
+    try:
+        with iRODSSession(irods_env_file=irods_env_file) as irods:
+            for entry in DictReader(sys.stdin):
+                _rm_user(irods, entry['username'])
+
+        return 0
+    except SYS_NO_API_PRIV:
+        print("The authenticated user is not a rodsadmin user")
+    except NonAnonymousLoginWithoutPassword as e:
+        print(e, file=sys.stderr)
+
+    return 1
+
+
+def _rm_user(irods: iRODSSession, username: str) -> None:
+    try:
+        _try_rm_user(irods, username)
+        return
+    except CAT_COLLECTION_NOT_EMPTY:
+        pass
+
+    if _has_data(irods, username):
+        print(f"present {username} has data")
+        return
+
+    _rm_user_collections(irods, username)
+    _try_rm_user(irods, username)
+
+
+def _has_data(irods: iRODSSession, username: str) -> bool:
+    return (
+        _has_data_in(irods, _home(irods.zone, username))
+        or _has_data_in(irods, _trash(irods.zone, username))
+    )
+
+
+def _has_data_in(irods: iRODSSession, coll: str) -> bool:
+    result = irods.query().count(DataObject.id).filter(Criterion('=', Collection.name, coll)).one()
+
+    if int(result[DataObject.id]) > 0:
+        return True
+
+    query = irods.query().count(DataObject.id).filter(Like(Collection.name, path.join(coll, '%')))
+
+    if int(query.one()[DataObject.id]) > 0:
+        return True
+
+    return False
+
+
+def _rm_user_collections(irods: iRODSSession, username: str) -> None:
+    for coll_path in [_home(irods.zone, username), _trash(irods.zone, username)]:
+        coll = irods.collections.get(coll_path)
+
+        if coll:
+            for child in coll.subcollections:
+                child.remove(force=True)
+
+
+def _home(zone: str, username: str) -> str:
+    return path.join("/", zone, 'home', username)
+
+
+def _trash(zone: str, username: str) -> str:
+    return path.join("/", zone, "trash", "home", username)
+
+
+def _try_rm_user(irods: iRODSSession, username: str) -> None:
+    name_parts = username.split('#')
+
+    try:
+        irods.users.remove(name_parts[0], user_zone=(name_parts[1] if len(name_parts) > 1 else ""))
+        print(f"absent {username} deleted")
+    except UserDoesNotExist:
+        print(f"absent {username} does not exist")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
