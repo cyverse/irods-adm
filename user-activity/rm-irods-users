@@ -73,8 +73,11 @@ def _rm_user(irods: iRODSSession, username: str) -> None:
         print(f"present {username} has data")
         return
 
-    _rm_user_collections(irods, username)
-    _try_rm_user(irods, username)
+    try:
+        _rm_user_collections(irods, username)
+        _try_rm_user(irods, username)
+    except CAT_COLLECTION_NOT_EMPTY:
+        print(f"present {username} has hidden data")
 
 
 def _has_data(irods: iRODSSession, username: str) -> bool:
