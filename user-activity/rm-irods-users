@@ -63,12 +63,16 @@ def main() -> int:
 def _rm_user(irods: iRODSSession, username: str) -> None:
     try:
         _try_rm_user(irods, username)
+        print(f"absent {username} deleted")
         return
-    except CAT_COLLECTION_NOT_EMPTY:
-        pass
+    except UserDoesNotExist:
+        print(f"absent {username} does not exist")
+        return
     except MultipleResultsFound:
         print(f"present {username} multiple results found")
         return
+    except CAT_COLLECTION_NOT_EMPTY:
+        pass
 
     if _has_data(irods, username):
         print(f"present {username} has data")
@@ -77,6 +81,7 @@ def _rm_user(irods: iRODSSession, username: str) -> None:
     try:
         _rm_user_collections(irods, username)
         _try_rm_user(irods, username)
+        print(f"absent {username} deleted")
     except CAT_COLLECTION_NOT_EMPTY:
         print(f"present {username} has hidden data")
 
@@ -122,13 +127,8 @@ def _trash(zone: str, username: str) -> str:
 
 def _try_rm_user(irods: iRODSSession, username: str) -> None:
     name_parts = username.split('#')
-
-    try:
-        irods.users.remove(
-            name_parts[0], user_zone=(name_parts[1] if len(name_parts) > 1 else irods.zone))
-        print(f"absent {username} deleted")
-    except UserDoesNotExist:
-        print(f"absent {username} does not exist")
+    zone = name_parts[1] if len(name_parts) > 1 else irods.zone
+    irods.users.remove(name_parts[0], user_zone=zone)
 
 
 if __name__ == "__main__":
