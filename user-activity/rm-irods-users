@@ -44,9 +44,10 @@ def main() -> int:
     """the entrypoint"""
     argparse.ArgumentParser(description=_HELP_MSG).parse_args()
     irods_env_file = path.expanduser(environ.get("IRODS_ENVIRONMENT_FILE", _DEFAULT_IRODS_ENV_FILE))
-
     try:
         with iRODSSession(irods_env_file=irods_env_file) as irods:
+            irods.connection_timeout = 300
+
             for entry in DictReader(sys.stdin):
                 _rm_user(irods, entry['username'])
 
