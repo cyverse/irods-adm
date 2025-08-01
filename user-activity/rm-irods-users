@@ -94,7 +94,8 @@ def _has_data_in(irods: iRODSSession, coll: str) -> bool:
     if int(result[DataObject.id]) > 0:
         return True
 
-    query = irods.query().count(DataObject.id).filter(Like(Collection.name, path.join(coll, '%')))
+    collPat = path.join(coll.replace("_", "\\_"), "%")
+    query = irods.query().count(DataObject.id).filter(Like(Collection.name, collPat))
 
     if int(query.one()[DataObject.id]) > 0:
         return True
