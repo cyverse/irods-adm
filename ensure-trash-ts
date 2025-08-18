@@ -1,4 +1,6 @@
 #!/usr/bin/env --split-string=uv run --script
+# # -*- coding: utf-8 -*-
+#
 # /// script
 # dependencies = [
 #    "python-irodsclient",
