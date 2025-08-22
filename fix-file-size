@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# © 2024 The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 show_help() {
 	cat <<EOF
@@ -110,10 +113,10 @@ FIX() {
 		local rs="$1"
 		local cmd="$2"
 
-		local superCmd="if [[ \$USER == irods ]]; then $cmd; else sudo -i -u irods <<'EOSUDO'
+		local superCmd="if [[ \$USER == irods ]]; then $cmd; else sudo -i -u irods <<'EOF'
 $cmd
-EOSUDO
-fi"
+EOF
+		fi"
 
 		#shellcheck disable=SC2087
 		ssh -q -t "$rs" "$superCmd" < /dev/null
