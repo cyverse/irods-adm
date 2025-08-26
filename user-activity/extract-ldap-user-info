@@ -1,0 +1,99 @@
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
+# -*- coding: utf-8 -*-
+#
+# /// script
+# dependencies = [
+#    "python-ldap",
+# ]
+# ///
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""Extract user contact information from LDAP
+This program reads a CSV file from stdin that has one column. The column contains the CyVerse
+usernames to lookup contact information in LDAP. The first row is assumed to be a header with label
+'username'.
+
+After looking up the information, it writes all information found to stdout. If a username isn't
+present, it writes the username to stderr along with an error message.
+
+It write a five column CSV file to stdout with one row per user. The columns are in order:
+'username', 'create_date', 'expire_date', 'cn', and 'mail'. The dates are in ISO-8601 format.
+"""
+
+from csv import DictReader, DictWriter
+from datetime import date, timedelta
+import sys
+from typing import Dict, Optional
+
+import ldap
+from ldap import LDAPError  # pylint: disable=no-name-in-module # type: ignore
+
+
+_LDAP_URL = 'ldap://ldap.iplantcollaborative.org'
+_LDAP_BASE = 'dc=iplantcollaborative,dc=org'
+
+
+def main():
+    """the entrypoint"""
+
+    writer = DictWriter(sys.stdout, ['username', 'create_date', 'expire_date', 'cn', 'mail'])
+    writer.writeheader()
+
+    for entry in DictReader(sys.stdin):
+        info = _get_ldap_user_info(entry['username'])
+
+        if info:
+            writer.writerow(info)
+
+
+def _get_ldap_user_info(username: str) -> Optional[Dict]:
+    try:
+        conn = ldap.initialize(_LDAP_URL)
+        conn.set_option(ldap.OPT_REFERRALS, 0)  # pylint: disable=no-member # type: ignore
+
+        result = conn.search_s(
+            _LDAP_BASE,
+            ldap.SCOPE_SUBTREE,  # pylint: disable=no-member # type: ignore
+            f"(uid={username})",
+            ['uid', 'cn', 'mail', 'shadowLastChange', 'shadowExpire'])
+
+        if result and len(result) > 0:
+            _, attrs = result[0]  # type: ignore
+
+            shadow_last_change = attrs.get('shadowLastChange')
+
+            if shadow_last_change:
+                create_date = _convert_shadow_to_date(shadow_last_change[0].decode('utf-8'))
+            else:
+                create_date = date(2011, 1, 1)
+
+            shadow_expire = attrs.get('shadowExpire')
+
+            if shadow_expire:
+                expire_date = _convert_shadow_to_date(shadow_expire[0].decode('utf-8'))
+            else:
+                expire_date = create_date + timedelta(365*2)
+
+            return {
+                'username': attrs.get('uid', [b''])[0].decode('utf-8'),
+                'create_date': str(create_date),
+                'expire_date': str(expire_date),
+                'cn': attrs.get('cn', [b''])[0].decode('utf-8'),
+                'mail': attrs.get('mail', [b''])[0].decode('utf-8'),
+            }
+
+        conn.unbind()
+    except LDAPError as e:
+        print(f"LDAP error for user {username}: {e}", file=sys.stderr)
+
+    return None
+
+
+def _convert_shadow_to_date(shadow_date: str) -> date:
+    return date.fromtimestamp(int(shadow_date) * 86_400)
+
+
+if __name__ == "__main__":
+    main()
