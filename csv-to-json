@@ -1,0 +1,55 @@
+#!/usr/bin/env python3  # pylint: disable=invalid-name
+# -*- coding: utf-8 -*-
+#
+# # © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""
+CSV to JSON-SEQ converter.
+
+This module provides functionality to convert CSV data from stdin to JSON Sequence
+format (RFC 7464), writing the result to stdout. Each JSON record is prefixed with
+RS (0x1E) and followed by LF. The CSV headers are used as JSON object keys.
+"""
+
+import csv
+import json
+import sys
+from typing import Dict
+
+
+def convert_csv_to_json_seq() -> None:
+    """
+    Convert CSV data from stdin to JSON Sequence format and write to stdout.
+
+    The function reads CSV formatted data from standard input and converts each row
+    to a JSON object. Each object is prefixed with RS (0x1E) and followed by LF,
+    conforming to RFC 7464 JSON Sequence format.
+
+    Raises:
+        csv.Error: If there is an error reading the CSV input
+        TypeError: If there is an error encoding the data as JSON
+    """
+    try:
+        reader = csv.DictReader(sys.stdin)
+
+        # Process each row individually to create JSON-SEQ format
+        for row in reader:
+            record: Dict[str, str] = row
+            # Write Record Separator (RS)
+            sys.stdout.buffer.write(b'\x1E')
+            # Write JSON record
+            json.dump(record, sys.stdout)
+            # Write Line Feed (LF)
+            sys.stdout.write('\n')
+
+    except csv.Error as err:
+        print(f"Error reading CSV data: {err}", file=sys.stderr)
+        sys.exit(1)
+    except TypeError as err:
+        print(f"Error encoding JSON: {err}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    convert_csv_to_json_seq()
