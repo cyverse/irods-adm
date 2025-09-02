@@ -1,4 +1,4 @@
-#!/usr/bin/env python3  # pylint: disable=invalid-name
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
 # -*- coding: utf-8 -*-
 #
 # # © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
@@ -15,7 +15,6 @@ RS (0x1E) and followed by LF. The CSV headers are used as JSON object keys.
 import csv
 import json
 import sys
-from typing import Dict
 
 
 def convert_csv_to_json_seq() -> None:
@@ -35,9 +34,16 @@ def convert_csv_to_json_seq() -> None:
 
         # Process each row individually to create JSON-SEQ format
         for row in reader:
-            record: Dict[str, str] = row
+            record = {
+                "username": row["username"],
+                "full_name": row["full_name"],
+                "last_activity": row["last_activity"],
+                "file_count": int(row["file_count"]),
+                "file_volume": int(row["file_volume"]),
+                "mail": row["mail"],
+            }
             # Write Record Separator (RS)
-            sys.stdout.buffer.write(b'\x1E')
+            sys.stdout.write('\x1E')
             # Write JSON record
             json.dump(record, sys.stdout)
             # Write Line Feed (LF)
