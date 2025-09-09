@@ -1,0 +1,191 @@
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
+# -*- coding: utf-8 -*-
+#
+# /// script
+# dependencies = [
+#     "jinja2",
+# ]
+# ///
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""
+CyVerse Account Removal Notification Script
+
+This script processes JSON-SEQ formatted user data from stdin and sends account
+removal notification emails to users whose accounts are scheduled for deletion
+due to inactivity.
+
+The script reads JSON documents line-by-line from standard input, where each line
+contains a JSON object with user information. For each user record, it generates
+a personalized email using a Jinja2 template and sends it via SMTP.
+
+Required JSON fields for each user record:
+    - username: The user's CyVerse username
+    - full_name: The user's full name (display name)
+    - mail: The user's email address
+
+The email template (removal-notification-msg.j2) should be located in the same
+directory as this script and will be rendered with the user's 'full_name' and 'username'
+variables.
+
+Environment Variables:
+    SMTP_SERVER: SMTP server hostname (default: localhost)
+    SMTP_PORT: SMTP server port (default: 25)
+
+Usage:
+    cat users.jsonseq | ./notify-users
+
+Example JSON-SEQ input:
+    {"username": "jdoe", "full_name": "John Doe", "mail": "jdoe@example.com"}
+    {"username": "asmith", "full_name": "Alice Smith", "mail": "asmith@example.com"}
+
+Exit Codes:
+    0: All emails sent successfully
+    1: One or more errors occurred during processing
+"""
+
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import json
+import os
+from pathlib import Path
+from smtplib import SMTP, SMTPException
+import sys
+import time
+from typing import TextIO
+
+from jinja2 import Environment, FileSystemLoader, Template, TemplateError
+
+
+FROM_ADDR: str = "tedgin@cyverse.org (CyVerse)"
+REPLY_ADDR: str = "support@cyverse.org (CyVerse Support)"
+SUBJECT: str = "Inactive CyVerse Account Removal"
+SEND_DELAY: int = 3
+
+
+def main() -> None:
+    """Main function to process JSON-SEQ and send notification emails."""
+    try:
+        success = process_json_seq(
+            sys.stdin,
+            load_template(Path(__file__).parent / "removal-notification-msg.j2"),
+            os.getenv("SMTP_SERVER", "localhost"),
+            int(os.getenv("SMTP_PORT", "25")))
+
+        sys.exit(0 if success else 1)
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user", file=sys.stderr)
+    except (FileNotFoundError, PermissionError) as err:
+        print(f"Fatal error: {err}", file=sys.stderr)
+    except TemplateError as err:
+        print(f"Configuration error: {err}", file=sys.stderr)
+    except ValueError as err:
+        print(f"Configuration error: {err}", file=sys.stderr)
+
+    sys.exit(1)
+
+
+def load_template(template_path: Path) -> Template:
+    """Load the Jinja2 template from the same directory as this script."""
+    if not template_path.exists():
+        raise FileNotFoundError(f"Template file not found: {template_path}")
+
+    env = Environment(loader=FileSystemLoader(template_path.parent))
+    return env.get_template(template_path.name)
+
+
+def process_json_seq(
+    user_seq: TextIO, template: Template, smtp_server: str, smtp_port: int
+) -> bool:
+    """
+    Read JSON-SEQ from stdin and process each document.
+
+    Returns:
+        True if all records processed successfully, False otherwise
+    """
+    success_count = 0
+    error_count = 0
+
+    for line_num, line in enumerate(user_seq, 1):
+        line = line.strip()
+        if not line:
+            continue
+
+        try:
+            data = json.loads(line)
+            username = data.get("username")
+            full_name = data.get("full_name")
+            email = data.get("mail")
+
+            if not username:
+                print(f"Line {line_num}: Missing 'username' field", file=sys.stderr)
+                error_count += 1
+                continue
+
+            if not full_name:
+                print(f"Line {line_num}: Missing 'full_name' field", file=sys.stderr)
+                error_count += 1
+                continue
+
+            if not email:
+                print(f"Line {line_num}: Missing 'mail' field", file=sys.stderr)
+                error_count += 1
+                continue
+
+            message_body = template.render(full_name=full_name, username=username)
+
+            if send_email(email, message_body, smtp_server, smtp_port):
+                success_count += 1
+            else:
+                error_count += 1
+        except json.JSONDecodeError as err:
+            print(f"Line {line_num}: Invalid JSON - {err}", file=sys.stderr)
+            error_count += 1
+        except (KeyError, ValueError) as err:
+            print(f"Line {line_num}: Data validation error - {err}", file=sys.stderr)
+            error_count += 1
+
+        time.sleep(SEND_DELAY)
+
+    print(
+        f"Processing complete: {success_count} emails sent, {error_count} errors", file=sys.stderr)
+
+    return error_count == 0
+
+
+def send_email(to_addr: str, body: str, smtp_server: str, smtp_port: int) -> bool:
+    """
+    Send an email using the configured SMTP server.
+
+    Args:
+        to_addr: Recipient's email address
+        body: Email message body
+        smtp_server: SMTP server hostname
+        smtp_port: SMTP server port number
+
+    Returns:
+        True if email sent successfully, False otherwise
+    """
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = FROM_ADDR
+        msg['To'] = to_addr
+        msg['Reply-To'] = REPLY_ADDR
+        msg['Subject'] = SUBJECT
+        msg.attach(MIMEText(body, 'plain'))
+
+        with SMTP(smtp_server, smtp_port) as server:
+            text = msg.as_string()
+            server.sendmail("support@cyverse.org", to_addr, text)
+
+        print(f"Email sent successfully to {to_addr}", file=sys.stderr)
+        return True
+    except (SMTPException, ConnectionError, OSError) as err:
+        print(f"Failed to send email to {to_addr}: {err}", file=sys.stderr)
+        return False
+
+
+if __name__ == "__main__":
+    main()
