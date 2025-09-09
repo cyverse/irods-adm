@@ -61,7 +61,7 @@ from jinja2 import Environment, FileSystemLoader, Template, TemplateError
 
 FROM_ADDR: str = "tedgin@ds-adm.cyverse.org (CyVerse)"
 REPLY_ADDR: str = "tedgin@cyverse.org (CyVerse Support)"
-SUBJECT: str = "Inactive CyVerse account removal"
+SUBJECT: str = "Your CyVerse account will be removed in 90 days"
 SEND_DELAY: int = 3
 
 
