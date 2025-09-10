@@ -55,11 +55,14 @@ from smtplib import SMTP, SMTPException
 import sys
 import time
 from typing import TextIO
+import getpass
+import socket
 
 from jinja2 import Environment, FileSystemLoader, Template, TemplateError
 
 
-FROM_ADDR: str = "tedgin@ds-adm.cyverse.org (CyVerse)"
+# Dynamically set FROM_ADDR using the current username and FQDN
+
 REPLY_ADDR: str = "tedgin@cyverse.org (CyVerse Support)"
 SUBJECT: str = "Your CyVerse account will be removed in 90 days"
 SEND_DELAY: int = 3
@@ -68,9 +71,13 @@ SEND_DELAY: int = 3
 def main() -> None:
     """Main function to process JSON-SEQ and send notification emails."""
     try:
+        from_user = getpass.getuser()
+        from_domain = socket.getfqdn()
+
         success = process_json_seq(
             sys.stdin,
             load_template(Path(__file__).parent / "removal-notification-msg.j2"),
+            f"{from_user}@{from_domain} (CyVerse)",
             os.getenv("SMTP_SERVER", "localhost"),
             int(os.getenv("SMTP_PORT", "25")))
 
@@ -97,7 +104,7 @@ def load_template(template_path: Path) -> Template:
 
 
 def process_json_seq(
-    user_seq: TextIO, template: Template, smtp_server: str, smtp_port: int
+    user_seq: TextIO, template: Template, from_addr: str, smtp_server: str, smtp_port: int
 ) -> bool:
     """
     Read JSON-SEQ from stdin and process each document.
@@ -136,7 +143,7 @@ def process_json_seq(
 
             message_body = template.render(full_name=full_name, username=username)
 
-            if send_email(email, message_body, smtp_server, smtp_port):
+            if send_email(from_addr, email, message_body, smtp_server, smtp_port):
                 success_count += 1
             else:
                 error_count += 1
@@ -155,7 +162,7 @@ def process_json_seq(
     return error_count == 0
 
 
-def send_email(to_addr: str, body: str, smtp_server: str, smtp_port: int) -> bool:
+def send_email(from_addr: str, to_addr: str, body: str, smtp_server: str, smtp_port: int) -> bool:
     """
     Send an email using the configured SMTP server.
 
@@ -170,7 +177,7 @@ def send_email(to_addr: str, body: str, smtp_server: str, smtp_port: int) -> boo
     """
     try:
         msg = MIMEMultipart()
-        msg['From'] = FROM_ADDR
+        msg['From'] = from_addr
         msg['To'] = to_addr
         msg['Reply-To'] = REPLY_ADDR
         msg['Subject'] = SUBJECT
