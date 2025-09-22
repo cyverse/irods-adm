@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 #
 # This describes the current state of the rule queue. It reports the total
 # number of executions in the queue. It also reports the number of executions
@@ -34,7 +34,7 @@
 
 set -o errexit -o nounset -o pipefail
 
-# Pertenent Internal Data Structures
+# Pertinent Internal Data Structures
 #
 # RULE_EXEC_REPORT
 #  Internally, this script passes around a RULE_EXEC_REPORT text object. It is a
@@ -43,22 +43,22 @@ set -o errexit -o nounset -o pipefail
 #
 # RULE_EXEC
 #  A RULE_EXEC text object is a description of scheduled rule execution. It
-#  consists of a sequence of key-value pairs of the form "<key> = <value>" where 
-#  each pair is separated by a line feed. The sequence of keys are the 
+#  consists of a sequence of key-value pairs of the form "<key> = <value>" where
+#  each pair is separated by a line feed. The sequence of keys are the
 #  following.
 #
 #  RULE_EXEC_ID             the rule execution Id
-#  RULE_EXEC_REI_FILE_PATH  the absolute path to the REI file on the rule engine 
+#  RULE_EXEC_REI_FILE_PATH  the absolute path to the REI file on the rule engine
 #                           host
 #  RULE_EXEC_STATUS         the current status of the rule execution, the only
 #                           value of interest is "RUNNING", which means the
 #                           rule is currently being executed
-#  RULE_EXEC_TIME           the local time when the rule execution is schedule 
-#                           in the form "<YYYY>/<MM>/<DD>T<hh>" where <YYYY> is 
-#                           the four digit Gregorian year, <MM> is the two digit 
-#                           month number, <DD> is the two digit day of the 
+#  RULE_EXEC_TIME           the local time when the rule execution is schedule
+#                           in the form "<YYYY>/<MM>/<DD>T<hh>" where <YYYY> is
+#                           the four digit Gregorian year, <MM> is the two digit
+#                           month number, <DD> is the two digit day of the
 #                           month, and <hh> is the two digit 24-hour clock hour
-#  RULE_EXEC_USER_NAME      the user account that caused the rule execution to 
+#  RULE_EXEC_USER_NAME      the user account that caused the rule execution to
 #                           be scheduled
 #  RULE_EXEC_NAME           the rule to be executed
 
@@ -71,7 +71,7 @@ main() {
 	trap "rm --force '$queueContents'" EXIT
 
  	gather_rules > "$queueContents"
- 
+
 	local reportWidth
 	reportWidth="$(tput cols)"
 
@@ -157,7 +157,7 @@ report_user_summary() {
 # generates a report describing the rule engine's current set of scheduled rule
 # executions.
 # Output:
-#  a RULE_EXEC_REPORT object 
+#  a RULE_EXEC_REPORT object
 gather_rules() {
 	iquest --no-page \
 			no-distinct \
@@ -174,20 +174,20 @@ gather_rules() {
 
 # converts the raw output of `iquest` into rule execution report
 # Input:
-#  It expects a set of objects delineated by a line of 60 hyphens ("-"). Each 
-#  object consists of a sequence of key-value pairs of the form 
-#  "<key> = <value>" where a <key> is at the beginning of a line. A <value> may 
-#  contain line feeds, The keys are the following: "RULE_EXEC_ID" holds the rule 
-#  execution Id, "RULE_EXEC_REI_FILE_PATH" holds the absolute path to the REI 
-#  file on the rule engine host, "RULE_EXEC_STATUS? holds the current status of 
-#  the rule execution, "RULE_EXEC_TIME" holds the time when the rule execution 
-#  is schedule in seconds since the POSIX epoch, "RULE_EXEC_USER_NAME" holds the 
-#  user account that caused the rule execution to be scheduled, and 
+#  It expects a set of objects delineated by a line of 60 hyphens ("-"). Each
+#  object consists of a sequence of key-value pairs of the form
+#  "<key> = <value>" where a <key> is at the beginning of a line. A <value> may
+#  contain line feeds, The keys are the following: "RULE_EXEC_ID" holds the rule
+#  execution Id, "RULE_EXEC_REI_FILE_PATH" holds the absolute path to the REI
+#  file on the rule engine host, "RULE_EXEC_STATUS? holds the current status of
+#  the rule execution, "RULE_EXEC_TIME" holds the time when the rule execution
+#  is schedule in seconds since the POSIX epoch, "RULE_EXEC_USER_NAME" holds the
+#  user account that caused the rule execution to be scheduled, and
 #  "RULE_EXEC_NAME" holds the rule to be executed.
 # Output:
-#  a RULE_EXEC_REPORT object 
+#  a RULE_EXEC_REPORT object
 clean_rules() {
-	awk --file - <(cat) <<'EOAWK'
+	awk --file - <(cat) <<'EOF'
 function build_rule_line(startIdx, endIdx) {
 	line = $startIdx;
 	for (i = startIdx + 1; i <= endIdx; i++) { line = line " " $i; }
@@ -235,7 +235,7 @@ function build_rule_line(startIdx, endIdx) {
 	if (rule != "") { rule = rule " "; }
 	rule = rule build_rule_line(1, NF);
 }
-EOAWK
+EOF
 }
 
 
@@ -249,7 +249,7 @@ EOAWK
 #  execution to be scheduled, <rei-id> is the REI state Id, and <rule-summary>
 #  is the rule to be executed. Each execution is separated by a line feed.
 filter_running() {
-	awk --file - <(cat) <<'EOAWK'
+	awk --file - <(cat) <<'EOF'
 /RULE_EXEC_ID/ { id = $3; }
 
 /RULE_EXEC_REI_FILE_PATH/ { rei = gensub(/^.*\./, "", "1", $3); }
@@ -270,7 +270,7 @@ filter_running() {
 	rei = "";
 	rule = "";
 }
-EOAWK
+EOF
 }
 
 
@@ -308,7 +308,7 @@ summarize_times() {
 # execution count in descending order
 # Input:
 #  a RULE_EXEC_REPORT object
-# Ouput:
+# Output:
 #  a two column summary, where the second column is a username and the first is
 #  the number of rule executions that username has queued. The first column is
 #  right justified with a width of at least seven characters. The two columns
@@ -321,7 +321,7 @@ summarize_users() {
 
 # counts how many times each entries appears in a list
 # Input:
-#  the list of entries deliniated by line feeds.
+#  the list of entries delineated by line feeds.
 # Output:
 #  a two column summary, where the second column is an entry and the first is
 #  the number of time it appeared in the list. The first column is right
