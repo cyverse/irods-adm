@@ -76,7 +76,7 @@ def main() -> None:
 
         success = process_json_seq(
             sys.stdin,
-            load_template(Path(__file__).parent / "removal-notification-msg.j2"),
+            load_template(Path(__file__).parent / "removal-notification-msg.html.j2"),
             f"{from_user}@{from_domain} (CyVerse)",
             os.getenv("SMTP_SERVER", "localhost"),
             int(os.getenv("SMTP_PORT", "25")))
@@ -181,8 +181,9 @@ def send_email(from_addr: str, to_addr: str, body: str, smtp_server: str, smtp_p
         msg['To'] = to_addr
         msg['Reply-To'] = REPLY_ADDR
         msg['Subject'] = SUBJECT
+        msg['Content-Type'] = 'text/html'
         msg['List-Unsubscribe'] = "<mailto:support@cyverse.org?subject=unsubscribe>"
-        msg.attach(MIMEText(body, 'plain'))
+        msg.attach(MIMEText(body, 'html'))
 
         with SMTP(smtp_server, smtp_port) as server:
             text = msg.as_string()
