@@ -201,13 +201,13 @@ def _fmt_report(df: DataFrame) -> str:
                 if (index === columnIndex) {
                     if (ascending) {
                         header.classList.add('sort-asc');
-                        arrow.textContent = '↑';
+                        arrow.innerHTML = '&uarr;';
                     } else {
                         header.classList.add('sort-desc');
-                        arrow.textContent = '↓';
+                        arrow.innerHTML = '&darr;';
                     }
                 } else {
-                    arrow.textContent = '⇅';
+                    arrow.textContent = '&#8597;';
                 }
             });
             
@@ -283,11 +283,11 @@ def _fmt_report_table(df: DataFrame) -> str:
     table_html = """<table id="projectTable">
         <thead>
             <tr>
-                <th onclick="sortTable(0, 'number')">Total <span class="sort-arrow">⇅</span></th>
-                <th onclick="sortTable(1, 'number')">Public <span class="sort-arrow">⇅</span></th>
-                <th onclick="sortTable(2, 'number')">Private <span class="sort-arrow">⇅</span></th>
-                <th onclick="sortTable(3, 'text')">Project <span class="sort-arrow">⇅</span></th>
-                <th onclick="sortTable(4, 'text')">Owner <span class="sort-arrow">⇅</span></th>
+                <th onclick="sortTable(0, 'number')">Total <span class="sort-arrow"&#8597;</span></th>
+                <th onclick="sortTable(1, 'number')">Public <span class="sort-arrow">&#8597;</span></th>
+                <th onclick="sortTable(2, 'number')">Private <span class="sort-arrow">&#8597;</span></th>
+                <th onclick="sortTable(3, 'text')">Project <span class="sort-arrow">&#8597;</span></th>
+                <th onclick="sortTable(4, 'text')">Owner <span class="sort-arrow">&#8597;</span></th>
             </tr>
         </thead>
         <tbody>"""
