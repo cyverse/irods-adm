@@ -54,86 +54,6 @@ _LDAP_URL = 'ldap://ldap.iplantcollaborative.org'
 _LDAP_BASE = 'dc=iplantcollaborative,dc=org'
 
 
-_REPORT_CSS = """
-    body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
-        line-height: 1.6;
-    }
-    h1 {
-        color: #333;
-        margin-bottom: 20px;
-    }
-    table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-bottom: 20px;
-    }
-    th, td {
-        padding: 8px 12px;
-        text-align: left;
-        border-bottom: 1px solid #ddd;
-    }
-    th {
-        background-color: #f2f2f2;
-        font-weight: bold;
-    }
-    tr:hover {
-        background-color: #f5f5f5;
-    }
-    .footer {
-        font-size: 0.8em;
-        color: #666;
-        margin-top: 30px;
-    }
-    .subtable {
-        margin: 0;
-        width: 100%;
-        border: none;
-        margin-top: 5px;
-        border: 1px solid #ddd;
-        border-radius: 0 0 3px 3px;
-    }
-    .subtable td {
-        border: none;
-        padding: 2px 6px;
-    }
-    .subtable tr:hover {
-        background-color: transparent;
-    }
-    .label {
-        font-weight: bold;
-        color: #555;
-    }
-    details {
-        cursor: pointer;
-        margin: 0;
-        padding: 0;
-    }
-    summary {
-        padding: 5px;
-        background-color: #f8f8f8;
-        border: 1px solid #ddd;
-        border-radius: 3px;
-        font-weight: bold;
-    }
-    details[open] summary {
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
-    }
-    .separator {
-        height: 1px;
-        background-color: #ddd;
-        padding: 0 !important;
-    }
-    .owner-header {
-        font-weight: bold;
-        padding-top: 8px !important;
-        color: #333;
-    }
-"""
-
-
 def main(args: List[str]) -> int:
     """Main function to parse arguments and generate the report.
 
@@ -177,126 +97,260 @@ def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: 
 
 
 def _fmt_report(df: DataFrame) -> str:
-    """Format the DataFrame as an HTML report with LDAP info for owners."""
-    return f"""
-        <!DOCTYPE html>
-        <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Public and Private Data Volume (GiB) per Project</title>
-                <style>
-                    {_REPORT_CSS}
-                </style>
-            </head>
-            <body>
-                <h1>Public and Private Data Volume (GiB) per Project</h1>
-                {_fmt_report_table(df)}
-            </body>
-        </html>
+    """Format the DataFrame as an HTML report with sortable columns."""
+    css_styles = """
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        th:hover {
+            background-color: #e8e8e8;
+        }
+        .sort-arrow {
+            float: right;
+            margin-left: 10px;
+            opacity: 0.5;
+        }
+        .sort-asc .sort-arrow {
+            opacity: 1;
+            color: blue;
+        }
+        .sort-desc .sort-arrow {
+            opacity: 1;
+            color: blue;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f0f0f0;
+        }
+        details {
+            margin: 0;
+        }
+        summary {
+            cursor: pointer;
+            padding: 2px 5px;
+            background-color: #f8f8f8;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .owner-details {
+            margin-top: 5px;
+            padding: 5px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .footer {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            color: #666;
+        }
     """
+    
+    javascript = """
+        let sortStates = {};
+
+        function sortTable(columnIndex, dataType) {
+            console.log(`Sorting column ${columnIndex} as ${dataType}`);
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Determine sort direction
+            let ascending = true;
+            if (sortStates[columnIndex] === 'asc') {
+                ascending = false;
+                sortStates[columnIndex] = 'desc';
+            } else {
+                ascending = true;
+                sortStates[columnIndex] = 'asc';
+            }
+            
+            // Update header arrows
+            const headers = table.querySelectorAll('th');
+            headers.forEach((header, index) => {
+                const arrow = header.querySelector('.sort-arrow');
+                header.classList.remove('sort-asc', 'sort-desc');
+                if (index === columnIndex) {
+                    if (ascending) {
+                        header.classList.add('sort-asc');
+                        arrow.textContent = '↑';
+                    } else {
+                        header.classList.add('sort-desc');
+                        arrow.textContent = '↓';
+                    }
+                } else {
+                    arrow.textContent = '⇅';
+                }
+            });
+            
+            // Sort the rows
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.cells[columnIndex];
+                const cellB = rowB.cells[columnIndex];
+                
+                let valueA, valueB;
+                
+                if (dataType === 'number') {
+                    valueA = parseFloat(cellA.textContent) || 0;
+                    valueB = parseFloat(cellB.textContent) || 0;
+                    return ascending ? valueA - valueB : valueB - valueA;
+                } else {
+                    // For text, including owner column - use summary text if available
+                    const summaryA = cellA.querySelector('summary');
+                    const summaryB = cellB.querySelector('summary');
+                    
+                    if (summaryA && summaryB) {
+                        valueA = summaryA.textContent.trim();
+                        valueB = summaryB.textContent.trim();
+                    } else {
+                        valueA = cellA.textContent.trim();
+                        valueB = cellB.textContent.trim();
+                    }
+                    
+                    const comparison = valueA.localeCompare(valueB);
+                    return ascending ? comparison : -comparison;
+                }
+            });
+            
+            // Reorder the DOM
+            rows.forEach(row => tbody.appendChild(row));
+            
+            // Update status
+            const columnNames = ['Total', 'Public', 'Private', 'Project', 'Owner'];
+            const direction = ascending ? 'ascending' : 'descending';
+            const statusElement = document.getElementById('sortStatus');
+            if (statusElement) {
+                statusElement.textContent = `Sorted by ${columnNames[columnIndex]} (${direction})`;
+            }
+        }
+        
+        console.log('JavaScript loaded successfully');
+    """
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public and Private Data Volume (GiB) per Project</title>
+    <style>{css_styles}</style>
+</head>
+<body>
+    <h1>Public and Private Data Volume (GiB) per Project</h1>
+    
+    {_fmt_report_table(df)}
+    
+    <div class="footer">
+        <p><strong>Instructions:</strong> Click column headers to sort. Click again to reverse order.</p>
+        <p><strong>Status:</strong> <span id="sortStatus">Click a column header to sort</span></p>
+    </div>
+
+    <script>{javascript}</script>
+</body>
+</html>"""
 
 
 def _fmt_report_table(df: DataFrame) -> str:
-    table = """
-        <table>
-            <thead>
-                <tr>
-    """
-
-    for lbl in df.columns:
-        table += f"<th>{lbl}</th>"
-
-    table += """
+    """Generate the HTML table with sortable headers."""
+    table_html = """<table id="projectTable">
+        <thead>
+            <tr>
+                <th onclick="sortTable(0, 'number')">Total <span class="sort-arrow">⇅</span></th>
+                <th onclick="sortTable(1, 'number')">Public <span class="sort-arrow">⇅</span></th>
+                <th onclick="sortTable(2, 'number')">Private <span class="sort-arrow">⇅</span></th>
+                <th onclick="sortTable(3, 'text')">Project <span class="sort-arrow">⇅</span></th>
+                <th onclick="sortTable(4, 'text')">Owner <span class="sort-arrow">⇅</span></th>
             </tr>
         </thead>
-        <tbody>
-    """
+        <tbody>"""
 
     for _, row in df.iterrows():
-        table += _fmt_project_row(row, df.columns)
+        table_html += f"""
+            <tr>
+                <td>{row['Total']}</td>
+                <td>{row['Public']}</td>
+                <td>{row['Private']}</td>
+                <td>{row['Project']}</td>
+                <td>{_fmt_owner_cell(row['Owner'])}</td>
+            </tr>"""
 
-    table += """
-            </tbody>
-        </table>
-    """
-
-    return table
-
-
-def _fmt_project_row(row: Series, columns: pandas.Index) -> str:
-    tr = "<tr>"
-
-    for col in columns:
-        if col == "Owner" and row[col]:
-            tr += _fmt_owner_cell(row[col])
-        else:
-            tr += f"<td>{row[col]}</td>"
-
-    tr += "</tr>"
-    return tr
+    table_html += """
+        </tbody>
+    </table>"""
+    
+    return table_html
 
 
-def _fmt_owner_cell(val: str) -> str:
-    owners = [owner.strip() for owner in val.split("; ")]
+def _fmt_owner_cell(owner_str: str) -> str:
+    """Format the owner cell with expandable details."""
+    if not owner_str:
+        return "No owner information"
+    
+    owners = [owner.strip() for owner in owner_str.split("; ")]
     owners_details = [_resolve_user_info(owner) for owner in owners]
-    summary_line = "; ".join([info['fullname'] for info in owners_details])
+    summary_names = [info['fullname'] if info['fullname'] != info['username'] else info['username'] 
+                     for info in owners_details]
+    summary_line = "; ".join(summary_names)
 
-    cell = f"""
-        <td>
-            <details>
-                <summary>{summary_line}</summary>
-                <table class="subtable">
-    """
-
-    for _, owner_info in enumerate(owners_details):
-        cell += _fmt_owner_info(owner_info)
-
-    cell += """
-                    <tr><td colspan="2" class="separator"></td></tr>
-                </table>
-            </details>
-        </td>
-    """
-
-    return cell
-
-
-def _fmt_owner_info(info: Dict[str, str]) -> str:
-    if info['fullname'] == info['username']:
-        full_name = "???"
-    else:
-        full_name = info['fullname']
-
-    row = f'<tr><td colspan="2" class="owner-header">{full_name} ({info["username"]})</td></tr>'
-
-    if info['username'] == info['fullname']:
-        row += '<tr><td colspan="2">No detailed information available</td></tr>'
-    else:
+    details_html = []
+    for info in owners_details:
+        detail_lines = [f"<strong>{info['fullname']} ({info['username']})</strong>"]
+        
         if info['email']:
-            row += f"""
-                <tr>
-                    <td class="label">Email:</td>
-                    <td><a href="mailto:{info['email']}">{info['email']}</a></td>
-                </tr>
-            """
-
+            detail_lines.append(f"Email: {info['email']}")
         if info['title']:
-            row += f'<tr><td class="label">Title:</td><td>{info["title"]}</td></tr>'
-
+            detail_lines.append(f"Title: {info['title']}")
         if info['department']:
-            row += f'<tr><td class="label">Department:</td><td>{info["department"]}</td></tr>'
-
+            detail_lines.append(f"Department: {info['department']}")
         if info['organization']:
-            row += f'<tr><td class="label">Organization:</td><td>{info["organization"]}</td></tr>'
+            detail_lines.append(f"Organization: {info['organization']}")
+        
+        if len(detail_lines) == 1:  # Only username, no other info
+            detail_lines.append("No additional information available")
+        
+        details_html.append("<br>".join(detail_lines))
 
-    return row
+    return f"""
+        <details>
+            <summary>{summary_line}</summary>
+            <div class="owner-details">
+                {"<br><br>".join(details_html)}
+            </div>
+        </details>
+    """
 
 
 def _resolve_user_info(username: str) -> Dict[str, str]:
     if username:
         info = _get_ldap_user_info(username)
-
         if info:
             return info
 
