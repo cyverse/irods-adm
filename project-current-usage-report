@@ -207,7 +207,7 @@ def _fmt_report(df: DataFrame) -> str:
                         arrow.innerHTML = '&darr;';
                     }
                 } else {
-                    arrow.textContent = '&#8597;';
+                    arrow.innerHTML = '&#8597;';
                 }
             });
             
