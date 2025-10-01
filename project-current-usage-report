@@ -97,79 +97,218 @@ def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: 
 
 
 def _fmt_report(df: DataFrame) -> str:
-    """Format the DataFrame as an HTML report with sortable columns."""
+    """Format the DataFrame as an HTML report with sortable columns and filters."""
     css_styles = """
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
             line-height: 1.6;
         }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
         h1 {
-            color: #333;
+            color: #1a1a1a;
+            margin: 0 0 30px 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .filter-container {
+            background-color: #f8f9fa;
+            padding: 24px;
+            margin-bottom: 24px;
+            border-radius: 6px;
+            border: 1px solid #e1e4e8;
+        }
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
         }
-        table {
-            border-collapse: collapse;
+        .filter-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #24292e;
+        }
+        .filter-section {
+            margin-bottom: 20px;
+        }
+        .filter-section:last-child {
+            margin-bottom: 0;
+        }
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #586069;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .filter-item label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #24292e;
+        }
+        .filter-item input {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.15s ease;
+        }
+        .filter-item input:focus {
+            outline: none;
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+        }
+        .filter-item input[type="number"] {
             width: 100%;
+        }
+        .filter-item input[type="text"] {
+            width: 100%;
+        }
+        .range-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .range-group input {
+            flex: 1;
+        }
+        .range-separator {
+            color: #6e7781;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid #e1e4e8;
+        }
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+        .btn-primary {
+            background-color: #0969da;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0860ca;
+        }
+        .btn-secondary {
+            background-color: white;
+            color: #24292e;
+            border: 1px solid #d1d5db;
+        }
+        .btn-secondary:hover {
+            background-color: #f6f8fa;
+        }
+        .status-bar {
+            padding: 8px 0;
+            font-size: 14px;
+            color: #57606a;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
             margin-bottom: 20px;
         }
         th, td {
-            padding: 10px;
+            padding: 12px;
             text-align: left;
-            border: 1px solid #ddd;
+            border-bottom: 1px solid #e1e4e8;
         }
         th {
-            background-color: #f2f2f2;
+            background-color: #f6f8fa;
+            font-weight: 600;
+            color: #24292e;
             cursor: pointer;
             user-select: none;
-            position: relative;
+            font-size: 14px;
         }
         th:hover {
-            background-color: #e8e8e8;
+            background-color: #eaeef2;
+        }
+        td {
+            font-size: 14px;
+            color: #24292e;
         }
         .sort-arrow {
             float: right;
-            margin-left: 10px;
+            margin-left: 8px;
+            color: #57606a;
             opacity: 0.5;
         }
-        .sort-asc .sort-arrow {
-            opacity: 1;
-            color: blue;
-        }
+        .sort-asc .sort-arrow,
         .sort-desc .sort-arrow {
             opacity: 1;
-            color: blue;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
+            color: #0969da;
         }
         tr:hover {
-            background-color: #f0f0f0;
+            background-color: #f6f8fa;
+        }
+        tr.filtered-out {
+            display: none;
         }
         details {
             margin: 0;
         }
         summary {
             cursor: pointer;
-            padding: 2px 5px;
-            background-color: #f8f8f8;
-            border: 1px solid #ccc;
-            border-radius: 3px;
+            padding: 4px 8px;
+            background-color: #f6f8fa;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        summary:hover {
+            background-color: #eaeef2;
         }
         .owner-details {
-            margin-top: 5px;
-            padding: 5px;
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-size: 0.9em;
+            margin-top: 8px;
+            padding: 12px;
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.6;
         }
         .footer {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            color: #666;
+            margin-top: 24px;
+            padding: 16px;
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #57606a;
+        }
+        .footer p {
+            margin: 4px 0;
         }
     """
     
@@ -177,13 +316,10 @@ def _fmt_report(df: DataFrame) -> str:
         let sortStates = {};
 
         function sortTable(columnIndex, dataType) {
-            console.log(`Sorting column ${columnIndex} as ${dataType}`);
-            
             const table = document.getElementById('projectTable');
             const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const rows = Array.from(tbody.querySelectorAll('tr:not(.filtered-out)'));
             
-            // Determine sort direction
             let ascending = true;
             if (sortStates[columnIndex] === 'asc') {
                 ascending = false;
@@ -193,7 +329,6 @@ def _fmt_report(df: DataFrame) -> str:
                 sortStates[columnIndex] = 'asc';
             }
             
-            // Update header arrows
             const headers = table.querySelectorAll('th');
             headers.forEach((header, index) => {
                 const arrow = header.querySelector('.sort-arrow');
@@ -201,17 +336,16 @@ def _fmt_report(df: DataFrame) -> str:
                 if (index === columnIndex) {
                     if (ascending) {
                         header.classList.add('sort-asc');
-                        arrow.innerHTML = '&uarr;';
+                        arrow.innerHTML = '↑';
                     } else {
                         header.classList.add('sort-desc');
-                        arrow.innerHTML = '&darr;';
+                        arrow.innerHTML = '↓';
                     }
                 } else {
-                    arrow.innerHTML = '&#8597;';
+                    arrow.innerHTML = '↕';
                 }
             });
             
-            // Sort the rows
             rows.sort((rowA, rowB) => {
                 const cellA = rowA.cells[columnIndex];
                 const cellB = rowB.cells[columnIndex];
@@ -223,7 +357,6 @@ def _fmt_report(df: DataFrame) -> str:
                     valueB = parseFloat(cellB.textContent) || 0;
                     return ascending ? valueA - valueB : valueB - valueA;
                 } else {
-                    // For text, including owner column - use summary text if available
                     const summaryA = cellA.querySelector('summary');
                     const summaryB = cellB.querySelector('summary');
                     
@@ -240,19 +373,99 @@ def _fmt_report(df: DataFrame) -> str:
                 }
             });
             
-            // Reorder the DOM
             rows.forEach(row => tbody.appendChild(row));
             
-            // Update status
             const columnNames = ['Total', 'Public', 'Private', 'Project', 'Owner'];
             const direction = ascending ? 'ascending' : 'descending';
+            updateStatus(`Sorted by ${columnNames[columnIndex]} (${direction})`);
+        }
+        
+        function applyFilters() {
+            const totalMin = parseFloat(document.getElementById('totalMin').value) || -Infinity;
+            const totalMax = parseFloat(document.getElementById('totalMax').value) || Infinity;
+            const publicMin = parseFloat(document.getElementById('publicMin').value) || -Infinity;
+            const publicMax = parseFloat(document.getElementById('publicMax').value) || Infinity;
+            const privateMin = parseFloat(document.getElementById('privateMin').value) || -Infinity;
+            const privateMax = parseFloat(document.getElementById('privateMax').value) || Infinity;
+            const projectSearch = document.getElementById('projectSearch').value.toLowerCase();
+            const ownerSearch = document.getElementById('ownerSearch').value.toLowerCase();
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const total = parseFloat(row.cells[0].textContent) || 0;
+                const publicVal = parseFloat(row.cells[1].textContent) || 0;
+                const privateVal = parseFloat(row.cells[2].textContent) || 0;
+                const project = row.cells[3].textContent.toLowerCase();
+                
+                const ownerCell = row.cells[4];
+                const ownerSummary = ownerCell.querySelector('summary');
+                const ownerText = ownerSummary ? ownerSummary.textContent.toLowerCase() : ownerCell.textContent.toLowerCase();
+                
+                const matchesTotal = total >= totalMin && total <= totalMax;
+                const matchesPublic = publicVal >= publicMin && publicVal <= publicMax;
+                const matchesPrivate = privateVal >= privateMin && privateVal <= privateMax;
+                const matchesProject = projectSearch === '' || project.includes(projectSearch);
+                const matchesOwner = ownerSearch === '' || ownerText.includes(ownerSearch);
+                
+                if (matchesTotal && matchesPublic && matchesPrivate && matchesProject && matchesOwner) {
+                    row.classList.remove('filtered-out');
+                    visibleCount++;
+                } else {
+                    row.classList.add('filtered-out');
+                }
+            });
+            
+            updateStatus(`Showing ${visibleCount} of ${rows.length} projects`);
+        }
+        
+        function clearFilters() {
+            document.getElementById('totalMin').value = '';
+            document.getElementById('totalMax').value = '';
+            document.getElementById('publicMin').value = '';
+            document.getElementById('publicMax').value = '';
+            document.getElementById('privateMin').value = '';
+            document.getElementById('privateMax').value = '';
+            document.getElementById('projectSearch').value = '';
+            document.getElementById('ownerSearch').value = '';
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            rows.forEach(row => {
+                row.classList.remove('filtered-out');
+            });
+            
+            updateStatus(`Showing all ${rows.length} projects`);
+        }
+        
+        function updateStatus(message) {
             const statusElement = document.getElementById('sortStatus');
             if (statusElement) {
-                statusElement.textContent = `Sorted by ${columnNames[columnIndex]} (${direction})`;
+                statusElement.textContent = message;
             }
         }
         
-        console.log('JavaScript loaded successfully');
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterInputs = document.querySelectorAll('.filter-item input');
+            filterInputs.forEach(input => {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        applyFilters();
+                    }
+                });
+            });
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            updateStatus(`Showing all ${rows.length} projects`);
+        });
     """
 
     return f"""<!DOCTYPE html>
@@ -264,13 +477,71 @@ def _fmt_report(df: DataFrame) -> str:
     <style>{css_styles}</style>
 </head>
 <body>
-    <h1>Public and Private Data Volume (GiB) per Project</h1>
-    
-    {_fmt_report_table(df)}
-    
-    <div class="footer">
-        <p><strong>Instructions:</strong> Click column headers to sort. Click again to reverse order.</p>
-        <p><strong>Status:</strong> <span id="sortStatus">Click a column header to sort</span></p>
+    <div class="container">
+        <h1>Public and Private Data Volume (GiB) per Project</h1>
+        
+        <div class="filter-container">
+            <div class="filter-header">
+                <h3>Filters</h3>
+                <div class="status-bar" id="filterStatus"></div>
+            </div>
+            
+            <div class="filter-section">
+                <div class="section-title">Data Volume (GiB)</div>
+                <div class="filter-grid">
+                    <div class="filter-item">
+                        <label>Total</label>
+                        <div class="range-group">
+                            <input type="number" id="totalMin" placeholder="Min" step="0.001">
+                            <span class="range-separator">—</span>
+                            <input type="number" id="totalMax" placeholder="Max" step="0.001">
+                        </div>
+                    </div>
+                    <div class="filter-item">
+                        <label>Public</label>
+                        <div class="range-group">
+                            <input type="number" id="publicMin" placeholder="Min" step="0.001">
+                            <span class="range-separator">—</span>
+                            <input type="number" id="publicMax" placeholder="Max" step="0.001">
+                        </div>
+                    </div>
+                    <div class="filter-item">
+                        <label>Private</label>
+                        <div class="range-group">
+                            <input type="number" id="privateMin" placeholder="Min" step="0.001">
+                            <span class="range-separator">—</span>
+                            <input type="number" id="privateMax" placeholder="Max" step="0.001">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="filter-section">
+                <div class="section-title">Search</div>
+                <div class="filter-grid">
+                    <div class="filter-item">
+                        <label>Project Name</label>
+                        <input type="text" id="projectSearch" placeholder="Search projects...">
+                    </div>
+                    <div class="filter-item">
+                        <label>Owner Name</label>
+                        <input type="text" id="ownerSearch" placeholder="Search owners...">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="filter-actions">
+                <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+                <button class="btn btn-secondary" onclick="clearFilters()">Clear All</button>
+            </div>
+        </div>
+        
+        {_fmt_report_table(df)}
+        
+        <div class="footer">
+            <p><strong>Instructions:</strong> Click column headers to sort. Use filters to narrow results. Press Enter to apply.</p>
+            <p><strong>Status:</strong> <span id="sortStatus">Loading...</span></p>
+        </div>
     </div>
 
     <script>{javascript}</script>
@@ -283,11 +554,11 @@ def _fmt_report_table(df: DataFrame) -> str:
     table_html = """<table id="projectTable">
         <thead>
             <tr>
-                <th onclick="sortTable(0, 'number')">Total <span class="sort-arrow">&#8597;</span></th>
-                <th onclick="sortTable(1, 'number')">Public <span class="sort-arrow">&#8597;</span></th>
-                <th onclick="sortTable(2, 'number')">Private <span class="sort-arrow">&#8597;</span></th>
-                <th onclick="sortTable(3, 'text')">Project <span class="sort-arrow">&#8597;</span></th>
-                <th onclick="sortTable(4, 'text')">Owner <span class="sort-arrow">&#8597;</span></th>
+                <th onclick="sortTable(0, 'number')">Total <span class="sort-arrow">↕</span></th>
+                <th onclick="sortTable(1, 'number')">Public <span class="sort-arrow">↕</span></th>
+                <th onclick="sortTable(2, 'number')">Private <span class="sort-arrow">↕</span></th>
+                <th onclick="sortTable(3, 'text')">Project <span class="sort-arrow">↕</span></th>
+                <th onclick="sortTable(4, 'text')">Owner <span class="sort-arrow">↕</span></th>
             </tr>
         </thead>
         <tbody>"""
@@ -333,7 +604,7 @@ def _fmt_owner_cell(owner_str: str) -> str:
         if info['organization']:
             detail_lines.append(f"Organization: {info['organization']}")
         
-        if len(detail_lines) == 1:  # Only username, no other info
+        if len(detail_lines) == 1:
             detail_lines.append("No additional information available")
         
         details_html.append("<br>".join(detail_lines))
