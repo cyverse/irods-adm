@@ -283,7 +283,7 @@ def _fmt_report_table(df: DataFrame) -> str:
     table_html = """<table id="projectTable">
         <thead>
             <tr>
-                <th onclick="sortTable(0, 'number')">Total <span class="sort-arrow"&#8597;</span></th>
+                <th onclick="sortTable(0, 'number')">Total <span class="sort-arrow">&#8597;</span></th>
                 <th onclick="sortTable(1, 'number')">Public <span class="sort-arrow">&#8597;</span></th>
                 <th onclick="sortTable(2, 'number')">Private <span class="sort-arrow">&#8597;</span></th>
                 <th onclick="sortTable(3, 'text')">Project <span class="sort-arrow">&#8597;</span></th>
