@@ -16,6 +16,9 @@
 # <bad repl> is the absolute, physical path to the bad replica; <candidate resc>
 # is the name of the storage resource hosting a candidate replica; and
 # <candidate repl> is a replica that has the same checksum as the bad replica.
+#
+# © 2025 The Arizona Board of Regents on behalf of The University of Arizona. For
+# license information, see https://cyverse.org/license.
 
 set -o errexit -o nounset -o pipefail
 
@@ -27,7 +30,7 @@ readonly CHKSUM_CHUNK_LEN=500
 declare -A ObjForChksum RescOf ReplOf
 
 main() {
-	printf 'Looking up checkums\n' >&2
+	printf 'Looking up checksums\n' >&2
 	local obj
 	while IFS= read -r obj; do
 		map_checksum "$obj"
