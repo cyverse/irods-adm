@@ -36,7 +36,7 @@
 
     - name: Send email
       community.general.mail:
-        from: support@cyverse.org (CyVerse)
+        from: ds-adm@ds-adm.cyverse.org
         to: "{{ recipient.contact.mail }} ({{ recipient.contact.cn }})"
         cc: "{{
           recipient.other_contacts
@@ -53,6 +53,10 @@
          - support@cyverse.org
          - tedgin@arizona.edu
         subtype: html
+        headers:
+          - From=ds-adm@ds-adm.cyverse.org (CyVerse)
+          - Reply-To=support@cyverse.org (CyVerse Support)
+          - List-Unsubscribe=<mailto:support@cyverse.org?subject=unsubscribe>
         subject: >-
           Potential issues with {{ recipient.project|default('your') }} data at CyVerse found on
           {{ audit_date }}
