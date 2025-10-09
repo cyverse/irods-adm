@@ -1,0 +1,13 @@
+---
+project: Data Store
+contact:
+  uid: tedgin
+  cn: Tony Edgin
+  mail: tedgin@cyverse.org
+other_contacts:
+  - mail: tedgin@arizona.edu
+  - uid: emember
+    cn: Example Member
+    mail: no-contact@cyverse.org
+corrupted_files: checksum-discrepencies.txt
+missing_files: missing-content.txt

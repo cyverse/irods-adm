@@ -1,0 +1,2 @@
+/iplant/home/shared/CyVerse_DSStats/bad-checksum-1
+/iplant/home/shared/CyVerse_DSStats/bad-checksum-2

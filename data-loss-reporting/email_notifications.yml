@@ -1,0 +1,70 @@
+---
+# This is the playbook used to send email notifications to a set of users
+# impacted by a data corruption event. Most of the information (variables)
+# needed to send the emails come from a recipients.yml file, but following need
+# to be provided on the ansible-playbook command line.
+#
+# Required Variables:
+#   audit_date      the date when the data corruption was detected
+#   recipient_file  the relative path to the recipients.yml file containing the
+#                   rest of the information needed to send the emails
+#
+# Optional Variables:
+#   notifier        the CyVerse employee sending the emails
+#
+- name: Email notifications
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Verify audit_date is set
+      when: audit_date is not defined
+      ansible.builtin.fail:
+        msg: An audit date is required.
+
+    - name: Verify recipient_file is set
+      when: recipient_file is not defined
+      ansible.builtin.fail:
+        msg: A list of recipients is required
+
+    - name: Determine event folder
+      ansible.builtin.set_fact:
+        event_folder: "{{ recipient_file | dirname }}"
+
+    - name: Load recipient information
+      ansible.builtin.include_vars:
+        file: "{{ recipient_file }}"
+
+    - name: Send email
+      community.general.mail:
+        from: support@cyverse.org (CyVerse)
+        to: "{{ recipient.contact.mail }} ({{ recipient.contact.cn }})"
+        cc: "{{
+          recipient.other_contacts
+            | default([])
+            | map(attribute='mail')
+            | zip(
+                recipient.other_contacts
+                  | default([])
+                  | map(attribute='cn')
+                  | map('regex_replace', '^(.*)$', '(\\1)') )
+            | map('join', ' ')
+            | list }}"
+        bcc:
+         - support@cyverse.org
+         - tedgin@arizona.edu
+        subtype: html
+        subject: >-
+          Potential issues with {{ recipient.project|default('your') }} data at CyVerse found on
+          {{ audit_date }}
+        body: "{% include 'ds_data_issue_notification.html.j2' %}"
+        attach: "{{
+          ([ recipient.corrupted_files|default(None) ] + [ recipient.missing_files|default(None) ])
+            | reject('none')
+            | map('replace', '', event_folder ~ '/', 1)
+            | list }}"
+      loop: "{{ recipients }}"
+      loop_control:
+        loop_var: recipient
+        label: >
+          {{ recipient.project | default(recipient.contact.cn) }} ({{ recipient.contact.mail }})
+        pause: 3

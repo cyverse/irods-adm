@@ -1,0 +1,65 @@
+{#
+This is the templated email notification.
+
+Required Parameters:
+	audit_date            the date when the corrupted data was discovered
+	recipient.contact.cn  the name of the person who the email is addressed to
+
+Optional Parameters:
+   notifier                   the name of the CyVerse employee sending the email
+	recipient.corrupted_files  a file containing data objects with bad checksums
+	                           or sizes that will be attached to the email
+	recipient.missing_files    a file containing data objects missing their
+	                           backing physical files that will be attached to
+	                           the email
+	recipient.project          the name of the project that owns the data objects
+	                           that need to be fixed
+#}
+<!DOCTYPE html>
+<html lang="en" xmlns="https://www.w3.org/1999/xhtml">
+	<head><meta charset="UTF-8"/></head>
+	<body>
+		Hi {{ recipient.contact.cn }}.<br/>
+		<p>
+			During a routine audit on {{ audit_date }}, CyVerse discovered that {{ recipient.project ~ ' has' if recipient.project is defined else 'you have' }} content on the CyVerse Data Store that has inconsistencies that might need your attention. We need your help to address the issues below and apologize for any inconvenience.
+		</p>
+{% if recipient.corrupted_files is defined %}
+		<p>
+			Some files have checksum or size metadata that differ from what's physically in storage. This indicates these files may be corrupted. Here’s what you need to do:
+		</p>
+		<ol>
+			<li>Please see the attachment "{{ recipient.corrupted_files | basename }}" for the list of these files and inspect them to see if corruption has occurred.</li>
+			<li>If any of the files are damaged, and if you have a copy, you may upload the clean file again without losing any metadata associated with the corrupted file.</li>
+			<li>For the good files, please let us know about them so we can correct their checksum and size metadata.</li>
+		</ol>
+{% endif -%}
+{% if recipient.missing_files is defined %}
+		<p>
+			{{ 'Also, some' if recipient.corrupted_files is defined else 'Some' }} files in the CyVerse Data Store are missing their content, i.e., they are not physically in storage. Since the files’ metadata still exist, the files will show up in your Data Store folder listings and search results, but if you attempt to download any of them, the download will fail. Here’s what you need to do:
+		</p>
+		<ol>
+			<li>Please see the attachment "{{ recipient.missing_files | basename }}" for the list of these files.</li>
+			<li>If you have a copy of the files, please upload them again. You will not lose any metadata associated with them.</li>
+		</ol>
+{% endif -%}
+		<p>
+			We ask that you review these files within the next 90 days and re-upload any corrupted files. After this period, we will take the following {{ 'actions' if recipient.corrupted_files is defined and recipient.missing_files is defined else 'action' }} to ensure the integrity of the Data Store going forward:
+		</p>
+		<ul>
+{% if recipient.corrupted_files is defined %}
+			<li>We will assume all of the files with bad checksum or size metadata are undamaged and correct their metadata.</li>
+{% endif %}
+{% if recipient.missing_files is defined %}
+			<li>We will {{ 'also assume' if recipient.corrupted_files is defined else 'assume' }} any files with missing content are not recoverable and will remove their metadata.</li>
+{% endif %}
+		</ul>
+		<p>
+			Please contact us as soon as possible if you have questions, need help, or if your review shows that your files are still good. Our email address is support@cyverse.org. Again, our apologies for any inconvenience and we thank you in advance for helping us resolve these issues.
+		</p>
+{% if notifier is defined %}
+		{{ notifier }}<br/>
+{% endif %}
+		CyVerse Data Store Team<br/>
+		University of Arizona<br/>
+	<body>
+</html>

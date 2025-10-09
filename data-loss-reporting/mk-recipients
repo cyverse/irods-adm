@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+#
+# This script generates a the recipients list (recipients.yml) for a certain
+# date. The location of the date folder should be `reports/DATE/`.
+#
+# Usage:
+#  mk-recipients [DATE]
+#
+# Parameters:
+#  DATE  the date to build the list for in YYYY-MM-DD form, default is current
+#        date
+
+set -o errexit -o nounset -o pipefail
+
+main() {
+	local reportDate
+	if (( $# >=1 )); then
+		local userReportDate="$1"
+
+		if ! reportDate="$(date --date "$userReportDate" +%Y-%m-%d)"; then
+			# shellcheck disable=SC2016
+			printf 'The report date must be provide in a form `date` understands\n' >&2
+			return 1
+		fi
+	else
+		reportDate="$(date +%Y-%m-%d)"
+	fi
+
+	local baseDir
+	baseDir="$(dirname "$(realpath --canonicalize-missing "$0")")"
+
+	local reportPath="$baseDir"/reports/"$reportDate"
+
+	if [[ ! -d "$reportPath" ]]; then
+		printf 'There is no report information for %s\n' "$reportDate" >&2
+		return 1
+	fi
+
+	local recipientsPath="$reportPath"/recipients.yml
+	find "$reportPath" -type f -name contact.yml | combine "$reportPath" > "$recipientsPath"
+}
+
+combine() {
+	local reportPath="$1"
+
+	printf -- '---\n'
+	printf 'recipients:\n'
+
+	local contact
+	while read -r contact; do
+		resolve_attachments "$reportPath" "$contact" | mk_list_item
+	done
+}
+
+mk_list_item() {
+	local prefix='- '
+
+	local line
+	while IFS= read -r line; do
+		if ! [[ "$line" == '---' || "$line" =~ ^[[:space:]]*$ ]]; then
+			printf '  %s%s\n' "$prefix" "$line"
+			prefix='  '
+		fi
+	done
+}
+
+resolve_attachments() {
+	local reportPath="$1"
+	local contact="$2"
+
+	local contactDir=
+	contactDir="$(dirname "$contact")"
+	contactDir="${contactDir#"$reportPath"/}"
+
+	sed 's|corrupted_files:[[:space:]]*\(.*\)|corrupted_files: '"$contactDir"'/\1|' "$contact" \
+		| sed 's|missing_files:[[:space:]]*\(.*\)|missing_files: '"$contactDir"'/\1|'
+}
+
+main "$@"
