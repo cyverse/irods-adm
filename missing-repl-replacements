@@ -124,7 +124,7 @@ map_checksum() {
 
 	local chksum resc repl
 	if IFS=$'\t' read -r chksum resc repl <<< "$(retrieve_chksum_and_loc "$coll" "$objName")"; then
-		if [[ -n "$chksum" && -n "$resc" && -n "$repl" ]]; then
+		if [[ -n "$chksum" && "$chksum" != 0 && -n "$resc" && -n "$repl" ]]; then
 			ObjForChksum[$chksum]="$objPath"
 			RescOf[$objPath]="$resc"
 			ReplOf[$objPath]="$repl"
