@@ -18,6 +18,9 @@
 # <replacement repl> is a replica that has the same checksum as the bad replica.
 #
 # This script is intended to read the output if `missing-repl-replacements`.
+#
+# © 2025 The Arizona Board of Regents on behalf of The University of Arizona. For
+# license information, see https://cyverse.org/license.
 
 set -o errexit -o nounset -o pipefail
 
@@ -36,18 +39,18 @@ main() {
 		local missingReplDir
 		missingReplDir="$(dirname "$missingRepl")"
 
-		if ! scp -q -P 1657 "$givingResc":"$(printf '%q' "$goodRepl")" "$StagedRepl"; then
+		if ! scp -q "$givingResc":"$(printf '%q' "$goodRepl")" "$StagedRepl"; then
 			printf 'ERROR: Good replica not found at %s:%s\n' "$givingResc" "$goodRepl"
 			continue
 		fi
 
 		# shellcheck disable=SC2029
-		ssh -q -p 1657 "$needyResc" sudo --user=irods mkdir --parents "'$missingReplDir'" < /dev/null
+		ssh -q "$needyResc" sudo --user=irods mkdir --parents "'$missingReplDir'" < /dev/null
 
-		scp -q -P 1657 "$StagedRepl" "$needyResc":"$(printf '%q' "$missingRepl")"
+		scp -q "$StagedRepl" "$needyResc":"$(printf '%q' "$missingRepl")"
 
 		# shellcheck disable=SC2029
-		ssh -q -p 1657 "$needyResc" chown irods.irods "'$missingRepl'" < /dev/null
+		ssh -q "$needyResc" chown irods.irods "'$missingRepl'" < /dev/null
 
 		printf 'Recovered %s\n' "$needyObj"
 	done
