@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# © 2025 The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 show_help() {
 	cat <<'EOF'
@@ -38,12 +41,13 @@ format() {
 	local year="$1"
 
 	awk --assign YEAR="$year" --file - <(cat) <<'EOF'
-function escape_ctrls(line) {
-	patsplit(line, ctrlChars, /[\x01-\x1f]/, segs);
-	escLine = segs[0];
+function esc_ctrl(line) {
+	patsplit(line, ctrlChars, /[\x01-\x1f]/, segments);
+	escLine = segments[0];
 	for (idx in ctrlChars) {
-		escLine = escLine ctrlEsc[ctrlChars[idx]] segs[idx];
+		escLine = escLine ctrlEsc[ctrlChars[idx]] segments[idx];
 	}
+	gsub(/\\r/, "\\\\r", escLine);
 	return escLine;
 }
 
@@ -104,14 +108,14 @@ BEGIN {
 	if (lastMonth == "12" && month == "01") {
 		YEAR = YEAR + 1;
 	}
-	currentEntry = YEAR "-" month "-" day escape_ctrls(rest);
+	currentEntry = YEAR "-" month "-" day esc_ctrl(rest);
 	lastMonth = month;
 	next;
 }
 
 NF > 0 {
 	if (currentEntry != "") {
-		currentEntry = currentEntry ctrlEsc["\x0a"] escape_ctrls($0);
+		currentEntry = currentEntry ctrlEsc["\x0a"] esc_ctrl($0);
 	}
 }
 
