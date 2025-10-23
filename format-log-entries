@@ -42,12 +42,13 @@ format() {
 
 	awk --assign YEAR="$year" --file - <(cat) <<'EOF'
 function esc_ctrl(line) {
+	line = gensub(/(\\\\[^"])/, "\\\\\\\\\\1", "g", line);
+	line = gensub(/\\r/, "\\\\\\\\r", "g", line);
 	patsplit(line, ctrlChars, /[\x01-\x1f]/, segments);
 	escLine = segments[0];
 	for (idx in ctrlChars) {
 		escLine = escLine ctrlEsc[ctrlChars[idx]] segments[idx];
 	}
-	gsub(/\\r/, "\\\\r", escLine);
 	return escLine;
 }
 
