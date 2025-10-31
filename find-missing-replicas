@@ -9,6 +9,9 @@
 # paths. It reads a list of data objects from stdin whose only replica has a bad
 # path. Each data object is specified by its absolute, logical path, one per
 # line.
+#
+# © 2025 The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 set -o nounset -o errexit -o pipefail
 
