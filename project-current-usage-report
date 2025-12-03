@@ -33,7 +33,7 @@ import sys
 from tempfile import NamedTemporaryFile
 import textwrap
 import traceback
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from irods.exception import iRODSException
 from irods.session import iRODSSession
@@ -456,7 +456,7 @@ def _connect_icat(host: str, port: int, user: str) -> Connection:
 def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: List[str]):
     report_df = _gen_report(resources, icat, irods)
 
-    with NamedTemporaryFile(delete_on_close=False) as file:
+    with NamedTemporaryFile() as file:
         file.write(_fmt_report(report_df).encode('utf-8'))
         file.close()
 
@@ -577,7 +577,7 @@ def _fmt_report_table(df: DataFrame) -> str:
     table_html += """
         </tbody>
     </table>"""
-    
+
     return table_html
 
 
@@ -585,17 +585,17 @@ def _fmt_owner_cell(owner_str: str) -> str:
     """Format the owner cell with expandable details."""
     if not owner_str:
         return "No owner information"
-    
+
     owners = [owner.strip() for owner in owner_str.split("; ")]
     owners_details = [_resolve_user_info(owner) for owner in owners]
-    summary_names = [info['fullname'] if info['fullname'] != info['username'] else info['username'] 
+    summary_names = [info['fullname'] if info['fullname'] != info['username'] else info['username']
                      for info in owners_details]
     summary_line = "; ".join(summary_names)
 
     details_html = []
     for info in owners_details:
         detail_lines = [f"<strong>{info['fullname']} ({info['username']})</strong>"]
-        
+
         if info['email']:
             detail_lines.append(f"Email: {info['email']}")
         if info['title']:
@@ -604,10 +604,10 @@ def _fmt_owner_cell(owner_str: str) -> str:
             detail_lines.append(f"Department: {info['department']}")
         if info['organization']:
             detail_lines.append(f"Organization: {info['organization']}")
-        
+
         if len(detail_lines) == 1:
             detail_lines.append("No additional information available")
-        
+
         details_html.append("<br>".join(detail_lines))
 
     return f"""
