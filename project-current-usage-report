@@ -53,52 +53,163 @@ _DS_REPORT_LOC = 'CyVerse_DSStats/data-products/project-data-usage'
 _LDAP_URL = 'ldap://ldap.iplantcollaborative.org'
 _LDAP_BASE = 'dc=iplantcollaborative,dc=org'
 
+_JAVASCRIPT = """
+        let sortStates = {};
 
-def main(args: List[str]) -> int:
-    """Main function to parse arguments and generate the report.
-
-    Params:
-        args: these are the command line arguments
+        function sortTable(columnIndex, dataType) {
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr:not(.filtered-out)'));
+            
+            let ascending = true;
+            if (sortStates[columnIndex] === 'asc') {
+                ascending = false;
+                sortStates[columnIndex] = 'desc';
+            } else {
+                ascending = true;
+                sortStates[columnIndex] = 'asc';
+            }
+            
+            const headers = table.querySelectorAll('th');
+            headers.forEach((header, index) => {
+                const arrow = header.querySelector('.sort-arrow');
+                header.classList.remove('sort-asc', 'sort-desc');
+                if (index === columnIndex) {
+                    if (ascending) {
+                        header.classList.add('sort-asc');
+                        arrow.innerHTML = '&uarr;';
+                    } else {
+                        header.classList.add('sort-desc');
+                        arrow.innerHTML = '&darr;';
+                    }
+                } else {
+                    arrow.innerHTML = '&#8597;';
+                }
+            });
+            
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.cells[columnIndex];
+                const cellB = rowB.cells[columnIndex];
+                
+                let valueA, valueB;
+                
+                if (dataType === 'number') {
+                    valueA = parseFloat(cellA.textContent) || 0;
+                    valueB = parseFloat(cellB.textContent) || 0;
+                    return ascending ? valueA - valueB : valueB - valueA;
+                } else {
+                    const summaryA = cellA.querySelector('summary');
+                    const summaryB = cellB.querySelector('summary');
+                    
+                    if (summaryA && summaryB) {
+                        valueA = summaryA.textContent.trim();
+                        valueB = summaryB.textContent.trim();
+                    } else {
+                        valueA = cellA.textContent.trim();
+                        valueB = cellB.textContent.trim();
+                    }
+                    
+                    const comparison = valueA.localeCompare(valueB);
+                    return ascending ? comparison : -comparison;
+                }
+            });
+            
+            rows.forEach(row => tbody.appendChild(row));
+            
+            const columnNames = ['Total', 'Public', 'Private', 'Project', 'Owner'];
+            const direction = ascending ? 'ascending' : 'descending';
+            updateStatus(`Sorted by ${columnNames[columnIndex]} (${direction})`);
+        }
+        
+        function applyFilters() {
+            const totalMin = parseFloat(document.getElementById('totalMin').value) || -Infinity;
+            const totalMax = parseFloat(document.getElementById('totalMax').value) || Infinity;
+            const publicMin = parseFloat(document.getElementById('publicMin').value) || -Infinity;
+            const publicMax = parseFloat(document.getElementById('publicMax').value) || Infinity;
+            const privateMin = parseFloat(document.getElementById('privateMin').value) || -Infinity;
+            const privateMax = parseFloat(document.getElementById('privateMax').value) || Infinity;
+            const projectSearch = document.getElementById('projectSearch').value.toLowerCase();
+            const ownerSearch = document.getElementById('ownerSearch').value.toLowerCase();
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const total = parseFloat(row.cells[0].textContent) || 0;
+                const publicVal = parseFloat(row.cells[1].textContent) || 0;
+                const privateVal = parseFloat(row.cells[2].textContent) || 0;
+                const project = row.cells[3].textContent.toLowerCase();
+                
+                const ownerCell = row.cells[4];
+                const ownerSummary = ownerCell.querySelector('summary');
+                const ownerText = ownerSummary ? ownerSummary.textContent.toLowerCase() : ownerCell.textContent.toLowerCase();
+                
+                const matchesTotal = total >= totalMin && total <= totalMax;
+                const matchesPublic = publicVal >= publicMin && publicVal <= publicMax;
+                const matchesPrivate = privateVal >= privateMin && privateVal <= privateMax;
+                const matchesProject = projectSearch === '' || project.includes(projectSearch);
+                const matchesOwner = ownerSearch === '' || ownerText.includes(ownerSearch);
+                
+                if (matchesTotal && matchesPublic && matchesPrivate && matchesProject && matchesOwner) {
+                    row.classList.remove('filtered-out');
+                    visibleCount++;
+                } else {
+                    row.classList.add('filtered-out');
+                }
+            });
+            
+            updateStatus(`Showing ${visibleCount} of ${rows.length} projects`);
+        }
+        
+        function clearFilters() {
+            document.getElementById('totalMin').value = '';
+            document.getElementById('totalMax').value = '';
+            document.getElementById('publicMin').value = '';
+            document.getElementById('publicMax').value = '';
+            document.getElementById('privateMin').value = '';
+            document.getElementById('privateMax').value = '';
+            document.getElementById('projectSearch').value = '';
+            document.getElementById('ownerSearch').value = '';
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            rows.forEach(row => {
+                row.classList.remove('filtered-out');
+            });
+            
+            updateStatus(`Showing all ${rows.length} projects`);
+        }
+        
+        function updateStatus(message) {
+            const statusElement = document.getElementById('sortStatus');
+            if (statusElement) {
+                statusElement.textContent = message;
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterInputs = document.querySelectorAll('.filter-item input');
+            filterInputs.forEach(input => {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        applyFilters();
+                    }
+                });
+            });
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            updateStatus(`Showing all ${rows.length} projects`);
+        });
     """
-    try:
-        term_wid, _ = shutil.get_terminal_size()
-        opts = _mk_arg_parser(term_wid).parse_args(args)
-        report_date = datetime.now()
-        report_file = f"report_{report_date.strftime('%Y-%m-%d')}.html"
-        fmt_report_date = report_date.strftime('%Y-%m-%d %H:%M:%S')
-        print(f"PROJECT STORAGE USAGE REPORT - GENERATED ON {fmt_report_date}\n")
 
-        with iRODSSession(irods_env_file=_IRODS_ENV_FILE) as irods:
-            with _connect_icat(opts.pghost, opts.pgport, opts.pguser) as icat:
-                _report(report_file, irods, icat, opts.resources)
-                print(f"To access report, please visit {_webdav_url(irods, report_file)}")
-    except RuntimeError as e:
-        print(f"ERROR: {str(e)}")
-        print(traceback.format_exc())
-        return 1
-
-    return 0
-
-
-def _connect_icat(host: str, port: int, user: str) -> Connection:
-    return sqlalchemy.create_engine(f"postgresql://{user}@{host}:{port}/ICAT").connect()
-
-
-def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: List[str]):
-    report_df = _gen_report(resources, icat, irods)
-
-    with NamedTemporaryFile(delete_on_close=False) as file:
-        file.write(_fmt_report(report_df).encode('utf-8'))
-        file.close()
-
-        irods.data_objects.put(
-            file.name,
-            os.path.join('/', irods.zone, 'home', 'shared', _DS_REPORT_LOC, report_file))
-
-
-def _fmt_report(df: DataFrame) -> str:
-    """Format the DataFrame as an HTML report with sortable columns and filters."""
-    css_styles = """
+_CSS_STYLES = """
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             margin: 0;
@@ -311,162 +422,52 @@ def _fmt_report(df: DataFrame) -> str:
             margin: 4px 0;
         }
     """
-    
-    javascript = """
-        let sortStates = {};
 
-        function sortTable(columnIndex, dataType) {
-            const table = document.getElementById('projectTable');
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr:not(.filtered-out)'));
-            
-            let ascending = true;
-            if (sortStates[columnIndex] === 'asc') {
-                ascending = false;
-                sortStates[columnIndex] = 'desc';
-            } else {
-                ascending = true;
-                sortStates[columnIndex] = 'asc';
-            }
-            
-            const headers = table.querySelectorAll('th');
-            headers.forEach((header, index) => {
-                const arrow = header.querySelector('.sort-arrow');
-                header.classList.remove('sort-asc', 'sort-desc');
-                if (index === columnIndex) {
-                    if (ascending) {
-                        header.classList.add('sort-asc');
-                        arrow.innerHTML = '&uarr;';
-                    } else {
-                        header.classList.add('sort-desc');
-                        arrow.innerHTML = '&darr;';
-                    }
-                } else {
-                    arrow.innerHTML = '&#8597;';
-                }
-            });
-            
-            rows.sort((rowA, rowB) => {
-                const cellA = rowA.cells[columnIndex];
-                const cellB = rowB.cells[columnIndex];
-                
-                let valueA, valueB;
-                
-                if (dataType === 'number') {
-                    valueA = parseFloat(cellA.textContent) || 0;
-                    valueB = parseFloat(cellB.textContent) || 0;
-                    return ascending ? valueA - valueB : valueB - valueA;
-                } else {
-                    const summaryA = cellA.querySelector('summary');
-                    const summaryB = cellB.querySelector('summary');
-                    
-                    if (summaryA && summaryB) {
-                        valueA = summaryA.textContent.trim();
-                        valueB = summaryB.textContent.trim();
-                    } else {
-                        valueA = cellA.textContent.trim();
-                        valueB = cellB.textContent.trim();
-                    }
-                    
-                    const comparison = valueA.localeCompare(valueB);
-                    return ascending ? comparison : -comparison;
-                }
-            });
-            
-            rows.forEach(row => tbody.appendChild(row));
-            
-            const columnNames = ['Total', 'Public', 'Private', 'Project', 'Owner'];
-            const direction = ascending ? 'ascending' : 'descending';
-            updateStatus(`Sorted by ${columnNames[columnIndex]} (${direction})`);
-        }
-        
-        function applyFilters() {
-            const totalMin = parseFloat(document.getElementById('totalMin').value) || -Infinity;
-            const totalMax = parseFloat(document.getElementById('totalMax').value) || Infinity;
-            const publicMin = parseFloat(document.getElementById('publicMin').value) || -Infinity;
-            const publicMax = parseFloat(document.getElementById('publicMax').value) || Infinity;
-            const privateMin = parseFloat(document.getElementById('privateMin').value) || -Infinity;
-            const privateMax = parseFloat(document.getElementById('privateMax').value) || Infinity;
-            const projectSearch = document.getElementById('projectSearch').value.toLowerCase();
-            const ownerSearch = document.getElementById('ownerSearch').value.toLowerCase();
-            
-            const table = document.getElementById('projectTable');
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            
-            let visibleCount = 0;
-            
-            rows.forEach(row => {
-                const total = parseFloat(row.cells[0].textContent) || 0;
-                const publicVal = parseFloat(row.cells[1].textContent) || 0;
-                const privateVal = parseFloat(row.cells[2].textContent) || 0;
-                const project = row.cells[3].textContent.toLowerCase();
-                
-                const ownerCell = row.cells[4];
-                const ownerSummary = ownerCell.querySelector('summary');
-                const ownerText = ownerSummary ? ownerSummary.textContent.toLowerCase() : ownerCell.textContent.toLowerCase();
-                
-                const matchesTotal = total >= totalMin && total <= totalMax;
-                const matchesPublic = publicVal >= publicMin && publicVal <= publicMax;
-                const matchesPrivate = privateVal >= privateMin && privateVal <= privateMax;
-                const matchesProject = projectSearch === '' || project.includes(projectSearch);
-                const matchesOwner = ownerSearch === '' || ownerText.includes(ownerSearch);
-                
-                if (matchesTotal && matchesPublic && matchesPrivate && matchesProject && matchesOwner) {
-                    row.classList.remove('filtered-out');
-                    visibleCount++;
-                } else {
-                    row.classList.add('filtered-out');
-                }
-            });
-            
-            updateStatus(`Showing ${visibleCount} of ${rows.length} projects`);
-        }
-        
-        function clearFilters() {
-            document.getElementById('totalMin').value = '';
-            document.getElementById('totalMax').value = '';
-            document.getElementById('publicMin').value = '';
-            document.getElementById('publicMax').value = '';
-            document.getElementById('privateMin').value = '';
-            document.getElementById('privateMax').value = '';
-            document.getElementById('projectSearch').value = '';
-            document.getElementById('ownerSearch').value = '';
-            
-            const table = document.getElementById('projectTable');
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            
-            rows.forEach(row => {
-                row.classList.remove('filtered-out');
-            });
-            
-            updateStatus(`Showing all ${rows.length} projects`);
-        }
-        
-        function updateStatus(message) {
-            const statusElement = document.getElementById('sortStatus');
-            if (statusElement) {
-                statusElement.textContent = message;
-            }
-        }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const filterInputs = document.querySelectorAll('.filter-item input');
-            filterInputs.forEach(input => {
-                input.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        applyFilters();
-                    }
-                });
-            });
-            
-            const table = document.getElementById('projectTable');
-            const tbody = table.querySelector('tbody');
-            const rows = tbody.querySelectorAll('tr');
-            updateStatus(`Showing all ${rows.length} projects`);
-        });
+def main(args: List[str]) -> int:
+    """Main function to parse arguments and generate the report.
+
+    Params:
+        args: these are the command line arguments
     """
+    try:
+        term_wid, _ = shutil.get_terminal_size()
+        opts = _mk_arg_parser(term_wid).parse_args(args)
+        report_date = datetime.now()
+        report_file = f"report_{report_date.strftime('%Y-%m-%d')}.html"
+        fmt_report_date = report_date.strftime('%Y-%m-%d %H:%M:%S')
+        print(f"PROJECT STORAGE USAGE REPORT - GENERATED ON {fmt_report_date}\n")
+
+        with iRODSSession(irods_env_file=_IRODS_ENV_FILE) as irods:
+            with _connect_icat(opts.pghost, opts.pgport, opts.pguser) as icat:
+                _report(report_file, irods, icat, opts.resources)
+                print(f"To access report, please visit {_webdav_url(irods, report_file)}")
+    except RuntimeError as e:
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return 1
+
+    return 0
+
+
+def _connect_icat(host: str, port: int, user: str) -> Connection:
+    return sqlalchemy.create_engine(f"postgresql://{user}@{host}:{port}/ICAT").connect()
+
+
+def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: List[str]):
+    report_df = _gen_report(resources, icat, irods)
+
+    with NamedTemporaryFile(delete_on_close=False) as file:
+        file.write(_fmt_report(report_df).encode('utf-8'))
+        file.close()
+
+        irods.data_objects.put(
+            file.name,
+            os.path.join('/', irods.zone, 'home', 'shared', _DS_REPORT_LOC, report_file))
+
+
+def _fmt_report(df: DataFrame) -> str:
+    """Format the DataFrame as an HTML report with sortable columns and filters."""
+
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -474,7 +475,7 @@ def _fmt_report(df: DataFrame) -> str:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Public and Private Data Volume (GiB) per Project</title>
-    <style>{css_styles}</style>
+    <style>{_CSS_STYLES}</style>
 </head>
 <body>
     <div class="container">
@@ -544,7 +545,7 @@ def _fmt_report(df: DataFrame) -> str:
         </div>
     </div>
 
-    <script>{javascript}</script>
+    <script>{_JAVASCRIPT}</script>
 </body>
 </html>"""
 
