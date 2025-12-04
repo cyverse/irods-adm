@@ -33,7 +33,7 @@ import sys
 from tempfile import NamedTemporaryFile
 import textwrap
 import traceback
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from irods.exception import iRODSException
 from irods.session import iRODSSession
@@ -53,86 +53,375 @@ _DS_REPORT_LOC = 'CyVerse_DSStats/data-products/project-data-usage'
 _LDAP_URL = 'ldap://ldap.iplantcollaborative.org'
 _LDAP_BASE = 'dc=iplantcollaborative,dc=org'
 
+_JAVASCRIPT = """
+        let sortStates = {};
 
-_REPORT_CSS = """
-    body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
-        line-height: 1.6;
-    }
-    h1 {
-        color: #333;
-        margin-bottom: 20px;
-    }
-    table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-bottom: 20px;
-    }
-    th, td {
-        padding: 8px 12px;
-        text-align: left;
-        border-bottom: 1px solid #ddd;
-    }
-    th {
-        background-color: #f2f2f2;
-        font-weight: bold;
-    }
-    tr:hover {
-        background-color: #f5f5f5;
-    }
-    .footer {
-        font-size: 0.8em;
-        color: #666;
-        margin-top: 30px;
-    }
-    .subtable {
-        margin: 0;
-        width: 100%;
-        border: none;
-        margin-top: 5px;
-        border: 1px solid #ddd;
-        border-radius: 0 0 3px 3px;
-    }
-    .subtable td {
-        border: none;
-        padding: 2px 6px;
-    }
-    .subtable tr:hover {
-        background-color: transparent;
-    }
-    .label {
-        font-weight: bold;
-        color: #555;
-    }
-    details {
-        cursor: pointer;
-        margin: 0;
-        padding: 0;
-    }
-    summary {
-        padding: 5px;
-        background-color: #f8f8f8;
-        border: 1px solid #ddd;
-        border-radius: 3px;
-        font-weight: bold;
-    }
-    details[open] summary {
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
-    }
-    .separator {
-        height: 1px;
-        background-color: #ddd;
-        padding: 0 !important;
-    }
-    .owner-header {
-        font-weight: bold;
-        padding-top: 8px !important;
-        color: #333;
-    }
-"""
+        function sortTable(columnIndex, dataType) {
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr:not(.filtered-out)'));
+            
+            let ascending = true;
+            if (sortStates[columnIndex] === 'asc') {
+                ascending = false;
+                sortStates[columnIndex] = 'desc';
+            } else {
+                ascending = true;
+                sortStates[columnIndex] = 'asc';
+            }
+            
+            const headers = table.querySelectorAll('th');
+            headers.forEach((header, index) => {
+                const arrow = header.querySelector('.sort-arrow');
+                header.classList.remove('sort-asc', 'sort-desc');
+                if (index === columnIndex) {
+                    if (ascending) {
+                        header.classList.add('sort-asc');
+                        arrow.innerHTML = '&uarr;';
+                    } else {
+                        header.classList.add('sort-desc');
+                        arrow.innerHTML = '&darr;';
+                    }
+                } else {
+                    arrow.innerHTML = '&#8597;';
+                }
+            });
+            
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.cells[columnIndex];
+                const cellB = rowB.cells[columnIndex];
+                
+                let valueA, valueB;
+                
+                if (dataType === 'number') {
+                    valueA = parseFloat(cellA.textContent) || 0;
+                    valueB = parseFloat(cellB.textContent) || 0;
+                    return ascending ? valueA - valueB : valueB - valueA;
+                } else {
+                    const summaryA = cellA.querySelector('summary');
+                    const summaryB = cellB.querySelector('summary');
+                    
+                    if (summaryA && summaryB) {
+                        valueA = summaryA.textContent.trim();
+                        valueB = summaryB.textContent.trim();
+                    } else {
+                        valueA = cellA.textContent.trim();
+                        valueB = cellB.textContent.trim();
+                    }
+                    
+                    const comparison = valueA.localeCompare(valueB);
+                    return ascending ? comparison : -comparison;
+                }
+            });
+            
+            rows.forEach(row => tbody.appendChild(row));
+            
+            const columnNames = ['Total', 'Public', 'Private', 'Project', 'Owner'];
+            const direction = ascending ? 'ascending' : 'descending';
+            updateStatus(`Sorted by ${columnNames[columnIndex]} (${direction})`);
+        }
+        
+        function applyFilters() {
+            const totalMin = parseFloat(document.getElementById('totalMin').value) || -Infinity;
+            const totalMax = parseFloat(document.getElementById('totalMax').value) || Infinity;
+            const publicMin = parseFloat(document.getElementById('publicMin').value) || -Infinity;
+            const publicMax = parseFloat(document.getElementById('publicMax').value) || Infinity;
+            const privateMin = parseFloat(document.getElementById('privateMin').value) || -Infinity;
+            const privateMax = parseFloat(document.getElementById('privateMax').value) || Infinity;
+            const projectSearch = document.getElementById('projectSearch').value.toLowerCase();
+            const ownerSearch = document.getElementById('ownerSearch').value.toLowerCase();
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const total = parseFloat(row.cells[0].textContent) || 0;
+                const publicVal = parseFloat(row.cells[1].textContent) || 0;
+                const privateVal = parseFloat(row.cells[2].textContent) || 0;
+                const project = row.cells[3].textContent.toLowerCase();
+                
+                const ownerCell = row.cells[4];
+                const ownerSummary = ownerCell.querySelector('summary');
+                const ownerText = ownerSummary ? ownerSummary.textContent.toLowerCase() : ownerCell.textContent.toLowerCase();
+                
+                const matchesTotal = total >= totalMin && total <= totalMax;
+                const matchesPublic = publicVal >= publicMin && publicVal <= publicMax;
+                const matchesPrivate = privateVal >= privateMin && privateVal <= privateMax;
+                const matchesProject = projectSearch === '' || project.includes(projectSearch);
+                const matchesOwner = ownerSearch === '' || ownerText.includes(ownerSearch);
+                
+                if (matchesTotal && matchesPublic && matchesPrivate && matchesProject && matchesOwner) {
+                    row.classList.remove('filtered-out');
+                    visibleCount++;
+                } else {
+                    row.classList.add('filtered-out');
+                }
+            });
+            
+            updateStatus(`Showing ${visibleCount} of ${rows.length} projects`);
+        }
+        
+        function clearFilters() {
+            document.getElementById('totalMin').value = '';
+            document.getElementById('totalMax').value = '';
+            document.getElementById('publicMin').value = '';
+            document.getElementById('publicMax').value = '';
+            document.getElementById('privateMin').value = '';
+            document.getElementById('privateMax').value = '';
+            document.getElementById('projectSearch').value = '';
+            document.getElementById('ownerSearch').value = '';
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            rows.forEach(row => {
+                row.classList.remove('filtered-out');
+            });
+            
+            updateStatus(`Showing all ${rows.length} projects`);
+        }
+        
+        function updateStatus(message) {
+            const statusElement = document.getElementById('sortStatus');
+            if (statusElement) {
+                statusElement.textContent = message;
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterInputs = document.querySelectorAll('.filter-item input');
+            filterInputs.forEach(input => {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        applyFilters();
+                    }
+                });
+            });
+            
+            const table = document.getElementById('projectTable');
+            const tbody = table.querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            updateStatus(`Showing all ${rows.length} projects`);
+        });
+    """
 
+_CSS_STYLES = """
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a1a1a;
+            margin: 0 0 30px 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .filter-container {
+            background-color: #f8f9fa;
+            padding: 24px;
+            margin-bottom: 24px;
+            border-radius: 6px;
+            border: 1px solid #e1e4e8;
+        }
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .filter-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #24292e;
+        }
+        .filter-section {
+            margin-bottom: 20px;
+        }
+        .filter-section:last-child {
+            margin-bottom: 0;
+        }
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #586069;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .filter-item label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #24292e;
+        }
+        .filter-item input {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.15s ease;
+        }
+        .filter-item input:focus {
+            outline: none;
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+        }
+        .filter-item input[type="number"] {
+            width: 100%;
+        }
+        .filter-item input[type="text"] {
+            width: 100%;
+        }
+        .range-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .range-group input {
+            flex: 1;
+        }
+        .range-separator {
+            color: #6e7781;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid #e1e4e8;
+        }
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+        .btn-primary {
+            background-color: #0969da;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0860ca;
+        }
+        .btn-secondary {
+            background-color: white;
+            color: #24292e;
+            border: 1px solid #d1d5db;
+        }
+        .btn-secondary:hover {
+            background-color: #f6f8fa;
+        }
+        .status-bar {
+            padding: 8px 0;
+            font-size: 14px;
+            color: #57606a;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        th {
+            background-color: #f6f8fa;
+            font-weight: 600;
+            color: #24292e;
+            cursor: pointer;
+            user-select: none;
+            font-size: 14px;
+        }
+        th:hover {
+            background-color: #eaeef2;
+        }
+        td {
+            font-size: 14px;
+            color: #24292e;
+        }
+        .sort-arrow {
+            float: right;
+            margin-left: 8px;
+            color: #57606a;
+            opacity: 0.5;
+        }
+        .sort-asc .sort-arrow,
+        .sort-desc .sort-arrow {
+            opacity: 1;
+            color: #0969da;
+        }
+        tr:hover {
+            background-color: #f6f8fa;
+        }
+        tr.filtered-out {
+            display: none;
+        }
+        details {
+            margin: 0;
+        }
+        summary {
+            cursor: pointer;
+            padding: 4px 8px;
+            background-color: #f6f8fa;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        summary:hover {
+            background-color: #eaeef2;
+        }
+        .owner-details {
+            margin-top: 8px;
+            padding: 12px;
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .footer {
+            margin-top: 24px;
+            padding: 16px;
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #57606a;
+        }
+        .footer p {
+            margin: 4px 0;
+        }
+    """
 
 def main(args: List[str]) -> int:
     """Main function to parse arguments and generate the report.
@@ -167,8 +456,8 @@ def _connect_icat(host: str, port: int, user: str) -> Connection:
 def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: List[str]):
     report_df = _gen_report(resources, icat, irods)
 
-    with NamedTemporaryFile(delete_on_close=False) as file:
-        file.write(_fmt_report(report_df).encode())
+    with NamedTemporaryFile() as file:
+        file.write(_fmt_report(report_df).encode('utf-8'))
         file.close()
 
         irods.data_objects.put(
@@ -177,126 +466,163 @@ def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: 
 
 
 def _fmt_report(df: DataFrame) -> str:
-    """Format the DataFrame as an HTML report with LDAP info for owners."""
-    return f"""
-        <!DOCTYPE html>
-        <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Public and Private Data Volume (GiB) per Project</title>
-                <style>
-                    {_REPORT_CSS}
-                </style>
-            </head>
-            <body>
-                <h1>Public and Private Data Volume (GiB) per Project</h1>
-                {_fmt_report_table(df)}
-            </body>
-        </html>
-    """
+    """Format the DataFrame as an HTML report with sortable columns and filters."""
+
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public and Private Data Volume (GiB) per Project</title>
+    <style>{_CSS_STYLES}</style>
+</head>
+<body>
+    <div class="container">
+        <h1>Public and Private Data Volume (GiB) per Project</h1>
+        
+        <div class="filter-container">
+            <div class="filter-header">
+                <h3>Filters</h3>
+                <div class="status-bar" id="filterStatus"></div>
+            </div>
+            
+            <div class="filter-section">
+                <div class="section-title">Data Volume (GiB)</div>
+                <div class="filter-grid">
+                    <div class="filter-item">
+                        <label>Total</label>
+                        <div class="range-group">
+                            <input type="number" id="totalMin" placeholder="Min" step="0.001">
+                            <span class="range-separator">&mdash;</span>
+                            <input type="number" id="totalMax" placeholder="Max" step="0.001">
+                        </div>
+                    </div>
+                    <div class="filter-item">
+                        <label>Public</label>
+                        <div class="range-group">
+                            <input type="number" id="publicMin" placeholder="Min" step="0.001">
+                            <span class="range-separator">&mdash;</span>
+                            <input type="number" id="publicMax" placeholder="Max" step="0.001">
+                        </div>
+                    </div>
+                    <div class="filter-item">
+                        <label>Private</label>
+                        <div class="range-group">
+                            <input type="number" id="privateMin" placeholder="Min" step="0.001">
+                            <span class="range-separator">&mdash;</span>
+                            <input type="number" id="privateMax" placeholder="Max" step="0.001">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="filter-section">
+                <div class="section-title">Search</div>
+                <div class="filter-grid">
+                    <div class="filter-item">
+                        <label>Project Name</label>
+                        <input type="text" id="projectSearch" placeholder="Search projects...">
+                    </div>
+                    <div class="filter-item">
+                        <label>Owner Name</label>
+                        <input type="text" id="ownerSearch" placeholder="Search owners...">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="filter-actions">
+                <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+                <button class="btn btn-secondary" onclick="clearFilters()">Clear All</button>
+            </div>
+        </div>
+        
+        {_fmt_report_table(df)}
+        
+        <div class="footer">
+            <p><strong>Instructions:</strong> Click column headers to sort. Use filters to narrow results. Press Enter to apply.</p>
+            <p><strong>Status:</strong> <span id="sortStatus">Loading...</span></p>
+        </div>
+    </div>
+
+    <script>{_JAVASCRIPT}</script>
+</body>
+</html>"""
 
 
 def _fmt_report_table(df: DataFrame) -> str:
-    table = """
-        <table>
-            <thead>
-                <tr>
-    """
-
-    for lbl in df.columns:
-        table += f"<th>{lbl}</th>"
-
-    table += """
+    """Generate the HTML table with sortable headers."""
+    table_html = """<table id="projectTable">
+        <thead>
+            <tr>
+                <th onclick="sortTable(0, 'number')">Total <span class="sort-arrow">&#8597;</span></th>
+                <th onclick="sortTable(1, 'number')">Public <span class="sort-arrow">&#8597;</span></th>
+                <th onclick="sortTable(2, 'number')">Private <span class="sort-arrow">&#8597;</span></th>
+                <th onclick="sortTable(3, 'text')">Project <span class="sort-arrow">&#8597;</span></th>
+                <th onclick="sortTable(4, 'text')">Owner <span class="sort-arrow">&#8597;</span></th>
             </tr>
         </thead>
-        <tbody>
-    """
+        <tbody>"""
 
     for _, row in df.iterrows():
-        table += _fmt_project_row(row, df.columns)
+        table_html += f"""
+            <tr>
+                <td>{row['Total']}</td>
+                <td>{row['Public']}</td>
+                <td>{row['Private']}</td>
+                <td>{row['Project']}</td>
+                <td>{_fmt_owner_cell(row['Owner'])}</td>
+            </tr>"""
 
-    table += """
-            </tbody>
-        </table>
-    """
+    table_html += """
+        </tbody>
+    </table>"""
 
-    return table
-
-
-def _fmt_project_row(row: Series, columns: pandas.Index) -> str:
-    tr = "<tr>"
-
-    for col in columns:
-        if col == "Owner" and row[col]:
-            tr += _fmt_owner_cell(row[col])
-        else:
-            tr += f"<td>{row[col]}</td>"
-
-    tr += "</tr>"
-    return tr
+    return table_html
 
 
-def _fmt_owner_cell(val: str) -> str:
-    owners = [owner.strip() for owner in val.split("; ")]
+def _fmt_owner_cell(owner_str: str) -> str:
+    """Format the owner cell with expandable details."""
+    if not owner_str:
+        return "No owner information"
+
+    owners = [owner.strip() for owner in owner_str.split("; ")]
     owners_details = [_resolve_user_info(owner) for owner in owners]
-    summary_line = "; ".join([info['fullname'] for info in owners_details])
+    summary_names = [info['fullname'] if info['fullname'] != info['username'] else info['username']
+                     for info in owners_details]
+    summary_line = "; ".join(summary_names)
 
-    cell = f"""
-        <td>
-            <details>
-                <summary>{summary_line}</summary>
-                <table class="subtable">
-    """
+    details_html = []
+    for info in owners_details:
+        detail_lines = [f"<strong>{info['fullname']} ({info['username']})</strong>"]
 
-    for _, owner_info in enumerate(owners_details):
-        cell += _fmt_owner_info(owner_info)
-
-    cell += """
-                    <tr><td colspan="2" class="separator"></td></tr>
-                </table>
-            </details>
-        </td>
-    """
-
-    return cell
-
-
-def _fmt_owner_info(info: Dict[str, str]) -> str:
-    if info['fullname'] == info['username']:
-        full_name = "???"
-    else:
-        full_name = info['fullname']
-
-    row = f'<tr><td colspan="2" class="owner-header">{full_name} ({info["username"]})</td></tr>'
-
-    if info['username'] == info['fullname']:
-        row += '<tr><td colspan="2">No detailed information available</td></tr>'
-    else:
         if info['email']:
-            row += f"""
-                <tr>
-                    <td class="label">Email:</td>
-                    <td><a href="mailto:{info['email']}">{info['email']}</a></td>
-                </tr>
-            """
-
+            detail_lines.append(f"Email: {info['email']}")
         if info['title']:
-            row += f'<tr><td class="label">Title:</td><td>{info["title"]}</td></tr>'
-
+            detail_lines.append(f"Title: {info['title']}")
         if info['department']:
-            row += f'<tr><td class="label">Department:</td><td>{info["department"]}</td></tr>'
-
+            detail_lines.append(f"Department: {info['department']}")
         if info['organization']:
-            row += f'<tr><td class="label">Organization:</td><td>{info["organization"]}</td></tr>'
+            detail_lines.append(f"Organization: {info['organization']}")
 
-    return row
+        if len(detail_lines) == 1:
+            detail_lines.append("No additional information available")
+
+        details_html.append("<br>".join(detail_lines))
+
+    return f"""
+        <details>
+            <summary>{summary_line}</summary>
+            <div class="owner-details">
+                {"<br><br>".join(details_html)}
+            </div>
+        </details>
+    """
 
 
 def _resolve_user_info(username: str) -> Dict[str, str]:
     if username:
         info = _get_ldap_user_info(username)
-
         if info:
             return info
 
