@@ -40,7 +40,7 @@ from irods.session import iRODSSession
 import ldap
 from ldap import LDAPError  # pylint: disable=no-name-in-module # type: ignore
 import pandas
-from pandas import DataFrame, Series
+from pandas import DataFrame
 import sqlalchemy
 from sqlalchemy import BigInteger, Connection, MetaData, String, Table
 
@@ -60,7 +60,7 @@ _JAVASCRIPT = """
             const table = document.getElementById('projectTable');
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr:not(.filtered-out)'));
-            
+
             let ascending = true;
             if (sortStates[columnIndex] === 'asc') {
                 ascending = false;
@@ -69,7 +69,7 @@ _JAVASCRIPT = """
                 ascending = true;
                 sortStates[columnIndex] = 'asc';
             }
-            
+
             const headers = table.querySelectorAll('th');
             headers.forEach((header, index) => {
                 const arrow = header.querySelector('.sort-arrow');
@@ -86,13 +86,13 @@ _JAVASCRIPT = """
                     arrow.innerHTML = '&#8597;';
                 }
             });
-            
+
             rows.sort((rowA, rowB) => {
                 const cellA = rowA.cells[columnIndex];
                 const cellB = rowB.cells[columnIndex];
-                
+
                 let valueA, valueB;
-                
+
                 if (dataType === 'number') {
                     valueA = parseFloat(cellA.textContent) || 0;
                     valueB = parseFloat(cellB.textContent) || 0;
@@ -100,7 +100,7 @@ _JAVASCRIPT = """
                 } else {
                     const summaryA = cellA.querySelector('summary');
                     const summaryB = cellB.querySelector('summary');
-                    
+
                     if (summaryA && summaryB) {
                         valueA = summaryA.textContent.trim();
                         valueB = summaryB.textContent.trim();
@@ -108,19 +108,19 @@ _JAVASCRIPT = """
                         valueA = cellA.textContent.trim();
                         valueB = cellB.textContent.trim();
                     }
-                    
+
                     const comparison = valueA.localeCompare(valueB);
                     return ascending ? comparison : -comparison;
                 }
             });
-            
+
             rows.forEach(row => tbody.appendChild(row));
-            
+
             const columnNames = ['Total', 'Public', 'Private', 'Project', 'Owner'];
             const direction = ascending ? 'ascending' : 'descending';
             updateStatus(`Sorted by ${columnNames[columnIndex]} (${direction})`);
         }
-        
+
         function applyFilters() {
             const totalMin = parseFloat(document.getElementById('totalMin').value) || -Infinity;
             const totalMax = parseFloat(document.getElementById('totalMax').value) || Infinity;
@@ -130,40 +130,48 @@ _JAVASCRIPT = """
             const privateMax = parseFloat(document.getElementById('privateMax').value) || Infinity;
             const projectSearch = document.getElementById('projectSearch').value.toLowerCase();
             const ownerSearch = document.getElementById('ownerSearch').value.toLowerCase();
-            
+
             const table = document.getElementById('projectTable');
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
-            
+
             let visibleCount = 0;
-            
+
             rows.forEach(row => {
                 const total = parseFloat(row.cells[0].textContent) || 0;
                 const publicVal = parseFloat(row.cells[1].textContent) || 0;
                 const privateVal = parseFloat(row.cells[2].textContent) || 0;
                 const project = row.cells[3].textContent.toLowerCase();
-                
+
                 const ownerCell = row.cells[4];
                 const ownerSummary = ownerCell.querySelector('summary');
-                const ownerText = ownerSummary ? ownerSummary.textContent.toLowerCase() : ownerCell.textContent.toLowerCase();
-                
+                const ownerText = ownerSummary
+                    ? ownerSummary.textContent.toLowerCase()
+                    : ownerCell.textContent.toLowerCase();
+
                 const matchesTotal = total >= totalMin && total <= totalMax;
                 const matchesPublic = publicVal >= publicMin && publicVal <= publicMax;
                 const matchesPrivate = privateVal >= privateMin && privateVal <= privateMax;
                 const matchesProject = projectSearch === '' || project.includes(projectSearch);
                 const matchesOwner = ownerSearch === '' || ownerText.includes(ownerSearch);
-                
-                if (matchesTotal && matchesPublic && matchesPrivate && matchesProject && matchesOwner) {
+
+                if (
+                    matchesTotal
+                    && matchesPublic
+                    && matchesPrivate
+                    && matchesProject
+                    && matchesOwner
+                ) {
                     row.classList.remove('filtered-out');
                     visibleCount++;
                 } else {
                     row.classList.add('filtered-out');
                 }
             });
-            
+
             updateStatus(`Showing ${visibleCount} of ${rows.length} projects`);
         }
-        
+
         function clearFilters() {
             document.getElementById('totalMin').value = '';
             document.getElementById('totalMax').value = '';
@@ -173,25 +181,25 @@ _JAVASCRIPT = """
             document.getElementById('privateMax').value = '';
             document.getElementById('projectSearch').value = '';
             document.getElementById('ownerSearch').value = '';
-            
+
             const table = document.getElementById('projectTable');
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
-            
+
             rows.forEach(row => {
                 row.classList.remove('filtered-out');
             });
-            
+
             updateStatus(`Showing all ${rows.length} projects`);
         }
-        
+
         function updateStatus(message) {
             const statusElement = document.getElementById('sortStatus');
             if (statusElement) {
                 statusElement.textContent = message;
             }
         }
-        
+
         document.addEventListener('DOMContentLoaded', function() {
             const filterInputs = document.querySelectorAll('.filter-item input');
             filterInputs.forEach(input => {
@@ -201,7 +209,7 @@ _JAVASCRIPT = """
                     }
                 });
             });
-            
+
             const table = document.getElementById('projectTable');
             const tbody = table.querySelector('tbody');
             const rows = tbody.querySelectorAll('tr');
@@ -423,6 +431,7 @@ _CSS_STYLES = """
         }
     """
 
+
 def main(args: List[str]) -> int:
     """Main function to parse arguments and generate the report.
 
@@ -456,7 +465,7 @@ def _connect_icat(host: str, port: int, user: str) -> Connection:
 def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: List[str]):
     report_df = _gen_report(resources, icat, irods)
 
-    with NamedTemporaryFile() as file:
+    with NamedTemporaryFile(delete_on_close=False) as file:
         file.write(_fmt_report(report_df).encode('utf-8'))
         file.close()
 
@@ -467,8 +476,6 @@ def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: 
 
 def _fmt_report(df: DataFrame) -> str:
     """Format the DataFrame as an HTML report with sortable columns and filters."""
-
-
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -480,13 +487,13 @@ def _fmt_report(df: DataFrame) -> str:
 <body>
     <div class="container">
         <h1>Public and Private Data Volume (GiB) per Project</h1>
-        
+
         <div class="filter-container">
             <div class="filter-header">
                 <h3>Filters</h3>
                 <div class="status-bar" id="filterStatus"></div>
             </div>
-            
+
             <div class="filter-section">
                 <div class="section-title">Data Volume (GiB)</div>
                 <div class="filter-grid">
@@ -516,7 +523,7 @@ def _fmt_report(df: DataFrame) -> str:
                     </div>
                 </div>
             </div>
-            
+
             <div class="filter-section">
                 <div class="section-title">Search</div>
                 <div class="filter-grid">
@@ -530,17 +537,20 @@ def _fmt_report(df: DataFrame) -> str:
                     </div>
                 </div>
             </div>
-            
+
             <div class="filter-actions">
                 <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
                 <button class="btn btn-secondary" onclick="clearFilters()">Clear All</button>
             </div>
         </div>
-        
+
         {_fmt_report_table(df)}
-        
+
         <div class="footer">
-            <p><strong>Instructions:</strong> Click column headers to sort. Use filters to narrow results. Press Enter to apply.</p>
+            <p>
+                <strong>Instructions:</strong> Click column headers to sort. Use filters to narrow
+                results. Press Enter to apply.
+            </p>
             <p><strong>Status:</strong> <span id="sortStatus">Loading...</span></p>
         </div>
     </div>
@@ -555,11 +565,21 @@ def _fmt_report_table(df: DataFrame) -> str:
     table_html = """<table id="projectTable">
         <thead>
             <tr>
-                <th onclick="sortTable(0, 'number')">Total <span class="sort-arrow">&#8597;</span></th>
-                <th onclick="sortTable(1, 'number')">Public <span class="sort-arrow">&#8597;</span></th>
-                <th onclick="sortTable(2, 'number')">Private <span class="sort-arrow">&#8597;</span></th>
-                <th onclick="sortTable(3, 'text')">Project <span class="sort-arrow">&#8597;</span></th>
-                <th onclick="sortTable(4, 'text')">Owner <span class="sort-arrow">&#8597;</span></th>
+                <th onclick="sortTable(0, 'number')">
+                    Total <span class="sort-arrow">&#8597;</span>
+                </th>
+                <th onclick="sortTable(1, 'number')">
+                    Public <span class="sort-arrow">&#8597;</span>
+                </th>
+                <th onclick="sortTable(2, 'number')">
+                    Private <span class="sort-arrow">&#8597;</span>
+                </th>
+                <th onclick="sortTable(3, 'text')">
+                    Project <span class="sort-arrow">&#8597;</span>
+                </th>
+                <th onclick="sortTable(4, 'text')">
+                    Owner <span class="sort-arrow">&#8597;</span>
+                </th>
             </tr>
         </thead>
         <tbody>"""
