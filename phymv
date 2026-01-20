@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-show_help()
-{
+show_help() {
   cat <<EOF
 
 $ExecName version $Version
@@ -14,7 +13,7 @@ associated with a data object that has a replica on the destination resource.
 
 Parameters:
  <src_resc>   the resource where the files are moved from
- <dest_resc>  the resouce where the files are moved to
+ <dest_resc>  the resource where the files are moved to
 
 Options:
  -c, --collection <collection>  only move the files associated with data objects
@@ -40,21 +39,18 @@ readonly ExecName
 readonly Version=1
 
 
-show_version()
-{
+show_version() {
   printf '%s\n' "$Version"
 }
 
 
-exit_with_help()
-{
+exit_with_help() {
   show_help >&2
   exit 1
 }
 
 
-finish()
-{
+finish() {
   local objList="$1"
 
   rm --force "$objList"
@@ -62,8 +58,7 @@ finish()
 }
 
 
-count_list()
-{
+count_list() {
   awk 'BEGIN {
          RS = "\0"
          tot = 0
@@ -75,8 +70,7 @@ count_list()
 }
 
 
-count_unmovable()
-{
+count_unmovable() {
   local baseCond="$1"
 
   psql --no-align --quiet --tuples-only ICAT  <<EOSQL
@@ -118,8 +112,7 @@ EOSQL
 }
 
 
-partition()
-{
+partition() {
   local minSizeB="$1"
 
   if [ "$#" -ge 2 ]
@@ -154,8 +147,7 @@ partition()
 }
 
 
-track_prog()
-{
+track_prog() {
   local cnt="$1"
   local tot="$2"
   local subTot="$3"
@@ -182,8 +174,7 @@ track_prog()
 }
 
 
-select_cohort()
-{
+select_cohort() {
   local cnt="$1"
   local tot="$2"
   local maxProcs="$3"
@@ -322,7 +313,7 @@ fi
 readonly SrcResc="$1"
 readonly DestResc="$2"
 
-# Redirect stadout to FD 3 to use as a logging channel
+# Redirect stdout to FD 3 to use as a logging channel
 readonly Log=3
 eval "exec $Log>&1"
 
