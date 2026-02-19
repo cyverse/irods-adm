@@ -87,7 +87,7 @@ BEGIN {
 	currentEntry = "";
 	lastMonth = "";
 	for (n = 1; n <= 0x1f; n++) {
-		ctrlEsc[sprintf("%c", n)] = sprintf("\\x%02x", n);
+		ctrlEsc[sprintf("%c", n)] = sprintf("\\\\u00%02x", n);
 	}
 	if (YEAR !~ /[0-9][0-9]*/) {
 		print "The YEAR variable must be set to a number on the command line" > "/dev/stderr";
