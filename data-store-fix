@@ -244,22 +244,21 @@ ORDER BY modify_ts;
 
 $(inject_heading "$DATA_TABLE_HEADING")
 SELECT
-	d.data_id IN (SELECT * FROM data_perm_probs)     AS "Permission Issue",
-	d.data_checksum IS NULL OR d.data_checksum = ''  AS "Missing Checksum",
+	d.data_id IN (SELECT data_id FROM data_perm_probs)  AS "Permission Issue",
+	d.data_checksum IS NULL OR d.data_checksum = ''     AS "Missing Checksum",
 	COALESCE((SELECT du.uuid_count FROM data_uuid_probs AS du WHERE du.data_id = d.data_id), 1)
 		AS "UUID Count",
-	d.data_owner_name || '#' || d.data_owner_zone    AS "Owner",
-	d.data_repl_num                                  AS "Replica",
-	TO_TIMESTAMP(CAST(d.modify_ts AS INTEGER))       AS "Modify Time",
+	d.data_owner_name || '#' || d.data_owner_zone       AS "Owner",
+	d.data_repl_num                                     AS "Replica",
+	TO_TIMESTAMP(CAST(d.modify_ts AS INTEGER))          AS "Modify Time",
 	REPLACE(REPLACE(c.coll_name || '/' || d.data_name, E'\\\\', E'\\\\\\\\'), E'\\n', E'\\\\n')
 		AS "Data Object"
 FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
 WHERE c.coll_name LIKE '/$zone/%'
 	AND d.modify_ts < '0$cutoffTS'
-	AND d.data_id IN (
-		SELECT * FROM data_perm_probs
-		UNION SELECT data_id FROM data_uuid_probs
-		UNION SELECT data_id FROM data_chksum_probs)
+	AND ((d.data_id, d.data_repl_num) IN (SELECT data_id, data_repl_num FROM data_chksum_probs))
+		OR d.data_id IN (
+			SELECT data_id FROM data_perm_probs UNION SELECT data_id FROM data_uuid_probs))
 ORDER BY d.modify_ts;
 
 $(inject_debug_newline)
@@ -276,9 +275,11 @@ $(inject_debug_msg 'creating data_checksum_probs')
 -- This may overestimate the number of problems, since it may find objects not
 -- in the zone.
 CREATE TEMPORARY TABLE data_chksum_probs AS
-SELECT DISTINCT data_id
+SELECT DISTINCT data_id, data_repl_num
 FROM r_data_main
 WHERE modify_ts < '0$cutoffTS' AND (data_checksum IS NULL OR data_checksum = '');
+
+CREATE INDEX idx_data_chksum_probs ON data_chksum_probs (data_id, data_repl_num);
 EOF
 }
 
@@ -404,8 +405,6 @@ fix_problems() {
 	done
 }
 
-
-
 fix_collection_problems() {
 	pass_hdr_thru
 
@@ -424,58 +423,23 @@ fix_collection_problems() {
 		local coll
 		coll="$(unescape "$escColl")"
 
+		local noPermIssue=false
 		if ! permIssue="$(process_perm_issue "$permIssue" "$coll")"; then
-			continue
+			noPermIssue=true
 		fi
 
+		local noUUIDIssue=false
 		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" coll "$coll")"; then
-			continue
+			noUUIDIssue=true
 		fi
 
-		printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
-		: $(( CollCnt++ ))
+		if [[ "$noPermIssue" == false || "$noUUIDIssue" == false ]]; then
+			printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
+			: $(( CollCnt++ ))
+		fi
 	done
 }
 
-fix_object_problems() {
-	pass_hdr_thru
-
-	trap 'complete_fix_objs "${FUNCNAME[0]-}"; rm_temp_files' EXIT
-	trap 'complete_fix_objs "${FUNCNAME[0]-}"' RETURN
-
-	local permIssue missingChksum uuidCnt owner replField createTime objField
-	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField; do
-		if [[ -z "$objField" ]]; then
-			break
-		fi
-
-		local escObj
-		escObj="$(trim "$objField")"
-
-		local obj
-		obj="$(unescape "$escObj")"
-
-		local repl
-		repl="$(trim "$replField")"
-
-		if ! permIssue="$(process_perm_issue "$permIssue" "$obj")"; then
-			continue
-		fi
-
-		if ! missingChksum="$(process_chksum_issue "$missingChksum" "$repl" "$obj")"; then
-			continue
-		fi
-
-		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" obj "$obj")"; then
-			continue
-		fi
-
-		printf '%s|%s|%s|%s|%s|%s|%s\n' \
-			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
-
-		: $(( ObjCnt++ ))
-	done
-}
 
 
 complete_fix_coll() {
@@ -483,14 +447,6 @@ complete_fix_coll() {
 
 	if [[ "$funcName" == fix_collection_problems ]]; then
 		printf '(%d collections)' "$CollCnt"
-	fi
-}
-
-complete_fix_objs() {
-	local funcName="$1"
-
-	if [[ "$funcName" == fix_object_problems ]]; then
-		printf '(%d data objects)' "$ObjCnt"
 	fi
 }
 
@@ -503,6 +459,73 @@ pass_hdr_thru() {
 			break
 		fi
 	done
+}
+
+process_perm_issue() {
+	local issue="$1"
+	local entity="$2"
+
+	if [[ "${issue// /}" == f ]]; then
+		printf '%s' "$issue"
+		return 1
+	fi
+
+	local err
+	if err="$(ichmod -M own rodsadmin "$entity" 2>&1 > /dev/null)"; then
+		printf '%s' "${issue/%  /✓ }"
+	elif [[ "$err" =~ CAT_INVALID_ARGUMENT ]]; then
+		printf '%s' "${issue/%  /👻 }"
+	else
+		printf '%s' "${issue/%  /✗ }"
+		echo "$err" >&2
+		printf 'FAILED TO ADD RODSADMIN OWN PERMISSION!! - %s\n' "$entity" >&2
+	fi
+
+	return 0
+}
+
+process_uuid_issue() {
+	local uuidCntField="$1"
+	local entityType="$2"
+	local entity="$3"
+
+	uuidCntField="${uuidCnt#  }"
+	declare -i cnt=$uuidCntField
+
+	if (( cnt == 1 )); then
+		printf '%s  ' "$uuidCntField"
+		return 1
+	fi
+
+	local imetaFlag
+	if [[ "$entityType" == coll ]]; then
+		local imetaFlag=-C
+	else
+		local imetaFlag=-d
+	fi
+
+	local statusMsg
+	if (( cnt == 0 )); then
+		statusMsg="$(add_missing_uuid "$entity" "$imetaFlag")"
+	else
+		statusMsg="$(rm_extra_uuids "$entity" "$imetaFlag")"
+	fi
+
+	local statusFmt
+	case "${statusMsg-}" in
+		SUCCESS)
+			statusFmt=✓
+			;;
+		MISSING)
+			statusFmt=👻
+			;;
+		*)
+			statusFmt=✗
+			;;
+	esac
+
+	printf '%s%s ' "$uuidCntField" "$statusFmt"
+	return 0
 }
 
 trim() {
@@ -542,37 +565,93 @@ unescape() {
 	printf '%s' "$entity"
 }
 
+fix_object_problems() {
+	pass_hdr_thru
+
+	trap 'complete_fix_objs "${FUNCNAME[0]-}"; rm_temp_files' EXIT
+	trap 'complete_fix_objs "${FUNCNAME[0]-}"' RETURN
+
+	local permIssue missingChksum uuidCnt owner replField createTime objField
+	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField; do
+		if [[ -z "$objField" ]]; then
+			break
+		fi
+
+		local escObj
+		escObj="$(trim "$objField")"
+
+		local obj
+		obj="$(unescape "$escObj")"
+
+		local repl
+		repl="$(trim "$replField")"
+
+		local noPermIssue=false
+		if ! permIssue="$(process_perm_issue "$permIssue" "$obj")"; then
+			noPermIssue=true
+		fi
+
+		local noChksumIssue=false
+		if ! missingChksum="$(process_chksum_issue "$missingChksum" "$repl" "$obj")"; then
+			noChksumIssue=true
+		fi
+
+		local noUUIDIssue=false
+		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" obj "$obj")"; then
+			noUUIDIssue=true
+		fi
+
+		if [[ "$noPermIssue" == false || "$noChksumIssue" == false || "$noUUIDIssue" == false ]]; then
+			printf '%s|%s|%s|%s|%s|%s|%s\n' \
+				"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
+
+			: $(( ObjCnt++ ))
+		fi
+	done
+}
+
+complete_fix_objs() {
+	local funcName="$1"
+
+	if [[ "$funcName" == fix_object_problems ]]; then
+		printf '(%d data objects)' "$ObjCnt"
+	fi
+}
+
 process_chksum_issue() {
 	local issue="$1"
 	local repl="$2"
 	local obj="$3"
 
-	if [[ "${issue// /}" == t ]]; then
-		local err retCode
-		err="$(ichksum -M --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
-		retCode="$?"
-
-		if [[ "$err" =~ 'does not exist' ]]; then
-			printf '%s' "${issue/%  /👻 }"
-			return
-		elif [[ "$err" =~ HIERARCHY_ERROR ]]; then
-			err="$(fix_archive_chksum "$repl" "$obj")"
-			retCode=$?
-		fi
-
-		if (( retCode == 0 )) && [[ -z "$err" ]]; then
-			printf '%s' "${issue/%  /✓ }"
-		else
-			if [[ -n "$err" ]]; then
-				echo "$err" >&2
-			fi
-
-			printf '%s' "${issue/%  /✗ }"
-			printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
-		fi
-	else
-		printf '%s' "$issue"
+	if [[ "${issue// /}" == f ]]; then
+		print '%s' "$issue"
+		return 1
 	fi
+
+	local err retCode
+	err="$(ichksum -M --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
+	retCode="$?"
+
+	if [[ "$err" =~ 'does not exist' ]]; then
+		printf '%s' "${issue/%  /👻 }"
+		return
+	elif [[ "$err" =~ HIERARCHY_ERROR ]]; then
+		err="$(fix_archive_chksum "$repl" "$obj")"
+		retCode=$?
+	fi
+
+	if (( retCode == 0 )) && [[ -z "$err" ]]; then
+		printf '%s' "${issue/%  /✓ }"
+	else
+		if [[ -n "$err" ]]; then
+			echo "$err" >&2
+		fi
+
+		printf '%s' "${issue/%  /✗ }"
+		printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
+	fi
+
+	return 0
 }
 
 fix_archive_chksum() {
@@ -625,69 +704,6 @@ get_sibling_chksum() {
 select DATA_CHECKSUM
 where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_CHECKSUM != ''
 EOF
-}
-
-process_perm_issue() {
-	local issue="$1"
-	local entity="$2"
-
-	if [[ "${issue// /}" = t ]]; then
-		local err
-		if err="$(ichmod -M own rodsadmin "$entity" 2>&1 > /dev/null)"; then
-			printf '%s' "${issue/%  /✓ }"
-		elif [[ "$err" =~ CAT_INVALID_ARGUMENT ]]; then
-			printf '%s' "${issue/%  /👻 }"
-		else
-			printf '%s' "${issue/%  /✗ }"
-			echo "$err" >&2
-			printf 'FAILED TO ADD RODSADMIN OWN PERMISSION!! - %s\n' "$entity" >&2
-		fi
-	else
-		printf '%s' "$issue"
-	fi
-}
-
-process_uuid_issue() {
-	local uuidCntField="$1"
-	local entityType="$2"
-	local entity="$3"
-
-	uuidCntField="${uuidCnt#  }"
-	declare -i cnt=$uuidCntField
-
-	if (( cnt == 1 )); then
-		printf '%s  ' "$uuidCntField"
-		return 0
-	fi
-
-	local imetaFlag
-	if [[ "$entityType" == coll ]]; then
-		local imetaFlag=-C
-	else
-		local imetaFlag=-d
-	fi
-
-	local statusMsg
-	if (( cnt == 0 )); then
-		statusMsg="$(add_missing_uuid "$entity" "$imetaFlag")"
-	else
-		statusMsg="$(rm_extra_uuids "$entity" "$imetaFlag")"
-	fi
-
-	local statusFmt
-	case "${statusMsg-}" in
-		SUCCESS)
-			statusFmt=✓
-			;;
-		MISSING)
-			statusFmt=👻
-			;;
-		*)
-			statusFmt=✗
-			;;
-	esac
-
-	printf '%s%s ' "$uuidCntField" "$statusFmt"
 }
 
 add_missing_uuid() {
