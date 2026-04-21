@@ -256,7 +256,8 @@ SELECT
 FROM r_coll_main AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
 WHERE c.coll_name LIKE '/$zone/%'
 	AND d.modify_ts < '0$cutoffTS'
-	AND ((d.data_id, d.data_repl_num) IN (SELECT data_id, data_repl_num FROM data_chksum_probs))
+	AND (
+		(d.data_id, d.data_repl_num) IN (SELECT data_id, data_repl_num FROM data_chksum_probs)
 		OR d.data_id IN (
 			SELECT data_id FROM data_perm_probs UNION SELECT data_id FROM data_uuid_probs))
 ORDER BY d.modify_ts;
@@ -271,9 +272,6 @@ inject_checksum_probs_table() {
 
 	cat <<EOF
 $(inject_debug_msg 'creating data_checksum_probs')
-
--- This may overestimate the number of problems, since it may find objects not
--- in the zone.
 CREATE TEMPORARY TABLE data_chksum_probs AS
 SELECT DISTINCT data_id, data_repl_num
 FROM r_data_main
@@ -309,8 +307,6 @@ WHERE NOT EXISTS (SELECT * FROM owned_by_rodsadmin AS o WHERE o.object_id = c.co
 	AND c.modify_ts < '0$cutoffTS';
 CREATE INDEX idx_coll_perm_probs ON coll_perm_probs(coll_id);
 
--- This may overestimate the number of problems, since it may find objects not
--- in the zone.
 $(inject_debug_msg 'creating data_perm_probs')
 CREATE TEMPORARY TABLE data_perm_probs AS
 SELECT DISTINCT data_id
@@ -340,8 +336,6 @@ GROUP BY c.coll_id
 HAVING COUNT(u.object_id) != 1;
 CREATE INDEX idx_coll_uuid_probs ON coll_uuid_probs (coll_id);
 
--- This may overestimate the number of problems, since it may find objects not
--- in the zone.
 $(inject_debug_msg 'creating data_uuid_probs')
 CREATE TEMPORARY TABLE data_uuid_probs (data_id, uuid_count) AS
 SELECT DISTINCT d.data_id, COUNT(u.object_id)
@@ -423,24 +417,22 @@ fix_collection_problems() {
 		local coll
 		coll="$(unescape "$escColl")"
 
-		local noPermIssue=false
+		local noPermIssue='false'
 		if ! permIssue="$(process_perm_issue "$permIssue" "$coll")"; then
-			noPermIssue=true
+			noPermIssue='true'
 		fi
 
-		local noUUIDIssue=false
+		local noUUIDIssue='false'
 		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" coll "$coll")"; then
-			noUUIDIssue=true
+			noUUIDIssue='true'
 		fi
 
-		if [[ "$noPermIssue" == false || "$noUUIDIssue" == false ]]; then
+		if [[ "$noPermIssue" == 'false' || "$noUUIDIssue" == 'false' ]]; then
 			printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
 			: $(( CollCnt++ ))
 		fi
 	done
 }
-
-
 
 complete_fix_coll() {
 	local funcName="$1"
@@ -528,6 +520,65 @@ process_uuid_issue() {
 	return 0
 }
 
+
+
+add_missing_uuid() {
+	local entity="$1"
+	local imetaFlag="$2"
+
+	local uuid
+	uuid="$(uuidgen -t)"
+
+	local err
+	if err="$(imeta set "$imetaFlag" "$entity" ipc_UUID "$uuid" 2>&1)"; then
+		printf SUCCESS
+	else
+		if [[ "$err" =~ (CAT_UNKNOWN_COLLECTION|CAT_UNKNOWN_FILE) ]]; then
+			printf MISSING
+			return 1
+		else
+			echo "$err" >&2
+			printf 'FAILED TO ADD UUID!! - %s\n' "$entity" >&2
+		fi
+	fi
+}
+
+rm_extra_uuids() {
+	local entity="$1"
+	local imetaFlag="$2"
+
+	local failed
+
+	local uuidMap
+	if ! uuidMap="$(get_meta_id_uuid_map "$entity" "$imetaFlag" 2>&1)"; then
+		failed=failed
+
+		if [[ "$uuidMap" = UNKNOWN_ENTITY ]]; then
+			printf MISSING
+		else
+			echo "$uuidMap" >&2
+		fi
+	else
+		local cnt=0
+
+		local uuid
+		while read -r _ uuid; do
+			# The first UUID created will have the first DB Id
+			if (( ++cnt > 1 )); then
+				if ! imeta rm "$imetaFlag" "$entity" ipc_UUID "$uuid"; then
+					failed=failed
+				fi
+			fi
+		done <<< "$uuidMap"
+	fi
+
+	if [[ -z "${failed-}" ]]; then
+		printf SUCCESS
+	else
+		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
+	fi
+}
+
 trim() {
 	local str="$*"
 	str="${str#"${str%%[![:space:]]*}"}"
@@ -586,22 +637,23 @@ fix_object_problems() {
 		local repl
 		repl="$(trim "$replField")"
 
-		local noPermIssue=false
+		local noPermIssue='false'
 		if ! permIssue="$(process_perm_issue "$permIssue" "$obj")"; then
-			noPermIssue=true
+			noPermIssue='true'
 		fi
 
-		local noChksumIssue=false
+		local noChksumIssue='false'
 		if ! missingChksum="$(process_chksum_issue "$missingChksum" "$repl" "$obj")"; then
-			noChksumIssue=true
+			noChksumIssue='true'
 		fi
 
-		local noUUIDIssue=false
+		local noUUIDIssue='false'
 		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" obj "$obj")"; then
-			noUUIDIssue=true
+			noUUIDIssue='true'
 		fi
 
-		if [[ "$noPermIssue" == false || "$noChksumIssue" == false || "$noUUIDIssue" == false ]]; then
+		if [[ "$noPermIssue" == 'false' || "$noChksumIssue" == 'false' || "$noUUIDIssue" == 'false' ]]
+		then
 			printf '%s|%s|%s|%s|%s|%s|%s\n' \
 				"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
 
@@ -704,63 +756,6 @@ get_sibling_chksum() {
 select DATA_CHECKSUM
 where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_CHECKSUM != ''
 EOF
-}
-
-add_missing_uuid() {
-	local entity="$1"
-	local imetaFlag="$2"
-
-	local uuid
-	uuid="$(uuidgen -t)"
-
-	local err
-	if err="$(imeta set "$imetaFlag" "$entity" ipc_UUID "$uuid" 2>&1)"; then
-		printf SUCCESS
-	else
-		if [[ "$err" =~ (CAT_UNKNOWN_COLLECTION|CAT_UNKNOWN_FILE) ]]; then
-			printf MISSING
-			return 1
-		else
-			echo "$err" >&2
-			printf 'FAILED TO ADD UUID!! - %s\n' "$entity" >&2
-		fi
-	fi
-}
-
-rm_extra_uuids() {
-	local entity="$1"
-	local imetaFlag="$2"
-
-	local failed
-
-	local uuidMap
-	if ! uuidMap="$(get_meta_id_uuid_map "$entity" "$imetaFlag" 2>&1)"; then
-		failed=failed
-
-		if [[ "$uuidMap" = UNKNOWN_ENTITY ]]; then
-			printf MISSING
-		else
-			echo "$uuidMap" >&2
-		fi
-	else
-		local cnt=0
-
-		local uuid
-		while read -r _ uuid; do
-			# The first UUID created will have the first DB Id
-			if (( ++cnt > 1 )); then
-				if ! imeta rm "$imetaFlag" "$entity" ipc_UUID "$uuid"; then
-					failed=failed
-				fi
-			fi
-		done <<< "$uuidMap"
-	fi
-
-	if [[ -z "${failed-}" ]]; then
-		printf SUCCESS
-	else
-		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
-	fi
 }
 
 # Retrieve UUIDs for an entity sorted by the metadata's DB Ids
