@@ -211,12 +211,8 @@ classify_tool_errors() {
 	uCMCnt="$(split_out_tool_class \
 		"$errorsFile" -314000 USER_CHKSUM_MISMATCH "$logBase".chksum_mismatches )"
 
-	local uFOEMissingCnt
-	uFOEMissingCnt="$(split_out_tool_class \
-		"$errorsFile" \
-		-510002 \
-		'UNIX_FILE_OPEN_ERR, No such file or directory' \
-		"$logBase".missing_replicas )"
+	local replOpenErrCnt
+	replOpenErrCnt="$(split_out_repl_open_errs "$errorsFile" "$logBase".missing_replicas)"
 
 	local uFOEFSErrCnt
 	uFOEFSErrCnt="$(split_out_fs_errs "$errorsFile" "$logBase".fs_errors)"
@@ -239,9 +235,9 @@ classify_tool_errors() {
 
 	display_error_count 'catalog errors' "$catErrCnt" "$totErrCnt"
 	display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
-	display_error_count 'file open errors' "$uFOEMissingCnt" "$totErrCnt"
 	display_error_count 'filesystem errors' "$uFOEFSErrCnt" "$totErrCnt"
 	display_error_count 'network connection issues' "$ncCnt" "$totErrCnt"
+	display_error_count 'replica open errors' "$replOpenErrCnt" "$totErrCnt"
 	display_error_count 'resource offline' "$roCnt" "$totErrCnt"
 	display_error_count 'short files' "$sCLECnt" "$totErrCnt"
 	display_error_count 'write failures' "$writeErrCnt" "$totErrCnt"
@@ -294,6 +290,27 @@ split_out_conn_errs() {
 	: $((cnt += connTO))
 
 	echo "$cnt"
+}
+
+split_out_repl_open_errs() {
+	local errorsFile="$1"
+	local classFile="$2"
+
+	local uFOEOpenCnt
+	uFOEOpenCnt="$(split_out_tool_class \
+		"$errorsFile" \
+		-510002 \
+		'UNIX_FILE_OPEN_ERR, No such file or directory' \
+		"$classFile" )"
+
+	local uFOEStatCnt
+	uFOEStatCnt="$(split_out_tool_class \
+		"$errorsFile" \
+		-516002 \
+		'UNIX_FILE_STAT_ERR, No such file or directory' \
+		"$classFile" )"
+
+	echo $(( uFOEOpenCnt + uFOEStatCnt ))
 }
 
 split_out_fs_errs() {
