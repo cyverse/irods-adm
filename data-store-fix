@@ -520,8 +520,6 @@ process_uuid_issue() {
 	return 0
 }
 
-
-
 add_missing_uuid() {
 	local entity="$1"
 	local imetaFlag="$2"
@@ -577,6 +575,33 @@ rm_extra_uuids() {
 	else
 		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
 	fi
+}
+
+
+
+# Retrieve UUIDs for an entity sorted by the metadata's DB Ids
+get_meta_id_uuid_map() {
+	local entityPath="$1"
+	local imetaFlag="$2"
+
+	local query
+	if [[ "$imetaFlag" = '-C' ]]; then
+		query="$(mk_coll_uuid_query "$entityPath")"
+	else
+		query="$(mk_data_uuid_query "$(dirname "$entityPath")" "$(basename "$entityPath")")"
+	fi
+
+	local results
+	if ! results="$(iquest --no-page '%s %s' "$query")"; then
+		return 1
+	fi
+
+	if [[ "$results" =~ CAT_NO_ROWS_FOUND ]]; then
+		printf UNKNOWN_ENTITY >&2
+		return 1
+	fi
+
+	echo "$results"
 }
 
 trim() {
@@ -676,7 +701,7 @@ process_chksum_issue() {
 	local obj="$3"
 
 	if [[ "${issue// /}" == f ]]; then
-		print '%s' "$issue"
+		printf '%s' "$issue"
 		return 1
 	fi
 
@@ -756,31 +781,6 @@ get_sibling_chksum() {
 select DATA_CHECKSUM
 where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_CHECKSUM != ''
 EOF
-}
-
-# Retrieve UUIDs for an entity sorted by the metadata's DB Ids
-get_meta_id_uuid_map() {
-	local entityPath="$1"
-	local imetaFlag="$2"
-
-	local query
-	if [[ "$imetaFlag" = '-C' ]]; then
-		query="$(mk_coll_uuid_query "$entityPath")"
-	else
-		query="$(mk_data_uuid_query "$(dirname "$entityPath")" "$(basename "$entityPath")")"
-	fi
-
-	local results
-	if ! results="$(iquest --no-page '%s %s' "$query")"; then
-		return 1
-	fi
-
-	if [[ "$results" =~ CAT_NO_ROWS_FOUND ]]; then
-		printf UNKNOWN_ENTITY >&2
-		return 1
-	fi
-
-	echo "$results"
 }
 
 mk_coll_uuid_query() {
