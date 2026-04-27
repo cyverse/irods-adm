@@ -147,6 +147,11 @@ verify_sys_cmds() {
 
 	local cmd
 	for cmd in "${cmds[@]}"; do
+		if ! [[ -f "$cmd" ]]; then
+			printf 'Error: the command %s cannot be found\n' "$cmd" >&2
+			return 127
+		fi
+
 		if [[ -L "$cmd" ]]; then
 			printf 'Warning: system command %s is a symbolic link.\n' "$cmd" >&2
 		fi
