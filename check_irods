@@ -2,6 +2,9 @@
 #
 # NB this should follow the Nagios plugin guidelines. See
 # https://nagios-plugins.org/doc/guidelines.html
+#
+# © 2024 The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 # TODO run network connection in separate process and kill it after a certain amount of time. (nagios DEFAULT_SOCKET_TIMEOUT)
 # TODO switch to using -p (lowercase) for PORT option
@@ -48,9 +51,6 @@ Exit Status:
  0  connected to iRODS
  2  failed to connect to iRODS
  3  an error occurred or connected to something other than iRODS
-
-© 2024 The Arizona Board of Regents on behalf of The University of Arizona. For
-license information, see https://cyverse.org/license.
 EOF
 }
 
@@ -222,26 +222,26 @@ format_opts() {
 		local arg="${!ai}"
 
 		if [[ "$arg" =~ ^-[^-] ]]; then
-			local shopts=''
+			local opts=''
 
 			local ci
 			for (( ci=1; ci<${#arg}; ci++ )); do
 				local c="${arg:$ci:1}"
 
 				if [[ "$c" == '?' ]]; then
-					if [[ -n "$shopts" ]]; then
-						transArgs+=( -"$shopts" )
-						shopts=''
+					if [[ -n "$opts" ]]; then
+						transArgs+=( -"$opts" )
+						opts=''
 					fi
 
 					transArgs+=( --usage )
 		  	else
-					shopts+="$c"
+					opts+="$c"
 				fi
 			done
 
-			if [[ -n "$shopts" ]]; then
-				transArgs+=( -"$shopts" )
+			if [[ -n "$opts" ]]; then
+				transArgs+=( -"$opts" )
 			fi
 		else
 			transArgs+=( "$arg" )
