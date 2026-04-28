@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bash
 
 show_help() {
   cat <<EOF
@@ -28,7 +28,9 @@ EOF
 
 set -o errexit -o nounset -o pipefail
 
-readonly ExecName=$(basename "$0")
+ExecName=$(basename "$0")
+readonly ExecName
+
 readonly Version=3
 
 
@@ -115,6 +117,7 @@ generate_report() {
   ipsReport=$(ips -v)
 
   local iesHost
+  # shellcheck disable=SC2001
   iesHost=$(sed 's/Server: //;q' <<<"$ipsReport")
 
   local iesIp
@@ -172,8 +175,8 @@ lookup_address() {
 
 
 # From the output of the HAProxy stats command 'show sess all'. this function
-# generates a map of proxy TCP ports to the IP address of the correspong client
-# being proxied.
+# generates a map of proxy TCP ports to the IP address of the corresponding
+# client being proxied.
 #
 # parameter:
 #   proxy  the IP address used by HAProxy to connect to the IES
