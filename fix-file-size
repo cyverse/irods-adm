@@ -27,6 +27,9 @@ corresponding file in storage.  No object name may have a carriage return in its
 path. The user must be initialized with iRODS as an admin user. Finally, the
 user must have passwordless access to the root account on the relevant storage
 resources.
+
+Dependencies
+* GNU parallel
 EOF
 }
 
@@ -34,7 +37,7 @@ readonly Version=2
 
 set -o errexit -o nounset -o pipefail
 
-ExecPath="$(readlink --canonicalize "$0")"
+ExecPath="$(realpath --canonicalize-existing "$0")"
 ExecName="$(basename "$ExecPath")"
 readonly ExecName ExecPath
 
