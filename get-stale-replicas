@@ -4,7 +4,7 @@
 # before a certain day. It writes the list to stdout.
 #
 # Usage:
-#  get-stale-repls [CUTOFF-DATE]
+#  get-stale-replicas [CUTOFF-DATE]
 #
 # Parameters:
 #  CUTOFF-DATE  only replicas modified prior to this date will be listed. The
