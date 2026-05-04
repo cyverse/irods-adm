@@ -9,6 +9,9 @@
 # This program makes iquest easier to use. It allows queries to be passed by
 # stdin, and it when there are no results, it returns nothing instead of
 # `CAT_NO_ROWS_FOUND`.
+#
+# © 2026 The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 set -o errexit -o nounset
 
