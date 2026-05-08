@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# © 2022, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 show_help() {
 	cat <<EOF
@@ -74,9 +77,6 @@ Prerequisites:
  2) The user must be initialized with iRODS as an admin user.
  3) The user must be able to connect to the ICAT DB without providing a
     password.
-
-© 2022, The Arizona Board of Regents on behalf of The University of Arizona. For
-license information, see https://cyverse.org/license.
 EOF
 }
 
