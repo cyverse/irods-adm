@@ -541,6 +541,8 @@ add_missing_uuid() {
 	fi
 }
 
+
+
 rm_extra_uuids() {
 	local entity="$1"
 	local imetaFlag="$2"
@@ -548,14 +550,15 @@ rm_extra_uuids() {
 	local failed
 
 	local uuidMap
-	if ! uuidMap="$(get_meta_id_uuid_map "$entity" "$imetaFlag" 2>&1)"; then
-		failed=failed
+	if [[ "$imetaFlag" = '-C' ]]; then
+		uuidMap="$(query_coll_uuid "$entity")"
+	else
+		uuidMap="$(query_data_uuid "$(dirname "$entity")" "$(basename "$entity")")"
+	fi
 
-		if [[ "$uuidMap" = UNKNOWN_ENTITY ]]; then
-			printf MISSING
-		else
-			echo "$uuidMap" >&2
-		fi
+	if [[ -z "$uuidMap" ]]; then
+		failed=failed
+		printf MISSING
 	else
 		local cnt=0
 
@@ -575,33 +578,6 @@ rm_extra_uuids() {
 	else
 		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
 	fi
-}
-
-
-
-# Retrieve UUIDs for an entity sorted by the metadata's DB Ids
-get_meta_id_uuid_map() {
-	local entityPath="$1"
-	local imetaFlag="$2"
-
-	local query
-	if [[ "$imetaFlag" = '-C' ]]; then
-		query="$(mk_coll_uuid_query "$entityPath")"
-	else
-		query="$(mk_data_uuid_query "$(dirname "$entityPath")" "$(basename "$entityPath")")"
-	fi
-
-	local results
-	if ! results="$(iquest --no-page '%s %s' "$query")"; then
-		return 1
-	fi
-
-	if [[ "$results" =~ CAT_NO_ROWS_FOUND ]]; then
-		printf UNKNOWN_ENTITY >&2
-		return 1
-	fi
-
-	echo "$results"
 }
 
 trim() {
@@ -783,20 +759,20 @@ where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_CHECKSUM != '
 EOF
 }
 
-mk_coll_uuid_query() {
+query_coll_uuid() {
 	local collPath="$1"
 
-	cat <<EOF
+	"$EXEC_DIR"/query '%s %s' <<EOF
 select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
 where META_COLL_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath'"
 EOF
 }
 
-mk_data_uuid_query() {
+query_data_uuid() {
 	local collPath="$1"
 	local dataName="$2"
 
-	cat <<EOF
+	"$EXEC_DIR"/query '%s %s' <<EOF
 select order(META_DATA_ATTR_ID), META_DATA_ATTR_VALUE
 where META_DATA_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath' and DATA_NAME = '$dataName'"
 EOF
