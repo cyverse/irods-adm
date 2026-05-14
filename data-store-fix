@@ -68,11 +68,12 @@ readonly EXEC_PATH
 EXEC_DIR="$(dirname "$EXEC_PATH")"
 EXEC_NAME="$(basename "$EXEC_PATH")"
 readonly EXEC_DIR EXEC_NAME
+export EXEC_DIR
 
 declare DEBUG
 
 declare -i CollCnt=0
-declare -i ObjCnt=0
+declare -i -x OBJ_CNT=0
 
 declare -a TempFiles
 
@@ -412,18 +413,18 @@ fix_collection_problems() {
 		fi
 
 		local escColl
-		escColl="$(trim "$collField")"
+		escColl="$(TRIM "$collField")"
 
 		local coll
-		coll="$(unescape "$escColl")"
+		coll="$(UNESCAPE "$escColl")"
 
 		local noPermIssue='false'
-		if ! permIssue="$(process_perm_issue "$permIssue" "$coll")"; then
+		if ! permIssue="$(PROCESS_PERM_ISSUE "$permIssue" "$coll")"; then
 			noPermIssue='true'
 		fi
 
 		local noUUIDIssue='false'
-		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" coll "$coll")"; then
+		if ! uuidCnt="$(PROCESS_UUID_ISSUE "$uuidCnt" coll "$coll")"; then
 			noUUIDIssue='true'
 		fi
 
@@ -433,6 +434,8 @@ fix_collection_problems() {
 		fi
 	done
 }
+
+
 
 complete_fix_coll() {
 	local funcName="$1"
@@ -453,329 +456,21 @@ pass_hdr_thru() {
 	done
 }
 
-process_perm_issue() {
-	local issue="$1"
-	local entity="$2"
-
-	if [[ "${issue// /}" == f ]]; then
-		printf '%s' "$issue"
-		return 1
-	fi
-
-	local err
-	if err="$(ichmod -M own rodsadmin "$entity" 2>&1 > /dev/null)"; then
-		printf '%s' "${issue/%  /✓ }"
-	elif [[ "$err" =~ CAT_INVALID_ARGUMENT ]]; then
-		printf '%s' "${issue/%  /👻 }"
-	else
-		printf '%s' "${issue/%  /✗ }"
-		echo "$err" >&2
-		printf 'FAILED TO ADD RODSADMIN OWN PERMISSION!! - %s\n' "$entity" >&2
-	fi
-
-	return 0
-}
-
-process_uuid_issue() {
-	local uuidCntField="$1"
-	local entityType="$2"
-	local entity="$3"
-
-	uuidCntField="${uuidCnt#  }"
-	declare -i cnt=$uuidCntField
-
-	if (( cnt == 1 )); then
-		printf '%s  ' "$uuidCntField"
-		return 1
-	fi
-
-	local imetaFlag
-	if [[ "$entityType" == coll ]]; then
-		local imetaFlag=-C
-	else
-		local imetaFlag=-d
-	fi
-
-	local statusMsg
-	if (( cnt == 0 )); then
-		statusMsg="$(add_missing_uuid "$entity" "$imetaFlag")"
-	else
-		statusMsg="$(rm_extra_uuids "$entity" "$imetaFlag")"
-	fi
-
-	local statusFmt
-	case "${statusMsg-}" in
-		SUCCESS)
-			statusFmt=✓
-			;;
-		MISSING)
-			statusFmt=👻
-			;;
-		*)
-			statusFmt=✗
-			;;
-	esac
-
-	printf '%s%s ' "$uuidCntField" "$statusFmt"
-	return 0
-}
-
-add_missing_uuid() {
-	local entity="$1"
-	local imetaFlag="$2"
-
-	local uuid
-	uuid="$(uuidgen -t)"
-
-	local err
-	if err="$(imeta set "$imetaFlag" "$entity" ipc_UUID "$uuid" 2>&1)"; then
-		printf SUCCESS
-	else
-		if [[ "$err" =~ (CAT_UNKNOWN_COLLECTION|CAT_UNKNOWN_FILE) ]]; then
-			printf MISSING
-			return 1
-		else
-			echo "$err" >&2
-			printf 'FAILED TO ADD UUID!! - %s\n' "$entity" >&2
-		fi
-	fi
-}
-
-
-
-rm_extra_uuids() {
-	local entity="$1"
-	local imetaFlag="$2"
-
-	local failed
-
-	local uuidMap
-	if [[ "$imetaFlag" = '-C' ]]; then
-		uuidMap="$(query_coll_uuid "$entity")"
-	else
-		uuidMap="$(query_data_uuid "$(dirname "$entity")" "$(basename "$entity")")"
-	fi
-
-	if [[ -z "$uuidMap" ]]; then
-		failed=failed
-		printf MISSING
-	else
-		local cnt=0
-
-		local uuid
-		while read -r _ uuid; do
-			# The first UUID created will have the first DB Id
-			if (( ++cnt > 1 )); then
-				if ! imeta rm "$imetaFlag" "$entity" ipc_UUID "$uuid"; then
-					failed=failed
-				fi
-			fi
-		done <<< "$uuidMap"
-	fi
-
-	if [[ -z "${failed-}" ]]; then
-		printf SUCCESS
-	else
-		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
-	fi
-}
-
-trim() {
-	local str="$*"
-	str="${str#"${str%%[![:space:]]*}"}"
-	str="${str%"${str##*[![:space:]]}"}"
-	printf '%s' "$str"
-}
-
-unescape() {
-	local escEntity="$*"
-
-	local entity=
-	local escaped=0
-
-	for i in $(seq 0 $(( ${#escEntity} - 1 ))); do
-		local curChar="${escEntity:$i:1}"
-
-		if (( escaped == 1 )); then
-			if [[ "$curChar" =~ (n|r) ]]; then
-				# shellcheck disable=SC1003
-				printf -v entity '%s\'"$curChar" "$entity"
-			else
-				entity="$entity$curChar"
-			fi
-
-			escaped=0
-		else
-			if [[ "$curChar" == \\ ]]; then
-				escaped=1
-			else
-				entity="$entity$curChar"
-			fi
-		fi
-	done
-
-	printf '%s' "$entity"
-}
-
 fix_object_problems() {
 	pass_hdr_thru
 
 	trap 'complete_fix_objs "${FUNCNAME[0]-}"; rm_temp_files' EXIT
 	trap 'complete_fix_objs "${FUNCNAME[0]-}"' RETURN
 
-	local permIssue missingChksum uuidCnt owner replField createTime objField
-	while IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField; do
-		if [[ -z "$objField" ]]; then
-			break
-		fi
-
-		local escObj
-		escObj="$(trim "$objField")"
-
-		local obj
-		obj="$(unescape "$escObj")"
-
-		local repl
-		repl="$(trim "$replField")"
-
-		local noPermIssue='false'
-		if ! permIssue="$(process_perm_issue "$permIssue" "$obj")"; then
-			noPermIssue='true'
-		fi
-
-		local noChksumIssue='false'
-		if ! missingChksum="$(process_chksum_issue "$missingChksum" "$repl" "$obj")"; then
-			noChksumIssue='true'
-		fi
-
-		local noUUIDIssue='false'
-		if ! uuidCnt="$(process_uuid_issue "$uuidCnt" obj "$obj")"; then
-			noUUIDIssue='true'
-		fi
-
-		if [[ "$noPermIssue" == 'false' || "$noChksumIssue" == 'false' || "$noUUIDIssue" == 'false' ]]
-		then
-			printf '%s|%s|%s|%s|%s|%s|%s\n' \
-				"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
-
-			: $(( ObjCnt++ ))
-		fi
-	done
+	parallel --line-buffer --no-notice --max-args 1 --max-procs 2 FIX_SINGLE_OBJECT_PROBLEMS
 }
 
 complete_fix_objs() {
 	local funcName="$1"
 
 	if [[ "$funcName" == fix_object_problems ]]; then
-		printf '(%d data objects)' "$ObjCnt"
+		printf '(%d data objects)' "$OBJ_CNT"
 	fi
-}
-
-process_chksum_issue() {
-	local issue="$1"
-	local repl="$2"
-	local obj="$3"
-
-	if [[ "${issue// /}" == f ]]; then
-		printf '%s' "$issue"
-		return 1
-	fi
-
-	local err retCode
-	err="$(ichksum -M --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
-	retCode="$?"
-
-	if [[ "$err" =~ 'does not exist' ]]; then
-		printf '%s' "${issue/%  /👻 }"
-		return
-	elif [[ "$err" =~ HIERARCHY_ERROR ]]; then
-		err="$(fix_archive_chksum "$repl" "$obj")"
-		retCode=$?
-	fi
-
-	if (( retCode == 0 )) && [[ -z "$err" ]]; then
-		printf '%s' "${issue/%  /✓ }"
-	else
-		if [[ -n "$err" ]]; then
-			echo "$err" >&2
-		fi
-
-		printf '%s' "${issue/%  /✗ }"
-		printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
-	fi
-
-	return 0
-}
-
-fix_archive_chksum() {
-	local repl="$1"
-	local dataPath="$2"
-
-	local collPath dataName
-	collPath="$(dirname "$dataPath")"
-	dataName="$(basename "$dataPath")"
-
-	local parentContext
-	parentContext="$(get_parent_resc_context "$repl" "$collPath" "$dataName")"
-
-	if [[ "$parentContext" != archive ]]; then
-		printf 'Replica %s of %s is not stored in an archival resource\n' "$repl" "$dataPath" >&2
-		return 1
-	fi
-
-	local chksum
-	chksum="$(get_sibling_chksum "$collPath" "$dataName")"
-
-	if [[ -z "$chksum" ]]; then
-		printf 'Cannot copy checksum from other replica to archival replica %s of %s\n' \
-				"$repl" "$dataPath" \
-			>&2
-
-		return 1
-	fi
-
-	iadmin modrepl logical_path "$dataPath" replica_number "$repl" DATA_CHECKSUM "$chksum" \
-		> /dev/null
-}
-
-get_parent_resc_context() {
-	local repl="$1"
-	local collPath="$2"
-	local dataName="$3"
-
-	"$EXEC_DIR"/quest %s <<EOF
-select RESC_PARENT_CONTEXT
-where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_REPL_NUM = '$repl'
-EOF
-}
-
-get_sibling_chksum() {
-	local collPath="$1"
-	local dataName="$2"
-
-	"$EXEC_DIR"/quest %s <<EOF
-select DATA_CHECKSUM
-where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_CHECKSUM != ''
-EOF
-}
-
-query_coll_uuid() {
-	local collPath="$1"
-
-	"$EXEC_DIR"/query '%s %s' <<EOF
-select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
-where META_COLL_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath'"
-EOF
-}
-
-query_data_uuid() {
-	local collPath="$1"
-	local dataName="$2"
-
-	"$EXEC_DIR"/query '%s %s' <<EOF
-select order(META_DATA_ATTR_ID), META_DATA_ATTR_VALUE
-where META_DATA_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath' and DATA_NAME = '$dataName'"
-EOF
 }
 
 generate_report() {
@@ -851,5 +546,329 @@ strip_noise() {
 rm_temp_files() {
 	rm --force "${TempFiles[@]}"
 }
+
+
+FIX_SINGLE_OBJECT_PROBLEMS() {
+	local permIssue missingChksum uuidCnt owner replField createTime objField
+	IFS='|' read -r permIssue missingChksum uuidCnt owner replField createTime objField <<< "$@"
+
+	if [[ -z "$objField" ]]; then
+			return 1
+	fi
+
+	local escObj
+	escObj="$(TRIM "$objField")"
+
+	local obj
+	obj="$(UNESCAPE "$escObj")"
+
+	local repl
+	repl="$(TRIM "$replField")"
+
+	local noPermIssue='false'
+	if ! permIssue="$(PROCESS_PERM_ISSUE "$permIssue" "$obj")"; then
+		noPermIssue='true'
+	fi
+
+	local noChksumIssue='false'
+	if ! missingChksum="$(PROCESS_CHKSUM_ISSUE "$missingChksum" "$repl" "$obj")"; then
+		noChksumIssue='true'
+	fi
+
+	local noUUIDIssue='false'
+	if ! uuidCnt="$(PROCESS_UUID_ISSUE "$uuidCnt" obj "$obj")"; then
+		noUUIDIssue='true'
+	fi
+
+	if [[ "$noPermIssue" == 'false' || "$noChksumIssue" == 'false' || "$noUUIDIssue" == 'false' ]]
+	then
+		printf '%s|%s|%s|%s|%s|%s|%s\n' \
+			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
+
+		: $(( OBJ_CNT++ ))
+	fi
+}
+export -f FIX_SINGLE_OBJECT_PROBLEMS
+
+PROCESS_CHKSUM_ISSUE() {
+	local issue="$1"
+	local repl="$2"
+	local obj="$3"
+
+	if [[ "${issue// /}" == f ]]; then
+		printf '%s' "$issue"
+		return 1
+	fi
+
+	local err retCode
+	err="$(ichksum -M --silent -n "$repl" "$obj" 2>&1 > /dev/null)"
+	retCode="$?"
+
+	if [[ "$err" =~ 'does not exist' ]]; then
+		printf '%s' "${issue/%  /👻 }"
+		return
+	elif [[ "$err" =~ HIERARCHY_ERROR ]]; then
+		err="$(FIX_ARCHIVE_CHKSUM "$repl" "$obj")"
+		retCode=$?
+	fi
+
+	if (( retCode == 0 )) && [[ -z "$err" ]]; then
+		printf '%s' "${issue/%  /✓ }"
+	else
+		if [[ -n "$err" ]]; then
+			echo "$err" >&2
+		fi
+
+		printf '%s' "${issue/%  /✗ }"
+		printf 'FAILED TO GENERATE CHECKSUM!! - %s\n' "$obj" >&2
+	fi
+
+	return 0
+}
+export -f PROCESS_CHKSUM_ISSUE
+
+FIX_ARCHIVE_CHKSUM() {
+	local repl="$1"
+	local dataPath="$2"
+
+	local collPath dataName
+	collPath="$(dirname "$dataPath")"
+	dataName="$(basename "$dataPath")"
+
+	local parentContext
+	parentContext="$(GET_PARENT_RESC_CONTEXT "$repl" "$collPath" "$dataName")"
+
+	if [[ "$parentContext" != archive ]]; then
+		printf 'Replica %s of %s is not stored in an archival resource\n' "$repl" "$dataPath" >&2
+		return 1
+	fi
+
+	local chksum
+	chksum="$(GET_SIBLING_CHKSUM "$collPath" "$dataName")"
+
+	if [[ -z "$chksum" ]]; then
+		printf 'Cannot copy checksum from other replica to archival replica %s of %s\n' \
+				"$repl" "$dataPath" \
+			>&2
+
+		return 1
+	fi
+
+	iadmin modrepl logical_path "$dataPath" replica_number "$repl" DATA_CHECKSUM "$chksum" \
+		> /dev/null
+}
+export -f FIX_ARCHIVE_CHKSUM
+
+GET_PARENT_RESC_CONTEXT() {
+	local repl="$1"
+	local collPath="$2"
+	local dataName="$3"
+
+	"$EXEC_DIR"/quest %s <<EOF
+select RESC_PARENT_CONTEXT
+where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_REPL_NUM = '$repl'
+EOF
+}
+export -f GET_PARENT_RESC_CONTEXT
+
+GET_SIBLING_CHKSUM() {
+	local collPath="$1"
+	local dataName="$2"
+
+	"$EXEC_DIR"/quest %s <<EOF
+select DATA_CHECKSUM
+where COLL_NAME = '$collPath' and DATA_NAME = '$dataName' and DATA_CHECKSUM != ''
+EOF
+}
+export -f GET_SIBLING_CHKSUM
+
+PROCESS_PERM_ISSUE() {
+	local issue="$1"
+	local entity="$2"
+
+	if [[ "${issue// /}" == f ]]; then
+		printf '%s' "$issue"
+		return 1
+	fi
+
+	local err
+	if err="$(ichmod -M own rodsadmin "$entity" 2>&1 > /dev/null)"; then
+		printf '%s' "${issue/%  /✓ }"
+	elif [[ "$err" =~ CAT_INVALID_ARGUMENT ]]; then
+		printf '%s' "${issue/%  /👻 }"
+	else
+		printf '%s' "${issue/%  /✗ }"
+		echo "$err" >&2
+		printf 'FAILED TO ADD RODSADMIN OWN PERMISSION!! - %s\n' "$entity" >&2
+	fi
+
+	return 0
+}
+export -f PROCESS_PERM_ISSUE
+
+PROCESS_UUID_ISSUE() {
+	local uuidCntField="$1"
+	local entityType="$2"
+	local entity="$3"
+
+	uuidCntField="${uuidCnt#  }"
+	declare -i cnt=$uuidCntField
+
+	if (( cnt == 1 )); then
+		printf '%s  ' "$uuidCntField"
+		return 1
+	fi
+
+	local imetaFlag
+	if [[ "$entityType" == coll ]]; then
+		local imetaFlag=-C
+	else
+		local imetaFlag=-d
+	fi
+
+	local statusMsg
+	if (( cnt == 0 )); then
+		statusMsg="$(ADD_MISSING_UUID "$entity" "$imetaFlag")"
+	else
+		statusMsg="$(RM_EXTRA_UUIDS "$entity" "$imetaFlag")"
+	fi
+
+	local statusFmt
+	case "${statusMsg-}" in
+		SUCCESS)
+			statusFmt=✓
+			;;
+		MISSING)
+			statusFmt=👻
+			;;
+		*)
+			statusFmt=✗
+			;;
+	esac
+
+	printf '%s%s ' "$uuidCntField" "$statusFmt"
+	return 0
+}
+export -f PROCESS_UUID_ISSUE
+
+ADD_MISSING_UUID() {
+	local entity="$1"
+	local imetaFlag="$2"
+
+	local uuid
+	uuid="$(uuidgen -t)"
+
+	local err
+	if err="$(imeta set "$imetaFlag" "$entity" ipc_UUID "$uuid" 2>&1)"; then
+		printf SUCCESS
+	else
+		if [[ "$err" =~ (CAT_UNKNOWN_COLLECTION|CAT_UNKNOWN_FILE) ]]; then
+			printf MISSING
+			return 1
+		else
+			echo "$err" >&2
+			printf 'FAILED TO ADD UUID!! - %s\n' "$entity" >&2
+		fi
+	fi
+}
+export -f ADD_MISSING_UUID
+
+RM_EXTRA_UUIDS() {
+	local entity="$1"
+	local imetaFlag="$2"
+
+	local failed
+
+	local uuidMap
+	if [[ "$imetaFlag" = '-C' ]]; then
+		uuidMap="$(QUERY_COLL_UUID "$entity")"
+	else
+		uuidMap="$(QUERY_DATA_UUID "$(dirname "$entity")" "$(basename "$entity")")"
+	fi
+
+	if [[ -z "$uuidMap" ]]; then
+		failed=failed
+		printf MISSING
+	else
+		local cnt=0
+
+		local uuid
+		while read -r _ uuid; do
+			# The first UUID created will have the first DB Id
+			if (( ++cnt > 1 )); then
+				if ! imeta rm "$imetaFlag" "$entity" ipc_UUID "$uuid" > /dev/null; then
+					failed=failed
+				fi
+			fi
+		done <<< "$uuidMap"
+	fi
+
+	if [[ -z "${failed-}" ]]; then
+		printf SUCCESS
+	else
+		printf 'FAILED TO REMOVE EXTRA UUIDS!! - %s\n' "$entity" >&2
+	fi
+}
+export -f RM_EXTRA_UUIDS
+
+QUERY_COLL_UUID() {
+	local collPath="$1"
+
+	"$EXEC_DIR"/quest '%s %s' <<EOF
+select order(META_COLL_ATTR_ID), META_COLL_ATTR_VALUE
+where META_COLL_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath'"
+EOF
+}
+export -f QUERY_COLL_UUID
+
+QUERY_DATA_UUID() {
+	local collPath="$1"
+	local dataName="$2"
+
+	"$EXEC_DIR"/quest '%s %s' <<EOF
+select order(META_DATA_ATTR_ID), META_DATA_ATTR_VALUE
+where META_DATA_ATTR_NAME = 'ipc_UUID' and COLL_NAME = '$collPath' and DATA_NAME = '$dataName'"
+EOF
+}
+export -f QUERY_DATA_UUID
+
+TRIM() {
+	local str="$*"
+	str="${str#"${str%%[![:space:]]*}"}"
+	str="${str%"${str##*[![:space:]]}"}"
+	printf '%s' "$str"
+}
+export -f TRIM
+
+UNESCAPE() {
+	local escEntity="$*"
+
+	local entity=
+	local escaped=0
+
+	for i in $(seq 0 $(( ${#escEntity} - 1 ))); do
+		local curChar="${escEntity:$i:1}"
+
+		if (( escaped == 1 )); then
+			if [[ "$curChar" =~ (n|r) ]]; then
+				# shellcheck disable=SC1003
+				printf -v entity '%s\'"$curChar" "$entity"
+			else
+				entity="$entity$curChar"
+			fi
+
+			escaped=0
+		else
+			if [[ "$curChar" == \\ ]]; then
+				escaped=1
+			else
+				entity="$entity$curChar"
+			fi
+		fi
+	done
+
+	printf '%s' "$entity"
+}
+export -f UNESCAPE
 
 main "$@"
