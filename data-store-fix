@@ -61,6 +61,7 @@ readonly COLL_TABLE_HEADING='Collection Repair Attempts'
 readonly DATA_TABLE_HEADING='Data Object Repair Attempts'
 readonly DEFAULT_AGE=0
 readonly MAX_LOG_MAIL_SIZE=2097152  # 2 MiB
+readonly FIX_CONCURRENCY=5
 
 EXEC_PATH="$(realpath --canonicalize-existing "$0")"
 readonly EXEC_PATH
@@ -450,7 +451,8 @@ fix_object_problems() {
 	trap 'complete_fix_objs "${FUNCNAME[0]-}"' RETURN
 
 	count_objs \
-		| parallel --line-buffer --no-notice --max-args 1 --max-procs 2 FIX_SINGLE_OBJECT_PROBLEMS
+		| parallel --line-buffer --no-notice --max-args 1 --max-procs "$FIX_CONCURRENCY" \
+			FIX_SINGLE_OBJECT_PROBLEMS
 }
 
 complete_fix_objs() {
@@ -471,6 +473,8 @@ count_objs() {
 		echo "$line"
 	done
 }
+
+
 
 generate_report() {
 	local cutoffTime="$1"
