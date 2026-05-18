@@ -73,7 +73,7 @@ export EXEC_DIR
 declare DEBUG
 
 declare -i CollCnt=0
-declare -i -x OBJ_CNT=0
+declare -i DataCnt=0
 
 declare -a TempFiles
 
@@ -435,8 +435,6 @@ fix_collection_problems() {
 	done
 }
 
-
-
 complete_fix_coll() {
 	local funcName="$1"
 
@@ -445,32 +443,33 @@ complete_fix_coll() {
 	fi
 }
 
-pass_hdr_thru() {
-	local line
-	while read -r line; do
-		printf '%s\n' "$line"
-
-		if [[ "$line" =~ ^- ]]; then
-			break
-		fi
-	done
-}
-
 fix_object_problems() {
 	pass_hdr_thru
 
 	trap 'complete_fix_objs "${FUNCNAME[0]-}"; rm_temp_files' EXIT
 	trap 'complete_fix_objs "${FUNCNAME[0]-}"' RETURN
 
-	parallel --line-buffer --no-notice --max-args 1 --max-procs 2 FIX_SINGLE_OBJECT_PROBLEMS
+	count_objs \
+		| parallel --line-buffer --no-notice --max-args 1 --max-procs 2 FIX_SINGLE_OBJECT_PROBLEMS
 }
 
 complete_fix_objs() {
 	local funcName="$1"
 
 	if [[ "$funcName" == fix_object_problems ]]; then
-		printf '(%d data objects)' "$OBJ_CNT"
+		printf '(%d data objects)' "$DataCnt"
 	fi
+}
+
+count_objs() {
+	local line
+	while IFS= read -r line; do
+		if ! [[ "$line" =~ '^(' ]]; then
+			: $(( DataCnt++ ))
+		fi
+
+		echo "$line"
+	done
 }
 
 generate_report() {
@@ -543,9 +542,23 @@ strip_noise() {
 	done
 }
 
+
+
+pass_hdr_thru() {
+	local line
+	while read -r line; do
+		printf '%s\n' "$line"
+
+		if [[ "$line" =~ ^- ]]; then
+			break
+		fi
+	done
+}
+
 rm_temp_files() {
 	rm --force "${TempFiles[@]}"
 }
+
 
 
 FIX_SINGLE_OBJECT_PROBLEMS() {
@@ -584,8 +597,6 @@ FIX_SINGLE_OBJECT_PROBLEMS() {
 	then
 		printf '%s|%s|%s|%s|%s|%s|%s\n' \
 			"$permIssue" "$missingChksum" "$uuidCnt" "$owner" "$replField" "$createTime" "$objField"
-
-		: $(( OBJ_CNT++ ))
 	fi
 }
 export -f FIX_SINGLE_OBJECT_PROBLEMS
