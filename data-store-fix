@@ -73,9 +73,6 @@ export EXEC_DIR
 
 declare DEBUG
 
-declare -i CollCnt=0
-declare -i DataCnt=0
-
 declare -a TempFiles
 
 main() {
@@ -404,9 +401,6 @@ fix_problems() {
 fix_collection_problems() {
 	pass_hdr_thru
 
-	trap 'complete_fix_coll "${FUNCNAME[0]-}"; rm_temp_files' EXIT
-	trap 'complete_fix_coll "${FUNCNAME[0]-}"' RETURN
-
 	local collField createTime permIssue owner uuidCnt
 	while IFS='|' read -r permIssue uuidCnt owner createTime collField; do
 		if [[ -z "$collField" ]]; then
@@ -431,57 +425,23 @@ fix_collection_problems() {
 
 		if [[ "$noPermIssue" == 'false' || "$noUUIDIssue" == 'false' ]]; then
 			printf '%s|%s|%s|%s|%s\n' "$permIssue" "$uuidCnt" "$owner" "$createTime" "$collField"
-			: $(( CollCnt++ ))
 		fi
 	done
-}
-
-complete_fix_coll() {
-	local funcName="$1"
-
-	if [[ "$funcName" == fix_collection_problems ]]; then
-		printf '(%d collections)' "$CollCnt"
-	fi
 }
 
 fix_object_problems() {
 	pass_hdr_thru
 
-	trap 'complete_fix_objs "${FUNCNAME[0]-}"; rm_temp_files' EXIT
-	trap 'complete_fix_objs "${FUNCNAME[0]-}"' RETURN
-
-	count_objs \
-		| parallel --line-buffer --no-notice --max-args 1 --max-procs "$FIX_CONCURRENCY" \
-			FIX_SINGLE_OBJECT_PROBLEMS
+	parallel --line-buffer --no-notice --max-args 1 --max-procs "$FIX_CONCURRENCY" \
+		FIX_SINGLE_OBJECT_PROBLEMS
 }
-
-complete_fix_objs() {
-	local funcName="$1"
-
-	if [[ "$funcName" == fix_object_problems ]]; then
-		printf '(%d data objects)' "$DataCnt"
-	fi
-}
-
-count_objs() {
-	local line
-	while IFS= read -r line; do
-		if ! [[ "$line" =~ '^(' ]]; then
-			: $(( DataCnt++ ))
-		fi
-
-		echo "$line"
-	done
-}
-
-
 
 generate_report() {
 	local cutoffTime="$1"
 	local fixLog="$2"
 	local errLog="$3"
 
-	print_report_title "$cutoffTime"
+	printf '\t%s DATA STORE REPAIR REPORT\n\n\n' "$cutoffTime"
 	printf 'ITEMIZED REPAIR ATTEMPTS\n\n'
 
 	local fixLogSize
@@ -523,11 +483,7 @@ generate_report() {
 	fi
 }
 
-print_report_title() {
-	local cutoffTime="$1"
 
-	printf '\t%s DATA STORE REPAIR REPORT\n\n\n' "$cutoffTime"
-}
 
 strip_noise() {
 	local line
