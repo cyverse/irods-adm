@@ -89,7 +89,7 @@ EOF
 }
 
 sync_to_irods() {
-	/root/bin/gocmd sync --debug --delete --no_root "$NFS_DIR" i:"$IRODS_COLL" \
+	/root/bin/gocmd sync --debug --delete --no_root --verify_checksum "$NFS_DIR" i:"$IRODS_COLL" \
 		| filter_gocmd_msgs
 }
 
