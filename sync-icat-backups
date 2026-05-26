@@ -96,12 +96,12 @@ sync_to_irods() {
 
 filter_gocmd_msgs() {
 	/usr/bin/awk --assign=DB_BASENAME="$DB_BASENAME" --file - <(/usr/bin/cat) <<'EOF'
-/msg="uploaded a file .*\/toc.dat\\"/ {
+/msg="uploaded a file" .*\/toc.dat / {
 	coll = gensub(".*/(" DB_BASENAME "[0-9]+)/.*", "\\1", 1, $0)
 	printf "• Uploading new backup %s\n", coll
 }
 
-/msg="removing an extra collection / {
+/msg="deleted an extra collection"/ {
 	coll = gensub(".*/(" DB_BASENAME "[0-9]+).*", "\\1", 1, $0)
 	printf "• Deleting old backup %s\n", coll
 }
