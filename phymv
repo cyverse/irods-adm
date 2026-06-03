@@ -36,6 +36,8 @@ EOF
 }
 
 
+set -e
+
 ExecName=$(basename "$0")
 readonly ExecName
 
@@ -235,8 +237,6 @@ select_cohort() {
 }
 
 
-set -e
-
 Opts=$( \
 	getopt \
 		--name "$ExecName" \
@@ -329,7 +329,7 @@ fi
 
 if ! psql ICAT <<<'' &> /dev/null
 then
-	printf "aren't able to connect to the ICAT DB as the icat_reader without a password\n" >&2
+	printf "aren't able to connect to the ICAT DB as the %s without a password\n" "$PGUSER" >&2
 	exit 1
 fi
 
