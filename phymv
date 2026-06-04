@@ -11,15 +11,16 @@ $ExecName version $Version
 Usage:
  $ExecName [options] <src_resc> <dest_resc>
 
-Moves the files from one resource to another. It will not move any file
-associated with a data object that has a replica on the destination resource.
+Moves replicas from one storage resource to another. It will not move any
+replica associated with a data object that has a replica on the destination
+resource.
 
 Parameters:
- <src_resc>   the resource where the files are moved from
- <dest_resc>  the resource where the files are moved to
+ <src_resc>   the name of the storage resource where replicas are moved from
+ <dest_resc>  the name of the storage resource where replicas are moved to
 
 Options:
- -c, --collection <collection>  only move the files associated with data objects
+ -c, --collection <collection>  only move replicas associated with data objects
                                 in the collection <collection>
  -d, --dbms <host>              connect to the ICAT's DBMS on the host <host>
                                 instead of the PostgreSQL default
@@ -172,31 +173,13 @@ EOF
 		<<EOSQL
 BEGIN;
 
-CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
-WITH RECURSIVE child_mapping AS (
-	SELECT
-			resc_id AS id,
-			resc_name AS name,
-			(resc_net != 'EMPTY_RESC_HOST') AS storage,
-			resc_name AS root
-		FROM r_resc_main
-		WHERE resc_parent = '' AND resc_name != 'bundleResc'
-	UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root
-		FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent )
-SELECT id, name, root FROM child_mapping WHERE storage;
-
-CREATE INDEX idx_storage_root_mapping_storage ON storage_root_mapping(root_name);
-
-
 CREATE TEMPORARY TABLE src_data (id) AS
 SELECT data_id
 	FROM r_data_main
-	WHERE resc_id = ANY(ARRAY(
-		SELECT storage_id FROM storage_root_mapping WHERE root_name = '$SrcResc' ))
+	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$SrcResc')
 EXCEPT SELECT data_id
 	FROM r_data_main
-	WHERE resc_id = ANY(ARRAY(
-		SELECT storage_id FROM storage_root_mapping WHERE root_name = '$DestResc' ));
+	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc');
 
 CREATE INDEX src_data_idx ON src_data (id);
 
@@ -205,9 +188,7 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d
 	JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 	JOIN src_data AS s ON s.id = d.data_id
-WHERE d.resc_id = ANY(ARRAY(
-		SELECT storage_id FROM storage_root_mapping WHERE root_name = '$SrcResc' ))
-	AND ($BaseCond);
+WHERE d.resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$SrcResc') AND ($BaseCond);
 
 ROLLBACK;
 EOSQL
@@ -266,40 +247,16 @@ count_unmovable() {
 	local baseCond="$1"
 
 	psql --no-align --quiet --tuples-only ICAT  <<EOSQL
-BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
-
-
-CREATE TEMPORARY TABLE storage_root_mapping(storage_id, storage_name, root_name) ON COMMIT DROP AS
-WITH RECURSIVE child_mapping AS (
-	SELECT
-			resc_id AS id,
-			resc_name AS name,
-			(resc_net != 'EMPTY_RESC_HOST') AS storage,
-			resc_name AS root
-		FROM r_resc_main
-		WHERE resc_parent = '' AND resc_name != 'bundleResc'
-	UNION SELECT r.resc_id, r.resc_name, r.resc_net != 'EMPTY_RESC_HOST', m.root
-		FROM r_resc_main AS r JOIN child_mapping AS m ON m.id::TEXT = r.resc_parent )
-SELECT id, name, root FROM child_mapping WHERE storage;
-
-CREATE INDEX idx_storage_root_mapping_storage ON storage_root_mapping(root_name);
-
-
 SELECT COUNT(data_id)
-	FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-	WHERE d.data_id = ANY(ARRAY(
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE d.data_id = ANY(ARRAY(
 		SELECT data_id
 			FROM r_data_main
-			WHERE resc_id = ANY(ARRAY(
-				SELECT storage_id FROM storage_root_mapping WHERE root_name = '$SrcResc' ))
+			WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$SrcResc')
 		INTERSECT SELECT data_id
 			FROM r_data_main
-			WHERE resc_id = ANY(ARRAY(
-					SELECT storage_id FROM storage_root_mapping WHERE root_name = '$DestResc' ))))
-				AND ($baseCond);
-
-
-ROLLBACK;
+			WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc') ))
+	AND ($baseCond);
 EOSQL
 }
 
