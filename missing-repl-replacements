@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 #
 # Usage:
-#  missing-repl-replacements
+#  missing-repl-replacements [AVOID-HOST]
+#
+# Parameters:
+#  AVOID-HOST  if provided, avoid replicas on this host unless the only good
+#              replica is on it
 #
 # Given a set of data objects that are missing their replicas, it looks for
 # other data objects that have replicas with the same checksum. It reads the set
@@ -12,13 +16,14 @@
 # <data obj>	<bad resc>	<bad repl>	<candidate resc>	<candidate repl>
 #
 # Here <data obj> is the absolute, logical path to the data object read from
-# stdin; <bad resc> is the name of the storage resource hosting the bad replica;
-# <bad repl> is the absolute, physical path to the bad replica; <candidate resc>
-# is the name of the storage resource hosting a candidate replica; and
-# <candidate repl> is a replica that has the same checksum as the bad replica.
+# stdin; <bad resc> is the host name of the resource server hosting the bad
+# replica; <bad repl> is the absolute, physical path to the bad replica;
+# <candidate resc> is the host name of the resource server hosting a candidate
+# replica; and <candidate repl> is a replica that has the same checksum as the
+# bad replica.
 #
-# © 2025 The Arizona Board of Regents on behalf of The University of Arizona. For
-# license information, see https://cyverse.org/license.
+# © 2025 The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 set -o errexit -o nounset -o pipefail
 
@@ -27,9 +32,14 @@ readonly EXEC_DIR
 
 readonly CHKSUM_CHUNK_LEN=500
 
-declare -A ObjForChksum RescOf ReplOf
+declare -A HostOf ObjForChksum ReplOf
+declare -a Candidates
 
 main() {
+	if (( $# > 0 )); then
+		avoidHost="$1"
+	fi
+
 	printf 'Looking up checksums\n' >&2
 	local obj
 	while IFS= read -r obj; do
@@ -45,49 +55,10 @@ main() {
 	selfCandidates="$(find_self_candidates)"
 
 	printf 'Eliminating selves from candidates\n' >&2
-	local candidates
-	readarray -t candidates <<< "$(comm -23 <(sort <<< "$sameFiles") <(sort <<< "$selfCandidates"))"
+	readarray -t Candidates <<< "$(comm -23 <(sort <<< "$sameFiles") <(sort <<< "$selfCandidates"))"
 
 	printf 'Resolving replicas\n' >&2
-	if [[ -n "${candidates[*]}" ]]; then
-		local obj needyResc missingRepl
-		local selectedResc=''
-		local selectedRepl=''
-		local lastObj=''
-
-		local candidate
-		for candidate in "${candidates[@]}"; do
-			local chksum resc repl
-			IFS=$'\t' read -r chksum resc repl <<< "$candidate"
-
-			obj="${ObjForChksum[$chksum]}"
-			needyResc="${RescOf[$obj]}"
-
-			if [[ "$obj" != "$lastObj" && -n "$lastObj" ]]; then
-				show_selected_mapping \
-					"$lastObj" \
-					"${RescOf[$lastObj]}" \
-					"${ReplOf[$lastObj]}" \
-					"$selectedResc" \
-					"$selectedRepl"
-
-				selectedResc=''
-				selectedRepl=''
-			fi
-
-			if select_copy "$needyResc" "$selectedResc" "$resc"; then
-				selectedResc="$resc"
-				selectedRepl="$repl"
-			fi
-
-			lastObj="$obj"
-		done
-
-		if [[ -n "$selectedResc" ]]; then
-			show_selected_mapping \
-				"$lastObj" "$needyResc" "${ReplOf[$obj]}" "$selectedResc" "$selectedRepl"
-		fi
-	fi
+	resolve_replicas "${avoidHost-}"
 }
 
 find_copies() {
@@ -100,18 +71,23 @@ find_copies() {
 
 		local query
 		printf -v query \
-			'select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH where DATA_CHECKSUM in (%s)\n' \
-			"$chksumList"
+			'select DATA_CHECKSUM, RESC_LOC, DATA_PATH where DATA_CHECKSUM in (%s)\n' "$chksumList"
 
 		"$EXEC_DIR"/quest $'%s\t%s\t%s' <<< "$query"
 	done
+}
+
+mk_query_list() {
+	local elmts=("$@")
+
+	printf $'\'%s\'\n' "${elmts[@]}" | paste --serial --delimiter=,
 }
 
 find_self_candidates() {
 	local chksum
 	for chksum in "${!ObjForChksum[@]}"; do
 		local obj="${ObjForChksum[$chksum]}"
-		printf '%s\t%s\t%s\n' "$chksum" "${RescOf[$obj]}" "${ReplOf[$obj]}"
+		printf '%s\t%s\t%s\n' "$chksum" "${HostOf[$obj]}" "${ReplOf[$obj]}"
 	done
 }
 
@@ -122,11 +98,11 @@ map_checksum() {
 	coll="$(dirname "$objPath")"
 	objName="$(basename "$objPath")"
 
-	local chksum resc repl
-	if IFS=$'\t' read -r chksum resc repl <<< "$(retrieve_chksum_and_loc "$coll" "$objName")"; then
-		if [[ -n "$chksum" && "$chksum" != 0 && -n "$resc" && -n "$repl" ]]; then
+	local chksum srv repl
+	if IFS=$'\t' read -r chksum srv repl <<< "$(retrieve_chksum_and_loc "$coll" "$objName")"; then
+		if [[ -n "$chksum" && "$chksum" != 0 && -n "$srv" && -n "$repl" ]]; then
 			ObjForChksum[$chksum]="$objPath"
-			RescOf[$objPath]="$resc"
+			HostOf[$objPath]="$srv"
 			ReplOf[$objPath]="$repl"
 		fi
 	fi
@@ -137,36 +113,79 @@ retrieve_chksum_and_loc() {
 	local dataName="$2"
 
 	"$EXEC_DIR"/quest $'%s\t%s\t%s' <<EOF
-select DATA_CHECKSUM, DATA_RESC_NAME, DATA_PATH
-where COLL_NAME = '$collPath' and DATA_NAME = '$dataName'
+select DATA_CHECKSUM, RESC_LOC, DATA_PATH where COLL_NAME = '$collPath' and DATA_NAME = '$dataName'
 EOF
 }
 
-select_copy() {
-	local needyResc="$1"
-	local curCopyResc="$2"
-	local candidateResc="$3"
+resolve_replicas() {
+	local avoidHost="$1"
 
-	[[ "$candidateResc" == "$needyResc" ]] \
-		|| [[ "$candidateResc" != corral4 && "$curCopyResc" != "$needyResc" ]] \
-		|| [[ "$candidateResc" == corral4 && -z "$curCopyResc" ]]
+	if [[ -n "${Candidates[*]}" ]]; then
+		local obj needyHost missingRepl
+		local selectedHost=''
+		local selectedRepl=''
+		local lastObj=''
+
+		local candidate
+		for candidate in "${Candidates[@]}"; do
+			local chksum srv repl
+			IFS=$'\t' read -r chksum srv repl <<< "$candidate"
+
+			obj="${ObjForChksum[$chksum]}"
+			needyHost="${HostOf[$obj]}"
+
+			if [[ "$obj" != "$lastObj" && -n "$lastObj" ]]; then
+				show_selected_mapping \
+					"$lastObj" \
+					"${HostOf[$lastObj]}" \
+					"${ReplOf[$lastObj]}" \
+					"$selectedHost" \
+					"$selectedRepl"
+
+				selectedHost=''
+				selectedRepl=''
+			fi
+
+			if select_copy "$needyHost" "$selectedHost" "$srv" "$avoidHost"; then
+				selectedHost="$srv"
+				selectedRepl="$repl"
+			fi
+
+			lastObj="$obj"
+		done
+
+		if [[ -n "$selectedHost" ]]; then
+			show_selected_mapping \
+				"$lastObj" "$needyHost" "${ReplOf[$obj]}" "$selectedHost" "$selectedRepl"
+		fi
+	fi
+}
+
+select_copy() {
+	local needyHost="$1"
+	local curCopyHost="$2"
+	local candidateHost="$3"
+	local avoidHost="$4"
+
+	local avoidCandidate=false
+	if [[ -n "$avoidHost" && "$candidateHost" == "$avoidHost" ]]; then
+		avoidCandidate=true
+	fi
+
+	[[ "$candidateHost" == "$needyHost" ]] \
+		|| [[ "$avoidCandidate" == false && "$curCopyHost" != "$needyHost" ]] \
+		|| [[ "$avoidCandidate" == true && -z "$curCopyHost" ]]
 }
 
 show_selected_mapping() {
 	local obj="$1"
-	local needyResc="$2"
+	local needyHost="$2"
 	local missingRepl="$3"
-	local providingResc="$4"
+	local providingHost="$4"
 	local selectedRepl="$5"
 
 	printf '%s\t%s\t%s\t%s\t%s\n' \
-		"$obj" "$needyResc" "$missingRepl" "$providingResc" "$selectedRepl"
-}
-
-mk_query_list() {
-	local elmts=("$@")
-
-	printf $'\'%s\'\n' "${elmts[@]}" | paste --serial --delimiter=,
+		"$obj" "$needyHost" "$missingRepl" "$providingHost" "$selectedRepl"
 }
 
 main "$@"
