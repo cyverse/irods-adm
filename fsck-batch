@@ -263,9 +263,8 @@ GET_STORE_INFO() {
 	local storeHost="$1"
 	local filePath="$2"
 
-	# NOTE: The fd redirection gymnastics is to silence TACC's greeting message
 	#shellcheck disable=SC2087
-	ssh -q -t "$storeHost" 2>&1 > /dev/null <<EOSSH
+	ssh -q -T "$storeHost" 'bash -s' <<EOSSH
 if ! size="\$(sudo --user=irods stat --format=%s '$filePath' 2> /dev/null)"; then
 	size=-1
 fi
@@ -276,7 +275,7 @@ else
 	chksum="\${chksum%% *}"
 fi
 
-printf '%s\t%s\n' "\$size" "\$chksum" >&2
+printf '%s\t%s\n' "\$size" "\$chksum"
 EOSSH
 }
 export -f GET_STORE_INFO
