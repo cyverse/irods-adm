@@ -23,11 +23,11 @@ main() {
 	while IFS= read -r dataPath; do
 		printf '%s\n' "$dataPath"
 
-		local attrs_per_repl
-		readarray attrs_per_repl < <(get_physical_attributes "$dataPath")
+		local attrsPerRepl
+		readarray attrsPerRepl < <(get_physical_attributes "$dataPath")
 
 		local attrs
-		for attrs in "${attrs_per_repl[@]}"; do
+		for attrs in "${attrsPerRepl[@]}"; do
 			local rescHier size chksum formerFilePath
 			IFS=$'\t' read -r rescHier size chksum formerFilePath <<<"$attrs"
 			rescHier="${rescHier//\"/}"
@@ -64,7 +64,7 @@ find_real_path() {
 	local expChksum="$4"
 
 	# shellcheck disable=SC2087
-	ssh -q -t "$server" <<EOF
+	ssh -q -T "$server" 'bash -s' <<EOF
 check() {
 	local root="\$1"
 
@@ -122,8 +122,7 @@ restore_path() {
 	local missingPath="$3"
 
 	# shellcheck disable=SC2087
-	ssh -q -t "$server" \
-<<EOF
+	ssh -q -T "$server" 'bash -s' <<EOF
 mv --no-clobber "$foundPath" "$missingPath"
 EOF
 }
