@@ -12,10 +12,11 @@
 # <data obj>	<bad resc>	<bad repl>	<good resc>	<replacement repl>
 #
 # Here <data obj> is the absolute, logical path to the data object read from
-# stdin; <bad resc> is the name of the storage resource hosting the bad replica;
-# <bad repl> is the absolute, physical path to the bad replica; <good resc> is
-# the name of the storage resource hosting the replacement replica; and
-# <replacement repl> is a replica that has the same checksum as the bad replica.
+# stdin; <bad resc> is the host name of the resource server hosting the bad
+# replica; <bad repl> is the absolute, physical path to the bad replica;
+# <good resc> is the host name of the resource server hosting the replacement
+# replica; and <replacement repl> is a replica that has the same checksum as the
+# bad replica.
 #
 # This script is intended to read the output if `missing-repl-replacements`.
 #
