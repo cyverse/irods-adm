@@ -28,14 +28,12 @@ Requirements:
 EOF
 }
 
-
 set -o errexit -o nounset -o pipefail
 
 ExecName=$(basename "$0")
 readonly ExecName
 
 readonly Version=3
-
 
 main() {
 	local opts
@@ -72,7 +70,6 @@ main() {
 	generate_report
 }
 
-
 # Format the output in a way similar to the ips does.
 #
 # parameter:
@@ -98,7 +95,6 @@ format_report() {
 	done
 }
 
-
 # Generate the report
 generate_report() {
 	local irodsHost
@@ -113,9 +109,6 @@ generate_report() {
 	local proxyHost
 	proxyHost=$(resolve_name "$irodsHost")
 
-	local proxyIp
-	proxyIp=$(lookup_address "$proxyHost")
-
 	local ipsReport
 	ipsReport=$(ips -v)
 
@@ -125,6 +118,9 @@ generate_report() {
 
 	local iesIp
 	iesIp=$(lookup_address "$iesHost")
+
+	local proxyIp
+	proxyIp=$(proxy_nic_address "$proxyHost" "$iesIp")
 
 	if [ "$iesIp" = "$proxyIp" ]
 	then
@@ -161,7 +157,6 @@ generate_report() {
 	fi
 }
 
-
 # Lookup the IP address of the provided
 #
 # parameter:
@@ -180,6 +175,29 @@ lookup_address() {
 	fi
 }
 
+# Determine the IP address of the NIC on the remote proxy host that would be
+# used to reach the IES.
+#
+# parameters:
+#   proxyHost  the remote proxy host name
+#   dest       the destination IP address to reach on the IES side
+#
+# stdout:
+#   the source IP address reported by the remote host's routing table
+proxy_nic_address() {
+	local proxyHost="$1"
+	local dest="$2"
+	local route
+
+	addr=$(ssh -q "$proxyHost" ip route get "$dest" | sed --quiet 's/^.* src \([^ ]\+\).*/\1/p')
+
+	if [[ -n "$addr" ]]
+	then
+		printf '%s\n' "$addr"
+	else
+		lookup_address "$proxyHost"
+	fi
+}
 
 # From the output of the HAProxy stats command 'show sess all'. this function
 # generates a map of proxy TCP ports to the IP address of the corresponding
@@ -194,7 +212,7 @@ lookup_address() {
 # stdout:
 #   It generates a map of TCP ports to IP addresses, one per line.
 #
-#   <port> <address?
+#   <port> <address>
 #
 #   The address is the address of the client being proxied. The port is the one
 #   used to connect to the IES.
@@ -209,12 +227,10 @@ function print_session(svrPort, source) {
 	}
 }
 
-
 BEGIN {
 	svrPort = "";
 	source = "";
 }
-
 
 /^[^ ]/ {
 	print_session(svrPort, source);
@@ -228,7 +244,6 @@ BEGIN {
 	}
 }
 
-
 /^  backend=irods_direct/ {
 	if (source != "") {
 		patsplit(\$4, terms, "[^=:]+");
@@ -239,13 +254,11 @@ BEGIN {
 	}
 }
 
-
 END {
 	print_session(svrPort, source);
 }
 EOS
 }
-
 
 # This function looks up the domain name a canonical domain name aliases. It
 # does this recursively, so that if a canonical name is an alias for another
@@ -282,17 +295,14 @@ resolve_name() {
 	printf '%s' "$name"
 }
 
-
 show_version() {
 	printf '%s\n' "$Version"
 }
-
 
 test_ip_address() {
 	local host="$1"
 
 	[[ "$host" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
 }
-
 
 main "$@"
