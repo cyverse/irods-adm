@@ -319,21 +319,7 @@ get_data_to_repl() {
 	local destResc="$3"
 	local baseColl="$4"
 
-	local replQuery
-	replQuery="$(mk_repl_query "$age" "$baseColl" "$srcResc" "$destResc")"
-
-	psql --no-align --tuples-only --record-separator-zero \
-		--command="$replQuery" --field-separator=' ' \
-		ICAT
-}
-
-mk_repl_query() {
-	local age="$1"
-	local baseColl="$2"
-	local srcResc="$3"
-	local destResc="$4"
-
-	cat <<EOSQL
+	psql --no-align --tuples-only --record-separator-zero --field-separator=' ' ICAT <<EOSQL
 SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
@@ -342,6 +328,8 @@ WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUN
 	AND ($(mk_resc_cond d.resc_id "$srcResc" "$destResc"))
 EOSQL
 }
+
+
 
 mk_coll_cond() {
 	local collNameCol="$1"
@@ -495,9 +483,6 @@ mk_prog_msg() {
 	printf 'cohort: %0*d/%d, all: %0*d/%d' \
 		${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
 }
-
-
-
 
 replicate_threaded() {
 	local maxThreads="$1"
@@ -670,9 +655,6 @@ replicate_small_files() {
 	echo "$replCnt"
 }
 
-
-
-
 validate_repl_conds() {
 	local procMult="$1"
 	local srcResc="$2"
@@ -707,8 +689,6 @@ validate_repl_conds() {
 		return 1
 	fi
 }
-
-
 
 count() {
 	local tot=0
@@ -899,6 +879,7 @@ track_prog() {
 	printf '%s' "$cnt"
 }
 
+
 REPL_BATCH() {
 	set -o errexit -o nounset -o pipefail
 
@@ -916,10 +897,9 @@ REPL_BATCH() {
 		replArgs+=(-R "$destResc")
 	fi
 
-	# XXX - irepl -S doesn't work in 4.2.8, but it's fixed in 4.2.9
-	#if [[ -n "$srcResc" ]]; then
-   #	replArgs+=(-S "$srcResc")
-	#fi
+	if [[ -n "$srcResc" ]]; then
+		replArgs+=(-S "$srcResc")
+	fi
 
 	local replStatus=0
 	stdbuf --error=L irepl "${replArgs[@]}" "$@" || replStatus=$?
