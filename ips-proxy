@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# © 2026, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 show_help() {
   cat <<EOF
@@ -170,7 +173,12 @@ generate_report() {
 lookup_address() {
   local name="$1"
 
-  host "$name" | sed 's/.* has address //'
+  if test_ip_address "$name"
+  then
+    echo "$name"
+  else
+    host "$name" | sed 's/.* has address //'
+  fi
 }
 
 
@@ -254,18 +262,23 @@ resolve_name() {
   local cname="$1"
 
   local name=
-  while [ -z "$name" ]
-  do
-    name=$(host "$cname" | sed --quiet "s/$cname is an alias for \(.*\)\./\1/p")
+  if test_ip_address "$cname"
+  then
+    name="$cname"
+  else
+    while [ -z "$name" ]
+    do
+      name=$(host "$cname" | sed --quiet "s/$cname is an alias for \(.*\)\./\1/p")
 
-    if [ -n "$name" ]
-    then
-      cname="$name"
-      name=
-    else
-      name="$cname"
-    fi
-  done
+      if [ -n "$name" ]
+      then
+        cname="$name"
+        name=
+      else
+        name="$cname"
+      fi
+    done
+  fi
 
   printf '%s' "$name"
 }
@@ -273,6 +286,13 @@ resolve_name() {
 
 show_version() {
   printf '%s\n' "$Version"
+}
+
+
+test_ip_address() {
+  local host="$1"
+
+  [[ "$host" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
 }
 
 
