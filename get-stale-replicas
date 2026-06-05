@@ -14,6 +14,9 @@
 #  It outputs one replica record per line. A record has two space-separated
 #  columns. The first column is the resource hierarchy storing the replica, and
 #  the second is the path to the corresponding data object.
+#
+# © 2026, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 set -o errexit -o nounset -o pipefail
 
