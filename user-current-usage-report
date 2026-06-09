@@ -583,7 +583,7 @@ def _fmt_user_cell(username: str) -> str:
         <details>
             <summary>{summary_line}</summary>
             <div class="user-details">
-                {"<br><br>".join(detail_lines)}
+                {"<br>".join(detail_lines)}
             </div>
         </details>
     """
