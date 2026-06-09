@@ -1,0 +1,801 @@
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
+# -*- coding: utf-8 -*-
+#
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#    "pandas",
+#    "psycopg2-binary",
+#    "python-ldap",
+#    "python-irodsclient",
+#    "SQLAlchemy",
+# ]
+# ///
+#
+# Requires the following system packages:
+#    libldap2-dev
+#    libsasl2-dev
+#
+# © 2025, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""Generates a report describing the user data storage usage
+
+This program generates a report on the amount of data each user has in on a
+given list of root resources.
+"""
+
+import argparse
+from datetime import datetime
+import os
+import shutil
+import sys
+from tempfile import NamedTemporaryFile
+import textwrap
+import traceback
+from typing import Dict, List, Optional
+
+from irods.session import iRODSSession
+import ldap
+from ldap import LDAPError  # pylint: disable=no-name-in-module # type: ignore
+import pandas
+from pandas import DataFrame
+import sqlalchemy
+from sqlalchemy import BigInteger, Connection, MetaData, String, Table
+
+
+_IRODS_ENV_FILE = os.environ.get(
+    'IRODS_ENVIRONMENT_FILE', os.path.expanduser('~/.irods/irods_environment.json'))
+
+_DS_REPORT_LOC = 'CyVerse_DSStats/data-products/user-data-usage'
+
+_LDAP_URL = 'ldap://ldap.iplantcollaborative.org'
+_LDAP_BASE = 'dc=iplantcollaborative,dc=org'
+
+_JAVASCRIPT = """
+        let sortStates = {};
+
+        function sortTable(columnIndex, dataType) {
+            const table = document.getElementById('userTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr:not(.filtered-out)'));
+
+            let ascending = true;
+            if (sortStates[columnIndex] === 'asc') {
+                ascending = false;
+                sortStates[columnIndex] = 'desc';
+            } else {
+                ascending = true;
+                sortStates[columnIndex] = 'asc';
+            }
+
+            const headers = table.querySelectorAll('th');
+            headers.forEach((header, index) => {
+                const arrow = header.querySelector('.sort-arrow');
+                header.classList.remove('sort-asc', 'sort-desc');
+                if (index === columnIndex) {
+                    if (ascending) {
+                        header.classList.add('sort-asc');
+                        arrow.innerHTML = '&uarr;';
+                    } else {
+                        header.classList.add('sort-desc');
+                        arrow.innerHTML = '&darr;';
+                    }
+                } else {
+                    arrow.innerHTML = '&#8597;';
+                }
+            });
+
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.cells[columnIndex];
+                const cellB = rowB.cells[columnIndex];
+
+                let valueA, valueB;
+
+                if (dataType === 'number') {
+                    valueA = parseFloat(cellA.textContent) || 0;
+                    valueB = parseFloat(cellB.textContent) || 0;
+                    return ascending ? valueA - valueB : valueB - valueA;
+                } else {
+                    const summaryA = cellA.querySelector('summary');
+                    const summaryB = cellB.querySelector('summary');
+
+                    if (summaryA && summaryB) {
+                        valueA = summaryA.textContent.trim();
+                        valueB = summaryB.textContent.trim();
+                    } else {
+                        valueA = cellA.textContent.trim();
+                        valueB = cellB.textContent.trim();
+                    }
+
+                    const comparison = valueA.localeCompare(valueB);
+                    return ascending ? comparison : -comparison;
+                }
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+
+            const columnNames = ['Total', 'User'];
+            const direction = ascending ? 'ascending' : 'descending';
+            updateStatus(`Sorted by ${columnNames[columnIndex]} (${direction})`);
+        }
+
+        function applyFilters() {
+            const totalMin = parseFloat(document.getElementById('totalMin').value) || -Infinity;
+            const totalMax = parseFloat(document.getElementById('totalMax').value) || Infinity;
+            const userSearch = document.getElementById('userSearch').value.toLowerCase();
+
+            const table = document.getElementById('userTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const total = parseFloat(row.cells[0].textContent) || 0;
+                const user = row.cells[1].textContent.toLowerCase();
+
+                const matchesTotal = total >= totalMin && total <= totalMax;
+                const matchUser = userSearch === '' || user.includes(userSearch);
+
+                if (
+                    matchesTotal
+                    && matchUser
+                ) {
+                    row.classList.remove('filtered-out');
+                    visibleCount++;
+                } else {
+                    row.classList.add('filtered-out');
+                }
+            });
+
+            updateStatus(`Showing ${visibleCount} of ${rows.length} users`);
+        }
+
+        function clearFilters() {
+            document.getElementById('totalMin').value = '';
+            document.getElementById('totalMax').value = '';
+            document.getElementById('userSearch').value = '';
+
+            const table = document.getElementById('userTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            rows.forEach(row => {
+                row.classList.remove('filtered-out');
+            });
+
+            updateStatus(`Showing all ${rows.length} users`);
+        }
+
+        function updateStatus(message) {
+            const statusElement = document.getElementById('sortStatus');
+            if (statusElement) {
+                statusElement.textContent = message;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterInputs = document.querySelectorAll('.filter-item input');
+            filterInputs.forEach(input => {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        applyFilters();
+                    }
+                });
+            });
+
+            const table = document.getElementById('userTable');
+            const tbody = table.querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            updateStatus(`Showing all ${rows.length} users`);
+        });
+    """
+
+_CSS_STYLES = """
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a1a1a;
+            margin: 0 0 30px 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .filter-container {
+            background-color: #f8f9fa;
+            padding: 24px;
+            margin-bottom: 24px;
+            border-radius: 6px;
+            border: 1px solid #e1e4e8;
+        }
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .filter-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #24292e;
+        }
+        .filter-section {
+            margin-bottom: 20px;
+        }
+        .filter-section:last-child {
+            margin-bottom: 0;
+        }
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #586069;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .filter-item label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #24292e;
+        }
+        .filter-item input {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.15s ease;
+        }
+        .filter-item input:focus {
+            outline: none;
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+        }
+        .filter-item input[type="number"] {
+            width: 100%;
+        }
+        .filter-item input[type="text"] {
+            width: 100%;
+        }
+        .range-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .range-group input {
+            flex: 1;
+        }
+        .range-separator {
+            color: #6e7781;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid #e1e4e8;
+        }
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+        .btn-primary {
+            background-color: #0969da;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0860ca;
+        }
+        .btn-secondary {
+            background-color: white;
+            color: #24292e;
+            border: 1px solid #d1d5db;
+        }
+        .btn-secondary:hover {
+            background-color: #f6f8fa;
+        }
+        .status-bar {
+            padding: 8px 0;
+            font-size: 14px;
+            color: #57606a;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        th {
+            background-color: #f6f8fa;
+            font-weight: 600;
+            color: #24292e;
+            cursor: pointer;
+            user-select: none;
+            font-size: 14px;
+        }
+        th:hover {
+            background-color: #eaeef2;
+        }
+        td {
+            font-size: 14px;
+            color: #24292e;
+        }
+        .sort-arrow {
+            float: right;
+            margin-left: 8px;
+            color: #57606a;
+            opacity: 0.5;
+        }
+        .sort-asc .sort-arrow,
+        .sort-desc .sort-arrow {
+            opacity: 1;
+            color: #0969da;
+        }
+        tr:hover {
+            background-color: #f6f8fa;
+        }
+        tr.filtered-out {
+            display: none;
+        }
+        details {
+            margin: 0;
+        }
+        summary {
+            cursor: pointer;
+            padding: 4px 8px;
+            background-color: #f6f8fa;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        summary:hover {
+            background-color: #eaeef2;
+        }
+        .user-details {
+            margin-top: 8px;
+            padding: 12px;
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .footer {
+            margin-top: 24px;
+            padding: 16px;
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #57606a;
+        }
+        .footer p {
+            margin: 4px 0;
+        }
+    """
+
+
+def main(args: List[str]) -> int:
+    """Main function to parse arguments and generate the report.
+
+    Params:
+        args: these are the command line arguments
+    """
+    try:
+        term_wid, _ = shutil.get_terminal_size()
+        opts = _mk_arg_parser(term_wid).parse_args(args)
+        report_date = datetime.now()
+        report_file = f"report_{report_date.strftime('%Y-%m-%d')}.html"
+        fmt_report_date = report_date.strftime('%Y-%m-%d %H:%M:%S')
+        print(f"USER STORAGE USAGE REPORT - GENERATED ON {fmt_report_date}\n")
+
+        with iRODSSession(irods_env_file=_IRODS_ENV_FILE) as irods:
+            with _connect_icat(opts.pghost, opts.pgport, opts.pguser) as icat:
+                _report(report_file, irods, icat, opts.resources)
+                print(f"To access report, please visit {_webdav_url(irods, report_file)}")
+    except RuntimeError as e:
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return 1
+
+    return 0
+
+
+def _connect_icat(host: str, port: int, user: str) -> Connection:
+    return sqlalchemy.create_engine(f"postgresql://{user}@{host}:{port}/ICAT").connect()
+
+
+def _report(report_file: str, irods: iRODSSession, icat: Connection, resources: List[str]):
+    report_df = _gen_report(resources, icat, irods)
+
+    with NamedTemporaryFile(delete_on_close=False) as file:
+        file.write(_fmt_report(report_df).encode('utf-8'))
+        file.close()
+
+        irods.data_objects.put(
+            file.name,
+            os.path.join('/', irods.zone, 'home', 'shared', _DS_REPORT_LOC, report_file))
+
+
+def _fmt_report(df: DataFrame) -> str:
+    """Format the DataFrame as an HTML report with sortable columns and filters."""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Volume (GiB) per User</title>
+    <style>{_CSS_STYLES}</style>
+</head>
+<body>
+    <div class="container">
+        <h1>Data Volume (GiB) per User</h1>
+
+        <div class="filter-container">
+            <div class="filter-header">
+                <h3>Filters</h3>
+                <div class="status-bar" id="filterStatus"></div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-grid">
+                    <div class="filter-item">
+                        <label>Total (GiB)</label>
+                        <div class="range-group">
+                            <input type="number" id="totalMin" placeholder="Min" step="0.001">
+                            <span class="range-separator">&mdash;</span>
+                            <input type="number" id="totalMax" placeholder="Max" step="0.001">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-grid">
+                    <div class="filter-item">
+                        <label>User Name</label>
+                        <input type="text" id="userSearch" placeholder="Search users...">
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+                <button class="btn btn-secondary" onclick="clearFilters()">Clear All</button>
+            </div>
+        </div>
+
+        {_fmt_report_table(df)}
+
+        <div class="footer">
+            <p>
+                <strong>Instructions:</strong> Click column headers to sort. Use filters to narrow
+                results. Press Enter to apply.
+            </p>
+            <p><strong>Status:</strong> <span id="sortStatus">Loading...</span></p>
+        </div>
+    </div>
+
+    <script>{_JAVASCRIPT}</script>
+</body>
+</html>"""
+
+
+def _fmt_report_table(df: DataFrame) -> str:
+    """Generate the HTML table with sortable headers."""
+    table_html = """<table id="userTable">
+        <thead>
+            <tr>
+                <th onclick="sortTable(0, 'number')">
+                    Total <span class="sort-arrow">&#8597;</span>
+                </th>
+                <th onclick="sortTable(1, 'text')">
+                    User <span class="sort-arrow">&#8597;</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody>"""
+
+    for _, row in df.iterrows():
+        table_html += f"""
+            <tr>
+                <td>{row['Total']}</td>
+                <td>{_fmt_user_cell(row['User'])}</td>
+            </tr>"""
+
+    table_html += """
+        </tbody>
+    </table>"""
+
+    return table_html
+
+
+def _fmt_user_cell(username: str) -> str:
+    """Format the user cell with expandable details."""
+    info = _resolve_user_info(username)
+
+    if info['fullname'] != info['username']:
+        summary_line = info['fullname']
+        name_detail = f"{info['fullname']} ({username})"
+    else:
+        summary_line = info['username']
+        name_detail = username
+
+    detail_lines = [f"<strong>{name_detail}</strong>"]
+    if info['email']:
+        detail_lines.append(f"Email: {info['email']}")
+    if info['title']:
+        detail_lines.append(f"Title: {info['title']}")
+    if info['department']:
+        detail_lines.append(f"Department: {info['department']}")
+    if info['organization']:
+        detail_lines.append(f"Organization: {info['organization']}")
+
+    if len(detail_lines) == 1:
+        detail_lines.append("No additional information available")
+
+    return f"""
+        <details>
+            <summary>{summary_line}</summary>
+            <div class="user-details">
+                {"<br><br>".join(detail_lines)}
+            </div>
+        </details>
+    """
+
+
+def _resolve_user_info(username: str) -> Dict[str, str]:
+    if username:
+        info = _get_ldap_user_info(username)
+        if info:
+            return info
+
+    return {
+        'username': username,
+        'fullname': username,
+        'email': '',
+        'title': '',
+        'department': '',
+        'organization': ''
+    }
+
+
+def _get_ldap_user_info(username: str) -> Optional[Dict]:
+    """Query LDAP for detailed user information."""
+    try:
+        conn = ldap.initialize(_LDAP_URL)
+        conn.set_option(ldap.OPT_REFERRALS, 0)  # pylint: disable=no-member # type: ignore
+
+        result = conn.search_s(
+            _LDAP_BASE,
+            ldap.SCOPE_SUBTREE,  # pylint: disable=no-member # type: ignore
+            f"(uid={username})",
+            ['cn', 'mail', 'title', 'departmentNumber', 'uid', 'o'])
+
+        if result and len(result) > 0:
+            _, attrs = result[0]  # type: ignore
+
+            return {
+                'fullname': attrs.get('cn', [b''])[0].decode('utf-8'),
+                'email': attrs.get('mail', [b''])[0].decode('utf-8'),
+                'title': attrs.get('title', [b''])[0].decode('utf-8'),
+                'department': attrs.get('departmentNumber', [b''])[0].decode('utf-8'),
+                'username': attrs.get('uid', [b''])[0].decode('utf-8'),
+                'organization': attrs.get('o', [b''])[0].decode('utf-8'),
+            }
+
+        conn.unbind()
+    except LDAPError as e:
+        print(f"LDAP error for user {username}: {e}")
+
+    return None
+
+
+def _gen_report(root_resources: List[str], icat: Connection, irods: iRODSSession) -> DataFrame:
+    """Generate the report data using temporary tables."""
+    with icat.begin() as trans:
+        icat.execute(sqlalchemy.text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"))
+        metadata = MetaData()
+        _create_store_resc_table(icat, metadata, root_resources)
+        _create_user_coll_table(icat, metadata, irods.zone)
+        _create_user_data_table(icat, metadata)
+        result = _get_icat_report_data(icat)
+        trans.rollback()
+
+    return result
+
+
+def _create_store_resc_table(icat: Connection, metadata: MetaData, root_resources: List[str]):
+    """Create temporary table for storage resources using SQLAlchemy."""
+    store_resc = Table(
+        'store_resc', metadata, sqlalchemy.Column('id', BigInteger), prefixes=['TEMPORARY'])
+
+    store_resc.create(icat)
+    sqlalchemy.Index('store_resc_idx', store_resc.c.id).create(icat)
+    resources_str = ", ".join(f"'{r}'" for r in root_resources)
+
+    recursive_query = f"""
+        WITH RECURSIVE resc_hier(resc_id, resc_net) AS (
+            SELECT resc_id, resc_net
+                FROM r_resc_main
+                WHERE resc_name IN ({resources_str})
+            UNION SELECT m.resc_id, m.resc_net
+                FROM resc_hier AS h JOIN r_resc_main AS m ON m.resc_parent = h.resc_id::TEXT
+                WHERE h.resc_net = 'EMPTY_RESC_HOST')
+        INSERT INTO store_resc (id) SELECT resc_id FROM resc_hier
+    """
+
+    icat.execute(sqlalchemy.text(recursive_query))
+
+
+def _create_user_coll_table(icat: Connection, metadata: MetaData, zone: str):
+    """Create temporary table for user collections."""
+    user_coll = Table(
+        'user_coll',
+        metadata,
+        sqlalchemy.Column('username', String),
+        sqlalchemy.Column('coll_id', BigInteger),
+        prefixes=['TEMPORARY'])
+
+    user_coll.create(icat)
+    sqlalchemy.Index('user_coll_idx', user_coll.c.coll_id).create(icat)
+
+    insert_query = f"""
+        INSERT INTO user_coll (username, coll_id)
+        SELECT
+            REGEXP_REPLACE(c.coll_name, '/{zone}/home/([^/]+).*', E'\\\\1') AS username,
+            c.coll_id
+        FROM r_coll_main c
+        WHERE c.coll_name LIKE '/{zone}/home/%'
+            AND c.coll_name NOT SIMILAR TO '/{zone}/home/shared(/%)?'
+    """
+
+    icat.execute(sqlalchemy.text(insert_query))
+
+
+def _create_user_data_table(icat: Connection, metadata: MetaData):
+    """Create temporary table for user data."""
+    user_data = Table(
+        'user_data',
+        metadata,
+        sqlalchemy.Column('username', String),
+        sqlalchemy.Column('coll_id', BigInteger),
+        sqlalchemy.Column('data_id', BigInteger),
+        sqlalchemy.Column('data_size', BigInteger),
+        prefixes=['TEMPORARY'])
+
+    user_data.create(icat)
+    idx = sqlalchemy.Index('user_data_coll_data_idx', user_data.c.coll_id, user_data.c.data_id)
+    idx.create(icat)
+    sqlalchemy.Index('user_data_data_idx', user_data.c.data_id).create(icat)
+
+    insert_query = """
+        INSERT INTO user_data (username, coll_id, data_id, data_size)
+        SELECT c.username, c.coll_id, d.data_id, d.data_size
+        FROM user_coll AS c JOIN r_data_main AS d ON d.coll_id = c.coll_id
+        WHERE d.resc_id IN (SELECT id FROM store_resc)
+    """
+
+    icat.execute(sqlalchemy.text(insert_query))
+
+
+def _get_icat_report_data(icat: Connection) -> DataFrame:
+    query = """
+        SELECT
+            ROUND((tot_vol / 2^30)::NUMERIC, 3) AS "Total",
+            username AS "User"
+        FROM (
+            SELECT a.username, SUM(a.data_size) AS tot_vol
+            FROM (SELECT DISTINCT username, data_id, data_size FROM user_data) AS a
+            GROUP BY a.username
+        ) AS t
+        ORDER BY username
+    """
+
+    return pandas.read_sql_query(sqlalchemy.text(query), icat)
+
+
+def _mk_arg_parser(disp_wid: int) -> argparse.ArgumentParser:
+    desc_lines = textwrap.wrap(
+        "Generate report on data usage per user.", width=disp_wid)
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description='\n'.join(desc_lines),
+        epilog=_desc_env_vars(disp_wid))
+
+    parser.add_argument(
+        "-H", "--pghost",
+        default=os.environ.get('PGHOST', 'localhost'),
+        help="PostgreSQL host if the ICAT DB")
+
+    parser.add_argument(
+        "-P", "--pgport",
+        default=os.environ.get('PGPORT', 5432),
+        help="TCP port used by PostgreSQL")
+
+    parser.add_argument(
+        "-U", "--pguser",
+        default=os.environ.get('PGUSER', 'postgres'),
+        help="PostgreSQL user for authorizing connection")
+
+    parser.add_argument("resources", nargs="+", help="List of root resources to analyze")
+    return parser
+
+
+def _desc_env_vars(disp_wid: int) -> str:
+    irods_env_file = 'IRODS_ENVIRONMENT_FILE'
+    irods_env_file_desc = (
+        'the path to the iRODS environment file (default: "~/.irods/irods_environment.json")')
+
+    pghost = 'PGHOST'
+    pghost_desc = 'provides the default value for the PostgreSQL host (default: "localhost")'
+
+    pgport = 'PGPORT'
+    pgport_desc = 'provides the default value for the TCP port used by PostgreSQL (default: 5432)'
+
+    pguser = 'PGUSER'
+    pguser_desc = (
+        'provides the default PostgreSQL user for authorizing connection (default: "postgres")')
+
+    desc_inset = 2 + max(len(v) for v in [irods_env_file, pghost, pgport, pguser])
+
+    return (
+        f'environment variables:\n'
+        f'{_fmt_envvar_help(irods_env_file, irods_env_file_desc, desc_inset, disp_wid)}\n'
+        f'{_fmt_envvar_help(pghost, pghost_desc, desc_inset, disp_wid)}\n'
+        f'{_fmt_envvar_help(pgport, pgport_desc, desc_inset, disp_wid)}\n'
+        f'{_fmt_envvar_help(pguser, pguser_desc, desc_inset, disp_wid)}')
+
+
+def _fmt_envvar_help(var: str, desc: str, desc_inset: int, width: int):
+    offset = ' ' * (desc_inset - len(var))
+    initial_indent = ' ' * 2
+    subsequent_indent = f"{initial_indent}{' ' * desc_inset}"
+    lines = textwrap.wrap(
+        f"{var}{offset}{desc}",
+        width=width,
+        initial_indent=initial_indent,
+        subsequent_indent=subsequent_indent)
+    return '\n'.join(lines)
+
+
+def _webdav_url(irods: iRODSSession, report_file: str) -> str:
+    dav_loc = os.path.join("dav", irods.zone, "projects", _DS_REPORT_LOC, report_file)
+    return f"https://{irods.host}/{dav_loc}"
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
