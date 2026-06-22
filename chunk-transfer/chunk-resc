@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# © 2026, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 set -o errexit -o nounset -o pipefail
 
@@ -55,15 +58,15 @@ chunk() {
 		mkdir --parents "$destDir"
 		cd "$destDir"
 
-		printf 'Chunking data set %s\n' "$srcColl"
+		printf 'Chunking data set %s\n\n' "$srcColl"
 		tar --create --directory "$srcParentDir" "$collName" |
 			split --verbose --bytes "$chunkSize" - "$collName"."$resc"-
 
 		printf '\nRegistering chunks into %s\n' "$destColl"
-		ireg -C -f -v -R "$resc" "$destDir" "$destColl"
+		ireg -r -f -v -R "$resc" "$destDir" "$destColl"
 	fi
 
-	printf 'DONE\n'
+	printf '\nDONE\n'
 }
 
 chunk_vol() {
