@@ -18,6 +18,9 @@
 # lexicographic order so that if the are concatenated using
 # `cat COLL-NAME.RESC-*`, the full archive will be rebuilt correctly. All chunks
 # for all storage resources are stored in the collection "COLL-PATH.chunked".
+#
+# © 2026, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 set -o errexit -o nounset -o pipefail
 
@@ -87,8 +90,8 @@ default_resc_from_zonereport() {
 
 	jq --raw-output --from-file /dev/stdin <(cat) <<JQ
 .zones
-	| map(select(.icat_server.server_config.irods_zone_name = "$zone"))
-	| .[0].icat_server.server_config.default_resource_name
+	| map(select(.servers[0].server_config.zone_name = "$zone"))
+	| .[0].servers[0].service_account_environment.irods_default_resource
 JQ
 }
 
@@ -96,38 +99,18 @@ get_storage_rescs() {
 	local rootResc="$1"
 	local coll="$2"
 
-# XXX - See iRODS#6101, fixed in iRODS 4.2.12
-# 	quest %s <<EOQ
-#select RESC_NAME
-#where DATA_RESC_HIER = '$rootResc' || like '$rootResc;%' and COLL_NAME = '$coll' || like '$coll/%'
-#EOQ
 	quest %s <<EOQ
-select RESC_NAME where DATA_RESC_HIER = '$rootResc' and COLL_NAME = '$coll' || like '$coll/%'
+select RESC_NAME
+where DATA_RESC_HIER = '$rootResc' || like '$rootResc;%' and COLL_NAME = '$coll' || like '$coll/%'
 EOQ
-	quest %s <<EOQ
-select RESC_NAME where DATA_RESC_HIER like '$rootResc;%' and COLL_NAME = '$coll' || like '$coll/%'
-EOQ
-# XXX - ^^^
 }
 
 get_acl() {
 	local coll="$1"
 
-	quest '%s %s' <<<"select COLL_ACCESS_USER_ID, COLL_ACCESS_NAME where COLL_NAME = '$coll'" |
-		sed 's/read object/read/;s/modify object/write/' |
-		resolve_user_names
-}
-
-resolve_user_names() {
-	local userId perm
-	while read -r userId perm; do
-		local userName
-		userName="$(quest %s <<<"select USER_NAME where USER_ID = '$userId'")"
-
-		if [[ "$userName" != public && "$userName" != anonymous ]]; then
-			printf '%s %s\n' "$userName" "$perm"
-		fi
-	done
+	quest '%s#%s %s' <<EOF
+select COLL_USER_NAME, COLL_ZONE_NAME, COLL_ACCESS_NAME where COLL_NAME = '$coll'
+EOF
 }
 
 quest() {
