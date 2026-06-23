@@ -7,7 +7,7 @@
 # Parameters:
 #    COLL-PATH  The absolute path to the iRODS collection to chunk
 #
-# This script breaks bundles all of the data objects in COLL-PATH that have on
+# This script bundles all of the data objects in COLL-PATH that have a replica on
 # the default resource for the first catalog service provider. For each storage
 # resource under the default resource, it archives all of the replicas on this
 # storage resource that belong to a data object in COLL-PATH, splitting the
@@ -15,7 +15,7 @@
 # the base name of the collection being chunked. For a store resource named
 # RESC, its archive chunks will be named "COLL-NAME.RESC-??" where ? is
 # lowercase letter between "a" and "z", inclusive. The chunks are generated in
-# lexicographic order so that if the are concatenated using
+# lexicographic order so that if they are concatenated using
 # `cat COLL-NAME.RESC-*`, the full archive will be rebuilt correctly. All chunks
 # for all storage resources are stored in the collection "COLL-PATH.chunked".
 #
@@ -90,8 +90,10 @@ default_resc_from_zonereport() {
 
 	jq --raw-output --from-file /dev/stdin <(cat) <<JQ
 .zones
-	| map(select(.servers[0].server_config.zone_name = "$zone"))
-	| .[0].servers[0].service_account_environment.irods_default_resource
+	| map(select(.servers[0].server_config.zone_name == "$zone"))
+	| .[0].servers
+	| map(select(.server_config.catalog_service_role == "provider"))
+	| .[0].service_account_environment.irods_default_resource
 JQ
 }
 
