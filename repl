@@ -322,14 +322,12 @@ get_data_to_repl() {
 	psql --no-align --tuples-only --record-separator-zero --field-separator=' ' ICAT <<EOSQL
 SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(resc_id) = 1)
+WHERE d.data_id IN (SELECT data_id FROM r_data_main GROUP BY data_id HAVING COUNT(*) = 1)
 	AND d.create_ts < '$(mk_max_create_ts "$age")'
 	AND ($(mk_coll_cond c.coll_name "$baseColl"))
 	AND ($(mk_resc_cond d.resc_id "$srcResc" "$destResc"))
 EOSQL
 }
-
-
 
 mk_coll_cond() {
 	local collNameCol="$1"
@@ -439,6 +437,32 @@ replicate_streaming() {
 	rm --force "$cohortList"
 }
 
+
+
+
+replicate_threaded() {
+	local maxThreads="$1"
+	local procMult="$2"
+	local srcResc="$3"
+	local destResc="$4"
+	local untilTS="$5"
+	local totObjs="$6"
+	local objCache="$7"
+
+	local cnt=0
+
+	cnt="$(replicate_small_files \
+		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
+
+	cnt="$(replicate_large_files \
+		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
+
+	cnt="$(replicate_empty_files \
+		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
+
+	echo "$cnt"
+}
+
 partition() {
 	local minSizeB="$1"
 	local maxSizeB="$2"
@@ -482,29 +506,6 @@ mk_prog_msg() {
 
 	printf 'cohort: %0*d/%d, all: %0*d/%d' \
 		${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
-}
-
-replicate_threaded() {
-	local maxThreads="$1"
-	local procMult="$2"
-	local srcResc="$3"
-	local destResc="$4"
-	local untilTS="$5"
-	local totObjs="$6"
-	local objCache="$7"
-
-	local cnt=0
-
-	cnt="$(replicate_small_files \
-		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
-
-	cnt="$(replicate_large_files \
-		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
-
-	cnt="$(replicate_empty_files \
-		"$maxThreads" "$procMult" "$srcResc" "$destResc" "$untilTS" "$totObjs" "$objCache" "$cnt" )"
-
-	echo "$cnt"
 }
 
 replicate_empty_files() {
