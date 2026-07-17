@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# © 2023, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 help() {
 	cat <<EOF
@@ -25,7 +28,7 @@ This works with iRODS 4.2.8 or later.
 Options:
  -A, --age AGE                how many days old a data object must be to be
                               replicated. A negative number means no time
-                              restriction. default: 1
+                              restriction. default: -1
  -C, --collection COLLECTION  only consider this collection when locating
                               unreplicated data objects.
  -d, --debug                  display progress and query time information
@@ -42,9 +45,6 @@ Environment Variables:
  PGHOST  the default PostgreSQL host
  PGPORT  the default PostgreSQL listening port
  PGUSER  the default PostgreSQL user for authorizating the ICAT DB connection
-
-© 2023, The Arizona Board of Regents on behalf of The University of Arizona. For
-license information, see https://cyverse.org/license.
 EOF
 }
 
@@ -54,7 +54,7 @@ set -o errexit -o nounset -o pipefail
 
 export PGHOST PGPORT PGUSER
 
-readonly DEFAULT_AGE=1
+readonly DEFAULT_AGE='-1'
 
 EXEC_NAME="$(basename "$(realpath --canonicalize-missing "$0")")"
 readonly EXEC_NAME
@@ -305,6 +305,7 @@ CREATE TEMPORARY TABLE unreplicated_replicas(root_resc, store_resc, size) ON COM
 SELECT s.root_name, s.storage_name, d.data_size
 FROM storage_root_mapping AS s JOIN r_data_main AS d ON d.resc_id = s.storage_id
 WHERE d.data_id IN (SELECT id FROM unreplicated_data)
+	AND d.data_is_dirty = 1
 	AND ( $(inject_time_restriction d create_ts "$age") );
 
 CREATE INDEX idx_unreplicated_replicas_root_resc ON unreplicated_replicas(root_resc);
