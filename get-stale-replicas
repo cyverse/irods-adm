@@ -8,7 +8,7 @@
 #
 # Parameters:
 #  CUTOFF-DATE  only replicas modified prior to this date will be listed. The
-#               default is yesterday.
+#               default is no cutoff date
 #
 # Output:
 #  It outputs one replica record per line. A record has two space-separated
@@ -20,8 +20,11 @@
 
 set -o errexit -o nounset -o pipefail
 
-readonly DEFAULT_CUTOFF_DATE=yesterday
+readonly DEFAULT_CUTOFF_DATE=tomorrow
 readonly MAX_STALE_SLICE=1000
+
+EXEC_DIR="$(dirname "$(realpath --canonicalize-existing "$0")")"
+readonly EXEC_DIR
 
 main() {
 	local cutoffDate="$DEFAULT_CUTOFF_DATE"
@@ -58,27 +61,28 @@ filter_old_stales() {
 
 	local idx
 	for (( idx=0; idx<numStales; idx+=MAX_STALE_SLICE )); do
-	   local slice=MAX_STALE_SLICE
+		local slice=MAX_STALE_SLICE
 		if (( numStales < idx + slice )); then
 			slice=$(( numStales - idx ))
 		fi
 
 		printf 'processing %s - %s\n' $(( idx + 1 )) $(( idx + slice )) >&2
-
-		local idList
-		idList="$(fmt_query_list "${allStales[@]:$idx:$slice}")"
-
-		quest \
-			%s \
-			"select DATA_ID
-				where DATA_REPL_STATUS = '1'
-					and DATA_MODIFY_TIME < '$modCutoff'
-					and DATA_ID in ($idList)"
+		get_fresh "$modCutoff" "$(fmt_query_list "${allStales[@]:$idx:$slice}")"
 	done
 }
 
+get_fresh() {
+	local modCutoff="$1"
+	local idList="$2"
+
+	"$EXEC_DIR"/quest %s <<EOF
+select DATA_ID
+where DATA_REPL_STATUS = '1' and DATA_MODIFY_TIME < '$modCutoff' and DATA_ID in ($idList)"
+EOF
+}
+
 get_stales() {
-	quest %s "select DATA_ID where DATA_REPL_STATUS = '0'"
+	"$EXEC_DIR"/quest %s <<< "select DATA_ID where DATA_REPL_STATUS = '0'"
 }
 
 map_resources() {
@@ -95,31 +99,20 @@ map_resources() {
 		fi
 
 		printf 'processing %s - %s\n' $(( idx + 1 )) $(( idx + slice )) >&2
-
-		local idList
-		idList="$(fmt_query_list "${oldStales[@]:$idx:$slice}")"
-
-		quest \
-			'%s %s/%s' \
-			"select DATA_RESC_HIER, COLL_NAME, DATA_NAME
-				where DATA_REPL_STATUS = '0' and DATA_ID in ($idList)"
+		get_stale_resc_mapping "$(fmt_query_list "${oldStales[@]:$idx:$slice}")"
 	done
+}
+
+get_stale_resc_mapping() {
+	local idList="$1"
+
+	"$EXEC_DIR"/quest '%s %s/%s' <<EOF
+select DATA_RESC_HIER, COLL_NAME, DATA_NAME where DATA_REPL_STATUS = '0' and DATA_ID in ($idList)
+EOF
 }
 
 fmt_query_list() {
 	printf $'\'%s\'\n' "$@" | paste --serial --delimiter ,
-}
-
-quest() {
-	local fmtStr="$1"
-	local query="$2"
-
-	# Replace groups of tabs and spaces with a single space so that iquest can
-	# parse the query.
-	# shellcheck disable=SC2001
-	query="$(sed 's/[[:blank:]]\+/ /' <<< "$query")"
-
-	iquest --no-page "$fmtStr" "$query" | sed '/^CAT_NO_ROWS_FOUND: /d'
 }
 
 main "$@"

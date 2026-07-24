@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -o errexit -o nounset -o pipefail
+
+EXEC_DIR="$(dirname "$(realpath --canonicalize-existing "$0")")"
+readonly EXEC_DIR
+
+main() {
+    local cutoffDate
+    if (( $# >= 1 )); then
+        cutoffDate="$1"
+    fi
+
+    "$EXEC_DIR"/get-stale-replicas "${cutoffDate-}" \
+        | cut --delimiter=' ' --fields=2- \
+        | xargs --delimiter='\n' irepl -a -M -U -v
+}
+
+main "$@"
