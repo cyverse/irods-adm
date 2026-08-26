@@ -383,7 +383,7 @@ mk_time_cond() {
 		printf TRUE
 	else
 		local cutoffTS="$(date --date="$(date --iso-8601 --date="$age days ago")" '+0%s')"
-		printf $'%s < \'%011d\'' "$timeCol" "$cutoffTS"
+		printf $'%s < \'%s\'' "$timeCol" "$cutoffTS"
 	fi
 }
 
@@ -475,8 +475,6 @@ select_cohort() {
 	partition "$minSizeB" "$maxSizeB"
 }
 
-
-
 partition() {
 	local minSizeB="$1"
 	local maxSizeB="$2"
@@ -516,6 +514,8 @@ threads_to_min_MiB() {
 	fi
 }
 
+
+
 track_prog() {
 	local cnt="$1"
 	local tot="$2"
@@ -524,8 +524,8 @@ track_prog() {
 	local subCnt=0
 
 	local msg
-
 	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
+
 	printf '%s' "$msg" >&2
 
 	local event
