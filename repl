@@ -382,7 +382,7 @@ mk_time_cond() {
 	if (( age < 0 )); then
 		printf TRUE
 	else
-		local cutoffTS = "$(date --date="$(date --iso-8601 --date="$age days ago")" '+0%s')"
+		local cutoffTS="$(date --date="$(date --iso-8601 --date="$age days ago")" '+0%s')"
 		printf $'%s < \'%011d\'' "$timeCol" "$cutoffTS"
 	fi
 }
@@ -444,8 +444,6 @@ replicate_streaming() {
 	rm --force "$cohortList"
 }
 
-
-
 div_ceil() {
 	local numerator="$1"
 	local denominator="$2"
@@ -475,6 +473,25 @@ select_cohort() {
 	fi
 
 	partition "$minSizeB" "$maxSizeB"
+}
+
+
+
+partition() {
+	local minSizeB="$1"
+	local maxSizeB="$2"
+
+	local objEntry
+	while IFS= read -r -d '' objEntry; do
+		local size="${objEntry%% *}"
+		local path="${objEntry#* }"
+
+		if ([[ -z "$maxSizeB" ]] && (( size >= minSizeB ))) \
+			|| (( size >= minSizeB && size < maxSizeB ))
+		then
+			printf '%s\0' "$path"
+		fi
+	done
 }
 
 threads_to_max_MiB() {
@@ -697,23 +714,6 @@ replicate_small_files() {
 	done
 
 	echo "$replCnt"
-}
-
-partition() {
-	local minSizeB="$1"
-	local maxSizeB="$2"
-
-	local objEntry
-	while IFS= read -r -d '' objEntry; do
-		local size="${objEntry%% *}"
-		local path="${objEntry#* }"
-
-		if ([[ -z "$maxSizeB" ]] && (( size >= minSizeB ))) \
-			|| (( size >= minSizeB && size < maxSizeB ))
-		then
-			printf '%s\0' "$path"
-		fi
-	done
 }
 
 clear_msg() {
