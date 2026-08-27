@@ -38,19 +38,22 @@ EOF
 
 set -o errexit -o nounset -o pipefail
 
-ExecName=$(basename "$0")
+ExecName="$(basename "$0")"
 readonly ExecName
 
 readonly Version=1
 
+BaseColl=
+ProcMult=1
+
 main() {
-	Opts=$( \
+	Opts="$( \
 		getopt \
 			--name "$ExecName" \
 			--longoptions collection:,dbms:,dbms-port:,help,multiplier:,user:,version \
 			--options c:d:hm:U:v \
 			-- \
-			"$@")
+			"$@")"
 	readonly Opts
 
 	ret="$?"
@@ -66,7 +69,7 @@ main() {
 	do
 		case "$1" in
 			-c|--collection)
-				readonly BaseColl="$2"
+				BaseColl="$2"
 				shift 2
 				;;
 			-d|--dbms)
@@ -82,7 +85,7 @@ main() {
 				exit 0
 				;;
 			-m|--multiplier)
-				readonly ProcMult="$2"
+				ProcMult="$2"
 				shift 2
 				;;
 			-U|--user)
@@ -103,7 +106,7 @@ main() {
 		esac
 	done
 
-	if [ -n "$ProcMult" ]
+	if [ -n "${ProcMult-}" ]
 	then
 		if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
 		then
@@ -112,9 +115,9 @@ main() {
 				>&2
 			exit 1
 		fi
-	else
-		readonly ProcMult=1
 	fi
+
+	readonly BaseColl ProcMult
 
 	if [ "$#" -lt 2 ]
 	then
@@ -140,7 +143,7 @@ main() {
 		exit 1
 	fi
 
-	ObjectList=$(mktemp)
+	ObjectList="$(mktemp)"
 	readonly ObjectList
 	trap 'finish "$ObjectList"' EXIT
 
@@ -153,7 +156,7 @@ main() {
 
 	printf 'Checking to see if all data objects can be physically moved...\n' >&2
 
-	UnmovableCount=$(count_unmovable "$BaseCond")
+	UnmovableCount="$(count_unmovable "$BaseCond")"
 	readonly UnmovableCount
 
 	if [ "$UnmovableCount" -gt 0 ]
@@ -187,7 +190,7 @@ WHERE ($(mk_resc_restrict_cond d.resc_id "$DestResc")) AND ($BaseCond);
 ROLLBACK;
 EOSQL
 
-	Tot=$(count_list < "$ObjectList")
+	Tot="$(count_list < "$ObjectList")"
 	readonly Tot
 
 	printf '%d data objects to physically move\n' "$Tot" >&2
@@ -195,13 +198,13 @@ EOSQL
 	if [ "$Tot" -gt 0 ]
 	then
 		cnt=0
-		cnt=$(select_cohort "$cnt" "$Tot" 16   0  1 < "$ObjectList")  # 16 1-threaded transfers
-		cnt=$(select_cohort "$cnt" "$Tot"  8   1  2 < "$ObjectList")  # 8 2-threaded
-		cnt=$(select_cohort "$cnt" "$Tot"  6   2  3 < "$ObjectList")  # 6 3-threaded
-		cnt=$(select_cohort "$cnt" "$Tot"  4   3  5 < "$ObjectList")  # 4 4--5-threaded
-		cnt=$(select_cohort "$cnt" "$Tot"  3   5  7 < "$ObjectList")  # 3 6--7-threaded
-		cnt=$(select_cohort "$cnt" "$Tot"  2   7 15 < "$ObjectList")  # 2 8--15-threaded
-		cnt=$(select_cohort "$cnt" "$Tot"  1  15    < "$ObjectList")  # 1 16-threaded
+		cnt="$(select_cohort "$cnt" "$Tot" 16   0  1 < "$ObjectList")"  # 16 1-threaded transfers
+		cnt="$(select_cohort "$cnt" "$Tot"  8   1  2 < "$ObjectList")"  # 8 2-threaded
+		cnt="$(select_cohort "$cnt" "$Tot"  6   2  3 < "$ObjectList")"  # 6 3-threaded
+		cnt="$(select_cohort "$cnt" "$Tot"  4   3  5 < "$ObjectList")"  # 4 4--5-threaded
+		cnt="$(select_cohort "$cnt" "$Tot"  3   5  7 < "$ObjectList")"  # 3 6--7-threaded
+		cnt="$(select_cohort "$cnt" "$Tot"  2   7 15 < "$ObjectList")"  # 2 8--15-threaded
+		cnt="$(select_cohort "$cnt" "$Tot"  1  15    < "$ObjectList")"  # 1 16-threaded
 	fi
 }
 
@@ -342,7 +345,7 @@ select_cohort() {
 	local minSizeB=$(( minSizeMiB * 1024**2 ))
 
 	local cohortList
-	cohortList=$(mktemp)
+	cohortList="$(mktemp)"
 
 	if [ -n "$maxThreads" ]
 	then
@@ -355,7 +358,7 @@ select_cohort() {
 	fi > "$cohortList"
 
 	local subTotal
-	subTotal=$(count_list <"$cohortList")
+	subTotal="$(count_list <"$cohortList")"
 
 	if [ -n "$maxSizeMiB" ]
 	then
