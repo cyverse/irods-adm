@@ -36,7 +36,7 @@ Options:
 EOF
 }
 
-set -e
+set -o errexit -o nounset -o pipefail
 
 ExecName=$(basename "$0")
 readonly ExecName
