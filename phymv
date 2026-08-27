@@ -186,7 +186,7 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d
 	JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 	JOIN src_data AS s ON s.id = d.data_id
-WHERE ($(mk_resc_restrict_cond d.resc_id "$DestResc")) AND ($collCond);
+WHERE ($collCond) AND NOT ($(mk_resc_restrict_cond d.resc_id "$DestResc"));
 
 ROLLBACK;
 EOSQL
