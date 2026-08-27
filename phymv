@@ -49,10 +49,7 @@ declare ProcMult
 
 main() {
 	local opts
-	opts="$(format_opts "$@")"
-
-	local ret="$?"
-	if (( ret != 0 ))
+	if ! opt="$(format_opts "$@")"
 	then
 		printf '\n' >&2
 		exit_with_help
@@ -175,7 +172,9 @@ BEGIN;
 
 CREATE TEMPORARY TABLE src_data (id) AS
 SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$SrcResc"))
-EXCEPT SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$DestResc"));
+EXCEPT SELECT data_id
+	FROM r_data_main
+	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc');
 
 CREATE INDEX src_data_idx ON src_data (id);
 
@@ -184,7 +183,7 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d
 	JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 	JOIN src_data AS s ON s.id = d.data_id
-WHERE ($collCond) AND NOT ($(mk_resc_restrict_cond d.resc_id "$DestResc"));
+WHERE ($collCond) AND d.resc_id != (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc');
 
 ROLLBACK;
 EOSQL
@@ -253,7 +252,7 @@ WHERE d.data_id = ANY(ARRAY(
 		SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$SrcResc"))
 		INTERSECT SELECT data_id
 			FROM r_data_main
-			WHERE ($(mk_resc_restrict_cond resc_id "$DestResc"))))
+			WHERE resc_id IN (SELECT resc_id FROM r_resc_main WHERE resc_name = "$DestResc")))
 	AND ($baseCond);
 EOSQL
 }
