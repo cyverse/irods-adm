@@ -172,30 +172,47 @@ EXCEPT SELECT data_id
 CREATE INDEX src_data_idx ON src_data (id);
 
 
-SELECT d.data_size, c.coll_name || '/' || d.data_name
+SELECT r.resc_name, d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d
+	JOIN r_resc_main AS r ON r.resc_id = d.resc_id
 	JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 	JOIN src_data AS s ON s.id = d.data_id
-WHERE ($collCond) AND d.resc_id != (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc');
+WHERE r.resc_name != '$DestResc' AND ($collCond);
 
 ROLLBACK;
 EOSQL
 
 	local tot
 	tot="$(count_list < "$ObjectList")"
-
 	printf '%d data objects to physically move\n' "$tot" >&2
 
-	if (( tot > 0 )); then
-		cnt=0
-		cnt="$(select_cohort "$cnt" "$tot" 16   0  1 < "$ObjectList")"  # 16 1-threaded transfers
-		cnt="$(select_cohort "$cnt" "$tot"  8   1  2 < "$ObjectList")"  # 8 2-threaded
-		cnt="$(select_cohort "$cnt" "$tot"  6   2  3 < "$ObjectList")"  # 6 3-threaded
-		cnt="$(select_cohort "$cnt" "$tot"  4   3  5 < "$ObjectList")"  # 4 4--5-threaded
-		cnt="$(select_cohort "$cnt" "$tot"  3   5  7 < "$ObjectList")"  # 3 6--7-threaded
-		cnt="$(select_cohort "$cnt" "$tot"  2   7 15 < "$ObjectList")"  # 2 8--15-threaded
-		cnt="$(select_cohort "$cnt" "$tot"  1  15    < "$ObjectList")"  # 1 16-threaded
-	fi
+	local cnt=0
+
+	local srcResc
+	for srcResc in $(list_src_resc < "$ObjectList"); do
+		local srcObjs
+		srcObjs="$(mktemp)"
+		sed --null-data --quiet $'s/^$srcResc //p' < "$ObjectList" > "$srcObjs"
+
+		local srcTot
+		srcTot="$(count_list < "%srcObjs")"
+		printf '\n%d data objects on %s to physicall move\n' "$srcTot" "$srcResc" >&2
+
+		if (( srcTot > 0 )); then
+			local srcCnt=0
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" 16   0  1 < "$srcObjs")"  # 16 1-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  8   1  2 < "$srcObjs")"  # 8 2-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  6   2  3 < "$srcObjs")"  # 6 3-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  4   3  5 < "$srcObjs")"  # 4 4--5-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  3   5  7 < "$srcObjs")"  # 3 6--7-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  2   7 15 < "$srcObjs")"  # 2 8--15-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  1  15    < "$srcObjs")"  # 1 16-threaded
+
+			(( cnt += srcCnt ))
+		fi
+
+		rm --force "$srcObjs"
+	done
 }
 
 format_opts() {
@@ -205,6 +222,12 @@ format_opts() {
 		--options c:d:hm:U:v \
 		-- \
 		"$@"
+}
+
+list_src_resc() {
+	cut --zero-terminated --delimiter=' ' --fields=1 \
+		| sort --unique --zero-terminated \
+		| tr --zero-terminated '\0' '\n'
 }
 
 show_version() {
