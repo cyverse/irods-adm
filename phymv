@@ -43,7 +43,9 @@ readonly ExecName
 
 readonly Version=1
 
-ProcMult=1
+readonly DefaultProcMult=1
+
+declare ProcMult
 
 main() {
 	local opts
@@ -115,6 +117,8 @@ main() {
 				>&2
 			exit 1
 		fi
+	else
+		ProcMult="$DefaultProcMult"
 	fi
 
 	readonly ProcMult
@@ -337,9 +341,10 @@ select_cohort() {
 	local maxProcs="$3"
 	local minThreads="$4"
 
+	local maxThreads
 	if [ "$#" -ge 5 ]
 	then
-		local maxThreads="$5"
+		maxThreads="$5"
 	fi
 
 	local minSizeMiB=$((minThreads * 32))
@@ -348,7 +353,7 @@ select_cohort() {
 	local cohortList
 	cohortList="$(mktemp)"
 
-	if [ -n "$maxThreads" ]
+	if [ -n "${maxThreads-}" ]
 	then
 		local maxSizeMiB=$((maxThreads * 32))
 		local maxSizeB=$(( maxSizeMiB * 1024**2 ))
