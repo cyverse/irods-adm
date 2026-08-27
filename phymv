@@ -49,13 +49,7 @@ declare ProcMult
 
 main() {
 	local opts
-	opts="$( \
-		getopt \
-			--name "$ExecName" \
-			--longoptions collection:,dbms:,dbms-port:,help,multiplier:,user:,version \
-			--options c:d:hm:U:v \
-			-- \
-			"$@")"
+	opts="$(format_opts "$@")"
 
 	local ret="$?"
 	if [ "$ret" -ne 0 ]
@@ -213,6 +207,15 @@ EOSQL
 	fi
 }
 
+format_opts() {
+	getopt \
+		--name "$ExecName" \
+		--longoptions collection:,dbms:,dbms-port:,help,multiplier:,user:,version \
+		--options c:d:hm:U:v \
+		-- \
+		"$@"
+}
+
 show_version() {
 	printf '%s\n' "$Version"
 }
@@ -278,12 +281,13 @@ SQL
 partition() {
 	local minSizeB="$1"
 
+	local maxSizeB
 	if [ "$#" -ge 2 ]
 	then
-		local maxSizeB="$2"
+		maxSizeB="$2"
 	fi
 
-	if [ -n "$maxSizeB" ]
+	if [ -n "${maxSizeB-}" ]
 	then
 		awk --assign min="$minSizeB" --assign max="$maxSizeB" \
 			'BEGIN {
