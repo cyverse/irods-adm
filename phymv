@@ -52,7 +52,7 @@ main() {
 	opts="$(format_opts "$@")"
 
 	local ret="$?"
-	if [ "$ret" -ne 0 ]
+	if (( ret != 0 ))
 	then
 		printf '\n' >&2
 		exit_with_help
@@ -102,7 +102,7 @@ main() {
 		esac
 	done
 
-	if [ -n "${ProcMult-}" ]
+	if [[ -n "${ProcMult-}" ]]
 	then
 		if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
 		then
@@ -117,7 +117,7 @@ main() {
 
 	readonly ProcMult
 
-	if [ "$#" -lt 2 ]
+	if (( $# < 2 ))
 	then
 		exit_with_help
 	fi
@@ -146,7 +146,7 @@ main() {
 	trap 'finish "$ObjectList"' EXIT
 
 	local collCond
-	if [ -n "$baseColl" ]
+	if [[ -n "$baseColl" ]]
 	then
 		collCond="c.coll_name = '$baseColl' OR c.coll_name LIKE '$baseColl/%'"
 	else
@@ -158,7 +158,7 @@ main() {
 	local unmovableCount
 	unmovableCount="$(count_unmovable "$collCond")"
 
-	if [ "$unmovableCount" -gt 0 ]
+	if (( unmovableCount > 0 ))
 	then
 		cat <<EOF >&2
 WARNING: NOT ALL DATA OBJECTS COULD BE MOVED BECAUSE REPLICAS ARE ALREADY ON THE
@@ -194,7 +194,7 @@ EOSQL
 
 	printf '%d data objects to physically move\n' "$tot" >&2
 
-	if [ "$tot" -gt 0 ]
+	if (( tot > 0 ))
 	then
 		cnt=0
 		cnt="$(select_cohort "$cnt" "$tot" 16   0  1 < "$ObjectList")"  # 16 1-threaded transfers
@@ -282,12 +282,12 @@ partition() {
 	local minSizeB="$1"
 
 	local maxSizeB
-	if [ "$#" -ge 2 ]
+	if (( $# >= 2 ))
 	then
 		maxSizeB="$2"
 	fi
 
-	if [ -n "${maxSizeB-}" ]
+	if [[ -n "${maxSizeB-}" ]]
 	then
 		awk --assign min="$minSizeB" --assign max="$maxSizeB" \
 			'BEGIN {
@@ -346,7 +346,7 @@ select_cohort() {
 	local minThreads="$4"
 
 	local maxThreads
-	if [ "$#" -ge 5 ]
+	if (( $# >= 5 ))
 	then
 		maxThreads="$5"
 	fi
@@ -357,9 +357,10 @@ select_cohort() {
 	local cohortList
 	cohortList="$(mktemp)"
 
-	if [ -n "${maxThreads-}" ]
+	local maxSizeMiB
+	if [[ -n "${maxThreads-}" ]]
 	then
-		local maxSizeMiB=$((maxThreads * 32))
+		maxSizeMiB=$((maxThreads * 32))
 		local maxSizeB=$(( maxSizeMiB * 1024**2 ))
 
 		partition "$minSizeB" "$maxSizeB"
@@ -370,7 +371,7 @@ select_cohort() {
 	local subTotal
 	subTotal="$(count_list <"$cohortList")"
 
-	if [ -n "$maxSizeMiB" ]
+	if [[ -n "${maxSizeMiB-}" ]]
 	then
 		printf 'Physically moving %s files with size in [%s, %s) MiB\n' \
 				"$subTotal" "$minSizeMiB" "$maxSizeMiB" \
@@ -379,7 +380,7 @@ select_cohort() {
 		printf 'Physically moving %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
 	fi
 
-	if [ "$subTotal" -gt 0 ]
+	if (( subTotal > 0 ))
 	then
 		local maxArgs=$(( 2 * maxProcs**2 ))
 		maxProcs=$((maxProcs * ProcMult))
