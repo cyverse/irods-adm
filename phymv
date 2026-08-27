@@ -172,12 +172,8 @@ EOF
 BEGIN;
 
 CREATE TEMPORARY TABLE src_data (id) AS
-SELECT data_id
-	FROM r_data_main
-	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$SrcResc')
-EXCEPT SELECT data_id
-	FROM r_data_main
-	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc');
+SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$SrcResc"))
+EXCEPT SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$DestResc"));
 
 CREATE INDEX src_data_idx ON src_data (id);
 
@@ -186,7 +182,7 @@ SELECT d.data_size, c.coll_name || '/' || d.data_name
 FROM r_data_main AS d
 	JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 	JOIN src_data AS s ON s.id = d.data_id
-WHERE d.resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$SrcResc') AND ($BaseCond);
+WHERE ($(mk_resc_restrict_cond d.resc_id "$DestResc")) AND ($BaseCond);
 
 ROLLBACK;
 EOSQL
@@ -243,14 +239,32 @@ count_unmovable() {
 SELECT COUNT(data_id)
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 WHERE d.data_id = ANY(ARRAY(
-		SELECT data_id
-			FROM r_data_main
-			WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$SrcResc')
+		SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$SrcResc"))
 		INTERSECT SELECT data_id
 			FROM r_data_main
-			WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc') ))
+			WHERE ($(mk_resc_restrict_cond resc_id "$DestResc"))))
 	AND ($baseCond);
 EOSQL
+}
+
+mk_resc_restrict_cond() {
+	local rescCol="$1"
+	local resc="$2"
+
+cat <<SQL
+$rescCol IN (
+	WITH RECURSIVE child_mapping AS (
+		SELECT resc_id AS id, (resc_net != 'EMPTY_RESC_HOST') AS storage, resc_name AS root
+			FROM r_resc_main
+			WHERE resc_name = '$resc'
+		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root
+			FROM r_resc_main AS r
+				JOIN child_mapping AS m
+					ON m.id = CASE WHEN r.resc_parent::TEXT = ''
+						THEN NULL
+						ELSE r.resc_parent::BIGINT END )
+	SELECT id FROM child_mapping WHERE storage )
+SQL
 }
 
 partition() {
