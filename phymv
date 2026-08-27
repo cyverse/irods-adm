@@ -49,8 +49,7 @@ declare ProcMult
 
 main() {
 	local opts
-	if ! opt="$(format_opts "$@")"
-	then
+	if ! opts="$(format_opts "$@")"; then
 		printf '\n' >&2
 		exit_with_help
 	fi
@@ -58,8 +57,7 @@ main() {
 	eval set -- "$opts"
 
 	local baseColl=
-	while true
-	do
+	while true; do
 		case "$1" in
 			-c|--collection)
 				baseColl="$2"
@@ -99,10 +97,8 @@ main() {
 		esac
 	done
 
-	if [[ -n "${ProcMult-}" ]]
-	then
-		if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]
-		then
+	if [[ -n "${ProcMult-}" ]]; then
+		if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]; then
 			printf 'The -m option value must be a positive number. The given value was %s.\n' \
 					"$ProcMult" \
 				>&2
@@ -114,8 +110,7 @@ main() {
 
 	readonly ProcMult
 
-	if (( $# < 2 ))
-	then
+	if (( $# < 2 )); then
 		exit_with_help
 	fi
 
@@ -126,14 +121,12 @@ main() {
 	readonly Log=3
 	eval "exec $Log>&1"
 
-	if ! iadmin lz &> /dev/null
-	then
+	if ! iadmin lz &> /dev/null; then
 		printf "aren't authenticated as a rodsadmin user\n" >&2
 		exit 1
 	fi
 
-	if ! psql ICAT <<<'' &> /dev/null
-	then
+	if ! psql ICAT <<<'' &> /dev/null; then
 		printf "aren't able to connect to the ICAT DB as the %s without a password\n" "$PGUSER" >&2
 		exit 1
 	fi
@@ -143,8 +136,7 @@ main() {
 	trap 'finish "$ObjectList"' EXIT
 
 	local collCond
-	if [[ -n "$baseColl" ]]
-	then
+	if [[ -n "$baseColl" ]]; then
 		collCond="c.coll_name = '$baseColl' OR c.coll_name LIKE '$baseColl/%'"
 	else
 		collCond=TRUE
@@ -155,8 +147,7 @@ main() {
 	local unmovableCount
 	unmovableCount="$(count_unmovable "$collCond")"
 
-	if (( unmovableCount > 0 ))
-	then
+	if (( unmovableCount > 0 )); then
 		cat <<EOF >&2
 WARNING: NOT ALL DATA OBJECTS COULD BE MOVED BECAUSE REPLICAS ARE ALREADY ON THE
 DESTINATION RESOURCE
@@ -193,8 +184,7 @@ EOSQL
 
 	printf '%d data objects to physically move\n' "$tot" >&2
 
-	if (( tot > 0 ))
-	then
+	if (( tot > 0 )); then
 		cnt=0
 		cnt="$(select_cohort "$cnt" "$tot" 16   0  1 < "$ObjectList")"  # 16 1-threaded transfers
 		cnt="$(select_cohort "$cnt" "$tot"  8   1  2 < "$ObjectList")"  # 8 2-threaded
@@ -281,13 +271,11 @@ partition() {
 	local minSizeB="$1"
 
 	local maxSizeB
-	if (( $# >= 2 ))
-	then
+	if (( $# >= 2 )); then
 		maxSizeB="$2"
 	fi
 
-	if [[ -n "${maxSizeB-}" ]]
-	then
+	if [[ -n "${maxSizeB-}" ]]; then
 		awk --assign min="$minSizeB" --assign max="$maxSizeB" \
 			'BEGIN {
 				RS = "\0"
@@ -320,8 +308,7 @@ track_prog() {
 	local subCnt=0
 	local msg=
 
-	while read -r
-	do
+	while read -r; do
 		((++subCnt))
 		((++cnt))
 		printf '\r%*s\r' "${#msg}" '' >&2
@@ -345,8 +332,7 @@ select_cohort() {
 	local minThreads="$4"
 
 	local maxThreads
-	if (( $# >= 5 ))
-	then
+	if (( $# >= 5 )); then
 		maxThreads="$5"
 	fi
 
@@ -357,8 +343,7 @@ select_cohort() {
 	cohortList="$(mktemp)"
 
 	local maxSizeMiB
-	if [[ -n "${maxThreads-}" ]]
-	then
+	if [[ -n "${maxThreads-}" ]]; then
 		maxSizeMiB=$((maxThreads * 32))
 		local maxSizeB=$(( maxSizeMiB * 1024**2 ))
 
@@ -370,8 +355,7 @@ select_cohort() {
 	local subTotal
 	subTotal="$(count_list <"$cohortList")"
 
-	if [[ -n "${maxSizeMiB-}" ]]
-	then
+	if [[ -n "${maxSizeMiB-}" ]]; then
 		printf 'Physically moving %s files with size in [%s, %s) MiB\n' \
 				"$subTotal" "$minSizeMiB" "$maxSizeMiB" \
 			>&2
@@ -379,8 +363,7 @@ select_cohort() {
 		printf 'Physically moving %s files with size >= %s MiB\n' "$subTotal" "$minSizeMiB" >&2
 	fi
 
-	if (( subTotal > 0 ))
-	then
+	if (( subTotal > 0 )); then
 		local maxArgs=$(( 2 * maxProcs**2 ))
 		maxProcs=$((maxProcs * ProcMult))
 
