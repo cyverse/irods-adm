@@ -50,8 +50,8 @@ declare ProcMult
 main() {
 	local opts
 	if ! opts="$(format_opts "$@")"; then
-		printf '\n' >&2
-		exit_with_help
+		show_help >&2
+		return 1
 	fi
 
 	eval set -- "$opts"
@@ -92,7 +92,8 @@ main() {
 				break
 				;;
 			*)
-				exit_with_help
+				show_help >&2
+				return 1
 				;;
 		esac
 	done
@@ -111,7 +112,8 @@ main() {
 	readonly ProcMult
 
 	if (( $# < 2 )); then
-		exit_with_help
+		show_help >&2
+		return 1
 	fi
 
 	readonly SrcResc="$1"
@@ -209,11 +211,6 @@ show_version() {
 	printf '%s\n' "$Version"
 }
 
-exit_with_help() {
-	show_help >&2
-	exit 1
-}
-
 finish() {
 	local objList="$1"
 
@@ -242,7 +239,7 @@ WHERE d.data_id = ANY(ARRAY(
 		SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$SrcResc"))
 		INTERSECT SELECT data_id
 			FROM r_data_main
-			WHERE resc_id IN (SELECT resc_id FROM r_resc_main WHERE resc_name = "$DestResc")))
+			WHERE resc_id IN (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc')))
 	AND ($baseCond);
 EOSQL
 }
