@@ -36,14 +36,12 @@ Options:
 EOF
 }
 
-
 set -e
 
 ExecName=$(basename "$0")
 readonly ExecName
 
 readonly Version=1
-
 
 main() {
 	Opts=$( \
@@ -211,17 +209,14 @@ EOSQL
 	fi
 }
 
-
 show_version() {
 	printf '%s\n' "$Version"
 }
-
 
 exit_with_help() {
 	show_help >&2
 	exit 1
 }
-
 
 finish() {
 	local objList="$1"
@@ -229,7 +224,6 @@ finish() {
 	rm --force "$objList"
 	eval "exec 1>&$Log $Log>&-"
 }
-
 
 count_list() {
 	awk 'BEGIN {
@@ -241,7 +235,6 @@ count_list() {
 
 		END { print tot }'
 }
-
 
 count_unmovable() {
 	local baseCond="$1"
@@ -259,7 +252,6 @@ WHERE d.data_id = ANY(ARRAY(
 	AND ($baseCond);
 EOSQL
 }
-
 
 partition() {
 	local minSizeB="$1"
@@ -295,7 +287,6 @@ partition() {
 	fi
 }
 
-
 track_prog() {
 	local cnt="$1"
 	local tot="$2"
@@ -321,7 +312,6 @@ track_prog() {
 
 	printf '%s' "$cnt"
 }
-
 
 select_cohort() {
 	local cnt="$1"
@@ -379,6 +369,5 @@ select_cohort() {
 
 	rm --force "$cohortList"
 }
-
 
 main "$@"
