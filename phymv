@@ -16,7 +16,7 @@ replica associated with a data object that has a replica on the destination
 resource.
 
 Parameters:
- <src_resc>   the name of the storage resource where replicas are moved from
+ <src_resc>   the name of the resource where replicas are moved from
  <dest_resc>  the name of the storage resource where replicas are moved to
 
 Options:
