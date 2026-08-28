@@ -43,7 +43,7 @@ readonly ExecName
 
 readonly Version=1
 
-readonly DefaultProcMult=1
+readonly DefaultMult=1
 
 main() {
 	local opts
@@ -54,13 +54,13 @@ main() {
 
 	eval set -- "$opts"
 
-	local baseColl=
-	local procMult="$DefaultProcMult"
+	local coll=
+	local mult="$DefaultMult"
 
 	while true; do
 		case "$1" in
 			-c|--collection)
-				baseColl="$2"
+				coll="$2"
 				shift 2
 				;;
 			-d|--dbms)
@@ -76,7 +76,7 @@ main() {
 				exit 0
 				;;
 			-m|--multiplier)
-				procMult="$2"
+				mult="$2"
 				shift 2
 				;;
 			-U|--user)
@@ -98,10 +98,10 @@ main() {
 		esac
 	done
 
-	if [[ -n "${procMult-}" ]]; then
-		if ! [[ "$procMult" =~ ^[1-9][0-9]* ]]; then
+	if [[ -n "${mult-}" ]]; then
+		if ! [[ "$mult" =~ ^[1-9][0-9]* ]]; then
 			printf 'The -m option value must be a positive number. The given value was %s.\n' \
-					"$procMult" \
+					"$mult" \
 				>&2
 			exit 1
 		fi
@@ -134,8 +134,8 @@ main() {
 	trap 'finish "$ObjectList"' EXIT
 
 	local collCond
-	if [[ -n "$baseColl" ]]; then
-		collCond="c.coll_name = '$baseColl' OR c.coll_name LIKE '$baseColl/%'"
+	if [[ -n "$coll" ]]; then
+		collCond="c.coll_name = '$coll' OR c.coll_name LIKE '$coll/%'"
 	else
 		collCond=TRUE
 	fi
@@ -191,32 +191,32 @@ EOSQL
 		sed --null-data --quiet $'s/^$srcResc //p' < "$ObjectList" > "$srcObjs"
 
 		local srcTot
-		srcTot="$(count_list < "%srcObjs")"
+		srcTot="$(count_list < "$srcObjs")"
 		printf '\n%d data objects on %s to physicall move\n' "$srcTot" "$srcResc" >&2
 
 		if (( srcTot > 0 )); then
 			local srcCnt=0
 
 			# 16 1-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult" 16  0  1 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult" 16  0  1 < "$srcObjs")"
 
 			# 8 2-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  8  1  2 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  8  1  2 < "$srcObjs")"
 
 			# 6 3-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  6  2  3 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  6  2  3 < "$srcObjs")"
 
 			# 4 4--5-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  4  3  5 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  4  3  5 < "$srcObjs")"
 
 			# 3 6--7-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  3  5  7 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  3  5  7 < "$srcObjs")"
 
 			# 2 8--15-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  2  7 15 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  2  7 15 < "$srcObjs")"
 
 			# 1 16-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  1 15    < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  1 15    < "$srcObjs")"
 
 			(( cnt += srcCnt ))
 		fi
@@ -356,7 +356,7 @@ track_prog() {
 select_cohort() {
 	local cnt="$1"
 	local tot="$2"
-	local procMult="$3"
+	local mult="$3"
 	local maxProcs="$4"
 	local minThreads="$5"
 
@@ -394,7 +394,7 @@ select_cohort() {
 
 	if (( subTotal > 0 )); then
 		local maxArgs=$(( 2 * maxProcs**2 ))
-		maxProcs=$((maxProcs * procMult))
+		maxProcs=$((maxProcs * mult))
 
 		xargs --null --max-args "$maxArgs" --max-procs "$maxProcs" \
 				iphymv -M -v -R "$DestResc" -S "$SrcResc" \
