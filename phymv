@@ -99,13 +99,8 @@ main() {
 		esac
 	done
 
-	if [[ -n "${mult-}" ]]; then
-		if ! [[ "$mult" =~ ^[1-9][0-9]* ]]; then
-			printf 'The -m option value must be a positive number. The given value was %s.\n' \
-					"$mult" \
-				>&2
-			return 1
-		fi
+	if ! validate_proc_mult "$mult"; then
+		return 1
 	fi
 
 	if (( $# < 2 )); then
@@ -199,25 +194,25 @@ EOSQL
 			local srcCnt=0
 
 			# 16 1-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult" 16  0  1 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult" 16  0  1 < "$srcObjs")"
 
 			# 8 2-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  8  1  2 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  8  1  2 < "$srcObjs")"
 
 			# 6 3-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  6  2  3 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  6  2  3 < "$srcObjs")"
 
 			# 4 4--5-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  4  3  5 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  4  3  5 < "$srcObjs")"
 
 			# 3 6--7-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  3  5  7 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  3  5  7 < "$srcObjs")"
 
 			# 2 8--15-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  2  7 15 < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  2  7 15 < "$srcObjs")"
 
 			# 1 16-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$mult"  1 15    < "$srcObjs")"
+			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  1 15    < "$srcObjs")"
 
 			(( cnt += srcCnt ))
 		fi
@@ -355,15 +350,16 @@ track_prog() {
 }
 
 select_cohort() {
-	local cnt="$1"
-	local tot="$2"
-	local mult="$3"
-	local maxProcs="$4"
-	local minThreads="$5"
+	local srcResc="$1"
+	local cnt="$2"
+	local tot="$3"
+	local mult="$4"
+	local maxProcs="$5"
+	local minThreads="$6"
 
 	local maxThreads
-	if (( $# >= 6 )); then
-		maxThreads="$6"
+	if (( $# >= 7 )); then
+		maxThreads="$7"
 	fi
 
 	local minSizeMiB=$((minThreads * 32))
@@ -398,7 +394,7 @@ select_cohort() {
 		maxProcs=$((maxProcs * mult))
 
 		xargs --null --max-args "$maxArgs" --max-procs "$maxProcs" \
-				iphymv -M -v -R "$DestResc" -S "$SrcResc" \
+				iphymv -M -v -R "$DestResc" -S "$srcResc" \
 			< "$cohortList" \
 			2>&"$Log" \
 			| tee >(cat >&"$Log") \
@@ -408,6 +404,17 @@ select_cohort() {
 	fi
 
 	rm --force "$cohortList"
+}
+
+validate_proc_mult() {
+	local mult="$1"
+
+	if ! [[ "$mult" =~ ^[1-9][0-9]* ]]; then
+		printf 'The -m option value must be a positive number. The given value was %s.\n' "$mult" >&2
+		return 1
+	fi
+
+	return 0
 }
 
 main "$@"
