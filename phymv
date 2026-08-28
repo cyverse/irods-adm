@@ -46,7 +46,7 @@ export PGHOST PGPORT PGUSER
 readonly DefaultMult=1
 readonly Version=1
 
-declare Log ObjectList SrcResc
+declare Log ObjectList
 
 main() {
 	local opts
@@ -106,7 +106,7 @@ main() {
 		return 1
 	fi
 
-	readonly SrcResc="$1"
+	local srcResc="$1"
 	local destResc="$2"
 
 	if ! validate_proc_mult "$mult"; then
@@ -141,7 +141,7 @@ main() {
 	printf 'Checking to see if all data objects can be physically moved...\n' >&2
 
 	local unmovableCount
-	unmovableCount="$(count_unmovable "$collCond" "$destResc")"
+	unmovableCount="$(count_unmovable "$collCond" "$srcResc" "$destResc")"
 
 	if (( unmovableCount > 0 )); then
 		cat <<EOF >&2
@@ -158,7 +158,7 @@ EOF
 BEGIN;
 
 CREATE TEMPORARY TABLE src_data (id) AS
-SELECT data_id FROM r_data_main WHERE ($collCond) AND ($(mk_resc_restrict_cond resc_id "$SrcResc"))
+SELECT data_id FROM r_data_main WHERE ($collCond) AND ($(mk_resc_restrict_cond resc_id "$srcResc"))
 EXCEPT SELECT data_id
 	FROM r_data_main
 	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc');
@@ -171,7 +171,7 @@ FROM r_data_main AS d
 	JOIN r_resc_main AS r ON r.resc_id = d.resc_id
 	JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 	JOIN src_data AS s ON s.id = d.data_id
-WHERE ($(mk_resc_restrict_cond r.resc_id "$SrcResc") AND ($baseCond));
+WHERE ($(mk_resc_restrict_cond r.resc_id "$srcResc") AND ($collCond));
 
 ROLLBACK;
 EOSQL
@@ -260,13 +260,14 @@ count_list() {
 
 count_unmovable() {
 	local baseCond="$1"
-	local destResc="$2"
+	local srcResc="$2"
+	local destResc="$3"
 
 	psql --no-align --quiet --tuples-only ICAT  <<EOSQL
 SELECT COUNT(data_id)
 FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 WHERE d.data_id = ANY(ARRAY(
-		SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$SrcResc"))
+		SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$srcResc"))
 		INTERSECT SELECT data_id
 			FROM r_data_main
 			WHERE resc_id IN (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc')))
