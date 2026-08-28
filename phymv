@@ -41,9 +41,10 @@ set -o errexit -o nounset -o pipefail
 ExecName="$(basename "$0")"
 readonly ExecName
 
-readonly Version=1
+export PGHOST PGPORT PGUSER
 
 readonly DefaultMult=1
+readonly Version=1
 
 main() {
 	local opts
@@ -64,11 +65,11 @@ main() {
 				shift 2
 				;;
 			-d|--dbms)
-				export PGHOST="$2"
+				PGHOST="$2"
 				shift 2
 				;;
 			--dbms-port)
-				export PGPORT="$2"
+				PGPORT="$2"
 				shift 2
 				;;
 			-h|--help)
@@ -80,7 +81,7 @@ main() {
 				shift 2
 				;;
 			-U|--user)
-				export PGUSER="$2"
+				PGUSER="$2"
 				shift 2
 				;;
 			-v|--version)
@@ -188,11 +189,11 @@ EOSQL
 	for srcResc in $(list_src_resc < "$ObjectList"); do
 		local srcObjs
 		srcObjs="$(mktemp)"
-		sed --null-data --quiet $'s/^$srcResc //p' < "$ObjectList" > "$srcObjs"
+		sed --null-data --quiet 's/^'"$srcResc"' //p' < "$ObjectList" > "$srcObjs"
 
 		local srcTot
 		srcTot="$(count_list < "$srcObjs")"
-		printf '\n%d data objects on %s to physicall move\n' "$srcTot" "$srcResc" >&2
+		printf '\n%d data objects on %s to physically move\n' "$srcTot" "$srcResc" >&2
 
 		if (( srcTot > 0 )); then
 			local srcCnt=0
