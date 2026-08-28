@@ -45,8 +45,6 @@ readonly Version=1
 
 readonly DefaultProcMult=1
 
-declare ProcMult
-
 main() {
 	local opts
 	if ! opts="$(format_opts "$@")"; then
@@ -57,7 +55,7 @@ main() {
 	eval set -- "$opts"
 
 	local baseColl=
-	local ProcMult="$DefaultProcMult"
+	local procMult="$DefaultProcMult"
 
 	while true; do
 		case "$1" in
@@ -78,7 +76,7 @@ main() {
 				exit 0
 				;;
 			-m|--multiplier)
-				ProcMult="$2"
+				procMult="$2"
 				shift 2
 				;;
 			-U|--user)
@@ -100,12 +98,10 @@ main() {
 		esac
 	done
 
-	readonly ProcMult
-
-	if [[ -n "${ProcMult-}" ]]; then
-		if ! [[ "$ProcMult" =~ ^[1-9][0-9]* ]]; then
+	if [[ -n "${procMult-}" ]]; then
+		if ! [[ "$procMult" =~ ^[1-9][0-9]* ]]; then
 			printf 'The -m option value must be a positive number. The given value was %s.\n' \
-					"$ProcMult" \
+					"$procMult" \
 				>&2
 			exit 1
 		fi
@@ -200,13 +196,27 @@ EOSQL
 
 		if (( srcTot > 0 )); then
 			local srcCnt=0
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot" 16   0  1 < "$srcObjs")"  # 16 1-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  8   1  2 < "$srcObjs")"  # 8 2-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  6   2  3 < "$srcObjs")"  # 6 3-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  4   3  5 < "$srcObjs")"  # 4 4--5-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  3   5  7 < "$srcObjs")"  # 3 6--7-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  2   7 15 < "$srcObjs")"  # 2 8--15-threaded
-			srcCnt="$(select_cohort "$srcCnt" "$srcTot"  1  15    < "$srcObjs")"  # 1 16-threaded
+
+			# 16 1-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult" 16  0  1 < "$srcObjs")"
+
+			# 8 2-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  8  1  2 < "$srcObjs")"
+
+			# 6 3-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  6  2  3 < "$srcObjs")"
+
+			# 4 4--5-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  4  3  5 < "$srcObjs")"
+
+			# 3 6--7-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  3  5  7 < "$srcObjs")"
+
+			# 2 8--15-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  2  7 15 < "$srcObjs")"
+
+			# 1 16-threaded
+			srcCnt="$(select_cohort "$srcCnt" "$srcTot" "$procMult"  1 15    < "$srcObjs")"
 
 			(( cnt += srcCnt ))
 		fi
@@ -225,9 +235,7 @@ format_opts() {
 }
 
 list_src_resc() {
-	cut --zero-terminated --delimiter=' ' --fields=1 \
-		| sort --unique --zero-terminated \
-		| tr --zero-terminated '\0' '\n'
+	cut --zero-terminated --delimiter=' ' --fields=1 | sort --unique --zero-terminated | tr '\0' '\n'
 }
 
 show_version() {
@@ -348,11 +356,12 @@ track_prog() {
 select_cohort() {
 	local cnt="$1"
 	local tot="$2"
-	local maxProcs="$3"
-	local minThreads="$4"
+	local procMult="$3"
+	local maxProcs="$4"
+	local minThreads="$5"
 
 	local maxThreads
-	if (( $# >= 5 )); then
+	if (( $# >= 6 )); then
 		maxThreads="$5"
 	fi
 
@@ -385,7 +394,7 @@ select_cohort() {
 
 	if (( subTotal > 0 )); then
 		local maxArgs=$(( 2 * maxProcs**2 ))
-		maxProcs=$((maxProcs * ProcMult))
+		maxProcs=$((maxProcs * procMult))
 
 		xargs --null --max-args "$maxArgs" --max-procs "$maxProcs" \
 				iphymv -M -v -R "$DestResc" -S "$SrcResc" \
