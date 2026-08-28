@@ -99,10 +99,6 @@ main() {
 		esac
 	done
 
-	if ! validate_proc_mult "$mult"; then
-		return 1
-	fi
-
 	if (( $# < 2 )); then
 		show_help >&2
 		return 1
@@ -110,6 +106,10 @@ main() {
 
 	readonly SrcResc="$1"
 	readonly DestResc="$2"
+
+	if ! validate_proc_mult "$mult"; then
+		return 1
+	fi
 
 	# Redirect stdout to FD 3 to use as a logging channel
 	readonly Log=3
@@ -404,6 +404,7 @@ select_cohort() {
 	fi
 
 	rm --force "$cohortList"
+	return 0
 }
 
 validate_proc_mult() {
