@@ -46,7 +46,7 @@ export PGHOST PGPORT PGUSER
 readonly DefaultMult=1
 readonly Version=1
 
-declare DestResc SrcResc
+declare Log ObjectList SrcResc
 
 main() {
 	local opts
@@ -107,7 +107,7 @@ main() {
 	fi
 
 	readonly SrcResc="$1"
-	readonly DestResc="$2"
+	local destResc="$2"
 
 	if ! validate_proc_mult "$mult"; then
 		return 1
@@ -141,7 +141,7 @@ main() {
 	printf 'Checking to see if all data objects can be physically moved...\n' >&2
 
 	local unmovableCount
-	unmovableCount="$(count_unmovable "$collCond")"
+	unmovableCount="$(count_unmovable "$collCond" "$destResc")"
 
 	if (( unmovableCount > 0 )); then
 		cat <<EOF >&2
@@ -158,10 +158,10 @@ EOF
 BEGIN;
 
 CREATE TEMPORARY TABLE src_data (id) AS
-SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$SrcResc"))
+SELECT data_id FROM r_data_main WHERE ($collCond) AND ($(mk_resc_restrict_cond resc_id "$SrcResc"))
 EXCEPT SELECT data_id
 	FROM r_data_main
-	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc');
+	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc');
 
 CREATE INDEX src_data_idx ON src_data (id);
 
@@ -171,7 +171,7 @@ FROM r_data_main AS d
 	JOIN r_resc_main AS r ON r.resc_id = d.resc_id
 	JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 	JOIN src_data AS s ON s.id = d.data_id
-WHERE ($(mk_resc_restrict_cond r.resc_id "$SrcResc"));
+WHERE ($(mk_resc_restrict_cond r.resc_id "$SrcResc") AND ($baseCond));
 
 ROLLBACK;
 EOSQL
@@ -182,41 +182,41 @@ EOSQL
 
 	local cnt=0
 
-	local srcResc
-	for srcResc in $(list_src_resc < "$ObjectList"); do
+	local sr
+	for sr in $(list_src_resc < "$ObjectList"); do
 		local srcObjs
 		srcObjs="$(mktemp)"
-		sed --null-data --quiet 's/^'"$srcResc"' //p' < "$ObjectList" > "$srcObjs"
+		sed --null-data --quiet 's/^'"$sr"' //p' < "$ObjectList" > "$srcObjs"
 
 		local srcTot
 		srcTot="$(count_list < "$srcObjs")"
-		printf '\n%d data objects on %s to physically move\n' "$srcTot" "$srcResc" >&2
+		printf '\n%d data objects on %s to physically move\n' "$srcTot" "$sr" >&2
 
 		if (( srcTot > 0 )); then
-			local srcCnt=0
+			local sc=0
 
 			# 16 1-threaded
-			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult" 16  0  1 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult" 16  0  1 < "$srcObjs")"
 
 			# 8 2-threaded
-			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  8  1  2 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  8  1  2 < "$srcObjs")"
 
 			# 6 3-threaded
-			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  6  2  3 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  6  2  3 < "$srcObjs")"
 
 			# 4 4--5-threaded
-			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  4  3  5 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  4  3  5 < "$srcObjs")"
 
 			# 3 6--7-threaded
-			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  3  5  7 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  3  5  7 < "$srcObjs")"
 
 			# 2 8--15-threaded
-			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  2  7 15 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  2  7 15 < "$srcObjs")"
 
 			# 1 16-threaded
-			srcCnt="$(select_cohort "$srcResc" "$srcCnt" "$srcTot" "$mult"  1 15    < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  1 15    < "$srcObjs")"
 
-			(( cnt += srcCnt ))
+			(( cnt += sc ))
 		fi
 
 		rm --force "$srcObjs"
@@ -260,6 +260,7 @@ count_list() {
 
 count_unmovable() {
 	local baseCond="$1"
+	local destResc="$2"
 
 	psql --no-align --quiet --tuples-only ICAT  <<EOSQL
 SELECT COUNT(data_id)
@@ -268,7 +269,7 @@ WHERE d.data_id = ANY(ARRAY(
 		SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$SrcResc"))
 		INTERSECT SELECT data_id
 			FROM r_data_main
-			WHERE resc_id IN (SELECT resc_id FROM r_resc_main WHERE resc_name = '$DestResc')))
+			WHERE resc_id IN (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc')))
 	AND ($baseCond);
 EOSQL
 }
@@ -352,16 +353,17 @@ track_prog() {
 }
 
 select_cohort() {
-	local srcResc="$1"
-	local cnt="$2"
-	local tot="$3"
-	local mult="$4"
-	local maxProcs="$5"
-	local minThreads="$6"
+	local destResc="$1"
+	local srcResc="$2"
+	local cnt="$3"
+	local tot="$4"
+	local mult="$5"
+	local maxProcs="$6"
+	local minThreads="$7"
 
 	local maxThreads
-	if (( $# >= 7 )); then
-		maxThreads="$7"
+	if (( $# >= 8 )); then
+		maxThreads="$8"
 	fi
 
 	local minSizeMiB=$((minThreads * 32))
@@ -396,7 +398,7 @@ select_cohort() {
 		maxProcs=$((maxProcs * mult))
 
 		xargs --null --max-args "$maxArgs" --max-procs "$maxProcs" \
-				iphymv -M -v -R "$DestResc" -S "$srcResc" \
+				iphymv -M -v -R "$destResc" -S "$srcResc" \
 			< "$cohortList" \
 			2>&"$Log" \
 			| tee >(cat >&"$Log") \
