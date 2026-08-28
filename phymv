@@ -44,9 +44,10 @@ readonly ExecName
 export PGHOST PGPORT PGUSER
 
 readonly DefaultMult=1
+readonly Log=3          # Redirect stdout to FD 3 to use as a logging channel
 readonly Version=1
 
-declare Log ObjectList
+declare ObjectList
 
 main() {
 	local opts
@@ -113,8 +114,6 @@ main() {
 		return 1
 	fi
 
-	# Redirect stdout to FD 3 to use as a logging channel
-	readonly Log=3
 	eval "exec $Log>&1"
 
 	if ! iadmin lz &> /dev/null; then
@@ -158,7 +157,7 @@ EOF
 BEGIN;
 
 CREATE TEMPORARY TABLE src_data (id) AS
-SELECT data_id FROM r_data_main WHERE ($collCond) AND ($(mk_resc_restrict_cond resc_id "$srcResc"))
+SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$srcResc"))
 EXCEPT SELECT data_id
 	FROM r_data_main
 	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc');
