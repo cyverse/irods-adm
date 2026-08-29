@@ -66,7 +66,7 @@ main() {
 	if [[ -n "${optMap[help]}" ]]; then
 		show_help
 	elif [[ -n "${optMap[version]}" ]]; then
-		show_version
+		printf '%s\n' "$Version"
 	else
 		move \
 			"${optMap[collection]}" \
@@ -153,20 +153,20 @@ EOF
 BEGIN;
 
 CREATE TEMPORARY TABLE src_data (id) AS
-SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$srcResc"))
-EXCEPT SELECT data_id
-	FROM r_data_main
-	WHERE resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc');
-
+SELECT d.data_id
+	FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+	WHERE ($collCond) AND ($(mk_resc_restrict_cond resc_id "$srcResc"))
+EXCEPT SELECT d.data_id
+	FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+	WHERE ($collCond) resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc');
 CREATE INDEX src_data_idx ON src_data (id);
 
-
 SELECT r.resc_name, d.data_size, c.coll_name || '/' || d.data_name
-FROM r_data_main AS d
-	JOIN r_resc_main AS r ON r.resc_id = d.resc_id
+FROM r_resc_main AS r
+	JOIN r_data_main AS d ON d.resc_id = r.resc_id
 	JOIN r_coll_main AS c ON c.coll_id = d.coll_id
 	JOIN src_data AS s ON s.id = d.data_id
-WHERE ($(mk_resc_restrict_cond r.resc_id "$srcResc") AND ($collCond));
+WHERE ($collCond) AND ($(mk_resc_restrict_cond r.resc_id "$srcResc"));
 
 ROLLBACK;
 EOSQL
@@ -219,10 +219,6 @@ EOSQL
 
 		rm --force "$so"
 	done
-}
-
-show_version() {
-	printf '%s\n' "$Version"
 }
 
 finish() {
@@ -315,6 +311,7 @@ partition() {
 
 resolve_opts() {
 	local mapVar="$1"
+	shift
 
 	local opts
 	if ! opts="$(format_opts "$@")"; then
