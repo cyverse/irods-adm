@@ -50,71 +50,65 @@ readonly Version=1
 declare ObjectList
 
 main() {
-	local opts
-	if ! opts="$(format_opts "$@")"; then
+	declare -A optMap=(
+		[collection]=''
+		[dest-resc]=''
+		[help]=''
+		[multiplier]="$DefaultMult"
+		[src-resc]=''
+		[version]='' )
+
+	if ! resolve_opts optMap "$@"; then
 		show_help >&2
 		return 1
 	fi
 
-	eval set -- "$opts"
+	if [[ -n "${optMap[help]}" ]]; then
+		show_help
+	elif [[ -n "${optMap[version]}" ]]; then
+		show_version
+	else
+		move \
+			"${optMap[collection]}" \
+			"${optMap[src-resc]}" \
+			"${optMap[dest-resc]}" \
+			"${optMap[multiplier]}"
+	fi
+}
 
-	local coll=
-	local mult="$DefaultMult"
 
-	while true; do
-		case "$1" in
-			-c|--collection)
-				coll="$2"
-				shift 2
-				;;
-			-d|--dbms)
-				PGHOST="$2"
-				shift 2
-				;;
-			--dbms-port)
-				PGPORT="$2"
-				shift 2
-				;;
-			-h|--help)
-				show_help
-				return 0
-				;;
-			-m|--multiplier)
-				mult="$2"
-				shift 2
-				;;
-			-U|--user)
-				PGUSER="$2"
-				shift 2
-				;;
-			-v|--version)
-				show_version
-				return 0
-				;;
-			--)
-				shift
-				break
-				;;
-			*)
-				show_help >&2
-				return 1
-				;;
-		esac
-	done
 
-	if (( $# < 2 )); then
-		show_help >&2
+format_opts() {
+	getopt \
+		--name "$ExecName" \
+		--longoptions collection:,dbms:,dbms-port:,help,multiplier:,user:,version \
+		--options c:d:hm:U:v \
+		-- \
+		"$@"
+}
+
+list_src_resc() {
+	cut --zero-terminated --delimiter=' ' --fields=1 | sort --unique --zero-terminated | tr '\0' '\n'
+}
+
+move() {
+	local coll="$1"
+	local srcResc="$2"
+	local destResc="$3"
+	local mult="$4"
+
+	if [[ "$srcResc" == "$destResc" ]]; then
+		printf 'The destination resource, %s, cannot be the same as the source resource, %s.\n' \
+				"$destResc" "$srcResc" \
+			>&2
+
 		return 1
 	fi
 
-	local srcResc="$1"
-	local destResc="$2"
-
-	if ! validate_proc_mult "$mult"; then
+	if ! [[ "$mult" =~ ^[1-9][0-9]* ]]; then
+		printf 'The -m option value must be a positive number. The given value was %s.\n' "$mult" >&2
 		return 1
 	fi
-
-	eval "exec $Log>&1"
 
 	if ! iadmin lz &> /dev/null; then
 		printf "aren't authenticated as a rodsadmin user\n" >&2
@@ -125,6 +119,8 @@ main() {
 		printf "aren't able to connect to the ICAT DB as the %s without a password\n" "$PGUSER" >&2
 		return 1
 	fi
+
+	eval "exec $Log>&1"
 
 	ObjectList="$(mktemp)"
 	readonly ObjectList
@@ -181,58 +177,48 @@ EOSQL
 
 	local cnt=0
 
+	local srcStoreRescs
+	readarray -t srcStoreRescs <<< "$(list_src_resc < "$ObjectList")"
+
 	local sr
-	for sr in $(list_src_resc < "$ObjectList"); do
-		local srcObjs
-		srcObjs="$(mktemp)"
-		sed --null-data --quiet 's/^'"$sr"' //p' < "$ObjectList" > "$srcObjs"
+	for sr in "${srcStoreRescs[@]}"; do
+		local so
+		so="$(mktemp)"
+		sed --null-data --quiet 's/^'"$sr"' //p' < "$ObjectList" > "$so"
 
-		local srcTot
-		srcTot="$(count_list < "$srcObjs")"
-		printf '\n%d data objects on %s to physically move\n' "$srcTot" "$sr" >&2
+		local st
+		st="$(count_list < "$so")"
+		printf '\n%d data objects on %s to physically move\n' "$st" "$sr" >&2
 
-		if (( srcTot > 0 )); then
+		if (( st > 0 )); then
 			local sc=0
 
 			# 16 1-threaded
-			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult" 16  0  1 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$st" "$mult" 16  0  1 < "$so")"
 
 			# 8 2-threaded
-			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  8  1  2 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$st" "$mult"  8  1  2 < "$so")"
 
 			# 6 3-threaded
-			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  6  2  3 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$st" "$mult"  6  2  3 < "$so")"
 
 			# 4 4--5-threaded
-			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  4  3  5 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$st" "$mult"  4  3  5 < "$so")"
 
 			# 3 6--7-threaded
-			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  3  5  7 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$st" "$mult"  3  5  7 < "$so")"
 
 			# 2 8--15-threaded
-			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  2  7 15 < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$st" "$mult"  2  7 15 < "$so")"
 
 			# 1 16-threaded
-			sc="$(select_cohort "$destResc" "$sr" "$sc" "$srcTot" "$mult"  1 15    < "$srcObjs")"
+			sc="$(select_cohort "$destResc" "$sr" "$sc" "$st" "$mult"  1 15    < "$so")"
 
-			(( cnt += sc ))
+			: $(( cnt += sc ))
 		fi
 
-		rm --force "$srcObjs"
+		rm --force "$so"
 	done
-}
-
-format_opts() {
-	getopt \
-		--name "$ExecName" \
-		--longoptions collection:,dbms:,dbms-port:,help,multiplier:,user:,version \
-		--options c:d:hm:U:v \
-		-- \
-		"$@"
-}
-
-list_src_resc() {
-	cut --zero-terminated --delimiter=' ' --fields=1 | sort --unique --zero-terminated | tr '\0' '\n'
 }
 
 show_version() {
@@ -327,6 +313,73 @@ partition() {
 	fi
 }
 
+resolve_opts() {
+	local mapVar="$1"
+
+	local opts
+	if ! opts="$(format_opts "$@")"; then
+		return 1
+	fi
+
+	eval set -- "$opts"
+
+	local reqRescs=true
+
+	while true; do
+		case "$1" in
+			-c|--collection)
+				eval "$mapVar""[collection]='$2'"
+				shift 2
+				;;
+			-d|--dbms)
+				PGHOST="$2"
+				shift 2
+				;;
+			--dbms-port)
+				PGPORT="$2"
+				shift 2
+				;;
+			-h|--help)
+				eval "$mapVar"'[help]=help'
+				reqRescs=false
+				shift
+				;;
+			-m|--multiplier)
+				eval "$mapVar""[multiplier]='$2'"
+				shift 2
+				;;
+			-U|--user)
+				PGUSER="$2"
+				shift 2
+				;;
+			-v|--version)
+				eval "$mapVar"'[version]=version'
+				reqRescs=false
+				shift
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				printf 'INTERNAL ERROR: failed to resolve command line options\n' >&2
+				return 1
+				;;
+		esac
+	done
+
+	if [[ "$reqRescs" == false ]]; then
+		return 0
+	fi
+
+	if (( $# < 2 )); then
+		return 1
+	fi
+
+	eval "$mapVar""[src-resc]='$1'"
+	eval "$mapVar""[dest-resc]='$2'"
+}
+
 track_prog() {
 	local cnt="$1"
 	local tot="$2"
@@ -408,17 +461,6 @@ select_cohort() {
 	fi
 
 	rm --force "$cohortList"
-	return 0
-}
-
-validate_proc_mult() {
-	local mult="$1"
-
-	if ! [[ "$mult" =~ ^[1-9][0-9]* ]]; then
-		printf 'The -m option value must be a positive number. The given value was %s.\n' "$mult" >&2
-		return 1
-	fi
-
 	return 0
 }
 
