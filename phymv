@@ -78,19 +78,6 @@ main() {
 
 
 
-format_opts() {
-	getopt \
-		--name "$ExecName" \
-		--longoptions collection:,dbms:,dbms-port:,help,multiplier:,user:,version \
-		--options c:d:hm:U:v \
-		-- \
-		"$@"
-}
-
-list_src_resc() {
-	cut --zero-terminated --delimiter=' ' --fields=1 | sort --unique --zero-terminated | tr '\0' '\n'
-}
-
 move() {
 	local coll="$1"
 	local srcResc="$2"
@@ -158,7 +145,7 @@ SELECT d.data_id
 	WHERE ($collCond) AND ($(mk_resc_restrict_cond resc_id "$srcResc"))
 EXCEPT SELECT d.data_id
 	FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-	WHERE ($collCond) resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc');
+	WHERE ($collCond) AND resc_id = (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc');
 CREATE INDEX src_data_idx ON src_data (id);
 
 SELECT r.resc_name, d.data_size, c.coll_name || '/' || d.data_name
@@ -219,94 +206,6 @@ EOSQL
 
 		rm --force "$so"
 	done
-}
-
-finish() {
-	local objList="$1"
-
-	rm --force "$objList"
-	eval "exec 1>&$Log $Log>&-"
-}
-
-count_list() {
-	awk 'BEGIN {
-			RS = "\0"
-			tot = 0
-		}
-
-		{ tot = tot + 1 }
-
-		END { print tot }'
-}
-
-count_unmovable() {
-	local baseCond="$1"
-	local srcResc="$2"
-	local destResc="$3"
-
-	psql --no-align --quiet --tuples-only ICAT  <<EOSQL
-SELECT COUNT(data_id)
-FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
-WHERE d.data_id = ANY(ARRAY(
-		SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$srcResc"))
-		INTERSECT SELECT data_id
-			FROM r_data_main
-			WHERE resc_id IN (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc')))
-	AND ($baseCond);
-EOSQL
-}
-
-mk_resc_restrict_cond() {
-	local rescCol="$1"
-	local resc="$2"
-
-cat <<SQL
-$rescCol IN (
-	WITH RECURSIVE child_mapping AS (
-		SELECT resc_id AS id, (resc_net != 'EMPTY_RESC_HOST') AS storage, resc_name AS root
-			FROM r_resc_main
-			WHERE resc_name = '$resc'
-		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root
-			FROM r_resc_main AS r
-				JOIN child_mapping AS m
-					ON m.id = CASE WHEN r.resc_parent::TEXT = ''
-						THEN NULL
-						ELSE r.resc_parent::BIGINT END )
-	SELECT id FROM child_mapping WHERE storage )
-SQL
-}
-
-partition() {
-	local minSizeB="$1"
-
-	local maxSizeB
-	if (( $# >= 2 )); then
-		maxSizeB="$2"
-	fi
-
-	if [[ -n "${maxSizeB-}" ]]; then
-		awk --assign min="$minSizeB" --assign max="$maxSizeB" \
-			'BEGIN {
-				RS = "\0"
-				FS = " "
-				ORS = "\0"
-			}
-
-			{
-				if ($1 >= min && $1 < max) { print substr($0, length($1) + 2) }
-			}'
-	else
-		awk --assign min="$minSizeB" \
-			'BEGIN {
-				RS = "\0"
-				FS = " "
-				ORS = "\0"
-			}
-
-			{
-				if ($1 >= min) { print substr($0, length($1) + 2) }
-			}'
-	fi
 }
 
 resolve_opts() {
@@ -375,6 +274,107 @@ resolve_opts() {
 
 	eval "$mapVar""[src-resc]='$1'"
 	eval "$mapVar""[dest-resc]='$2'"
+}
+
+finish() {
+	local objList="$1"
+
+	rm --force "$objList"
+	eval "exec 1>&$Log $Log>&-"
+}
+
+count_list() {
+	awk 'BEGIN {
+			RS = "\0"
+			tot = 0
+		}
+
+		{ tot = tot + 1 }
+
+		END { print tot }'
+}
+
+count_unmovable() {
+	local baseCond="$1"
+	local srcResc="$2"
+	local destResc="$3"
+
+	psql --no-align --quiet --tuples-only ICAT  <<EOSQL
+SELECT COUNT(data_id)
+FROM r_data_main AS d JOIN r_coll_main AS c ON c.coll_id = d.coll_id
+WHERE d.data_id = ANY(ARRAY(
+		SELECT data_id FROM r_data_main WHERE ($(mk_resc_restrict_cond resc_id "$srcResc"))
+		INTERSECT SELECT data_id
+			FROM r_data_main
+			WHERE resc_id IN (SELECT resc_id FROM r_resc_main WHERE resc_name = '$destResc')))
+	AND ($baseCond);
+EOSQL
+}
+
+mk_resc_restrict_cond() {
+	local rescCol="$1"
+	local resc="$2"
+
+cat <<SQL
+$rescCol IN (
+	WITH RECURSIVE child_mapping AS (
+		SELECT resc_id AS id, (resc_net != 'EMPTY_RESC_HOST') AS storage, resc_name AS root
+			FROM r_resc_main
+			WHERE resc_name = '$resc'
+		UNION SELECT r.resc_id, r.resc_net != 'EMPTY_RESC_HOST', m.root
+			FROM r_resc_main AS r
+				JOIN child_mapping AS m
+					ON m.id = CASE WHEN r.resc_parent::TEXT = ''
+						THEN NULL
+						ELSE r.resc_parent::BIGINT END )
+	SELECT id FROM child_mapping WHERE storage )
+SQL
+}
+
+format_opts() {
+	getopt \
+		--name "$ExecName" \
+		--longoptions collection:,dbms:,dbms-port:,help,multiplier:,user:,version \
+		--options c:d:hm:U:v \
+		-- \
+		"$@"
+}
+
+list_src_resc() {
+	cut --zero-terminated --delimiter=' ' --fields=1 | sort --unique --zero-terminated | tr '\0' '\n'
+}
+
+partition() {
+	local minSizeB="$1"
+
+	local maxSizeB
+	if (( $# >= 2 )); then
+		maxSizeB="$2"
+	fi
+
+	if [[ -n "${maxSizeB-}" ]]; then
+		awk --assign min="$minSizeB" --assign max="$maxSizeB" \
+			'BEGIN {
+				RS = "\0"
+				FS = " "
+				ORS = "\0"
+			}
+
+			{
+				if ($1 >= min && $1 < max) { print substr($0, length($1) + 2) }
+			}'
+	else
+		awk --assign min="$minSizeB" \
+			'BEGIN {
+				RS = "\0"
+				FS = " "
+				ORS = "\0"
+			}
+
+			{
+				if ($1 >= min) { print substr($0, length($1) + 2) }
+			}'
+	fi
 }
 
 track_prog() {
