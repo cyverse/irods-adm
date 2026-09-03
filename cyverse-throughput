@@ -6,10 +6,10 @@
 help() {
 	cat <<EOF
 
-$EXEC_NAME version $VERSION
+$ExecName version $Version
 
 Usage:
- $EXEC_NAME [options]
+ $ExecName [options]
 
 This script measures transfer throughput of the client running this script to
 and from the CyVerse Data Store. It downloads a data object one or more times in
@@ -107,11 +107,11 @@ EOF
 
 set -o errexit -o nounset -o pipefail
 
-readonly VERSION=2
-readonly DEFAULT_NUM_RUNS=30
-readonly EXEC_ABS_PATH=$(readlink --canonicalize "$0")
-readonly EXEC_NAME=$(basename "$EXEC_ABS_PATH")
-readonly TEST_TIME="$(date --utc --iso-8601=seconds)"
+readonly Version=2
+readonly DefaultNumRuns=30
+readonly ExecAbsPath=$(readlink --canonicalize "$0")
+readonly ExecName=$(basename "$ExecAbsPath")
+readonly TestTime="$(date --utc --iso-8601=seconds)"
 
 declare ReportLog
 declare StatusLog
@@ -121,9 +121,9 @@ main() {
 		[help]=''
 		[version]=''
 		[verbose]=''
-		[client-dir]="${TMPDIR:-$PWD}/throughput-$TEST_TIME"
+		[client-dir]="${TMPDIR:-$PWD}/throughput-$TestTime"
 		[max-threads]=''
-		[num-runs]="$DEFAULT_NUM_RUNS"
+		[num-runs]="$DefaultNumRuns"
 		[server-coll]=''
 		[sizes]=1GiB
 		[log]=/dev/stdout )
@@ -142,7 +142,7 @@ main() {
 
 	if [[ -n "${optMap[version]}" ]]
 	then
-		printf '%s\n' "$VERSION"
+		printf '%s\n' "$Version"
 		return 0
 	fi
 
@@ -237,7 +237,7 @@ fmt_opts() {
 
 	local longOptsStr
 	longOptsStr="$(printf '%s\n' "${longOpts[@]}" | paste --serial --delimiter=,)"
-	getopt --name="$EXEC_NAME" --longoptions="$longOptsStr" --options=hVvD:L:T:N:S:C: -- "$@"
+	getopt --name="$ExecName" --longoptions="$longOptsStr" --options=hVvD:L:T:N:S:C: -- "$@"
 }
 
 do_test() {
@@ -255,7 +255,7 @@ do_test() {
 
 	if [[ -z "$svrColl" ]]
 	then
-		svrColl="$(ipwd)/throughput-$TEST_TIME"
+		svrColl="$(ipwd)/throughput-$TestTime"
 	fi
 
 	# shellcheck disable=SC2064
@@ -536,7 +536,7 @@ gen_report() {
 			then
 				if [[ -n "${downDurs-}" ]] || [[ -n "${upDurs-}" ]]
 				then
-					sumReport=$(append_size_summary
+					sumReport=$(append_size_summary \
 						"$sumReport" "$reportSize" "$curSize" downDurs upDurs )
 
 					downDurs=()
@@ -569,7 +569,7 @@ gen_report() {
 
 	local report
 	printf -v report 'CYVERSE THROUGHPUT REPORT\n'
-	printf -v report '%s\nExecution Time:  %s\n' "$report" "$TEST_TIME"
+	printf -v report '%s\nExecution Time:  %s\n' "$report" "$TestTime"
 	printf -v report '%s\n\n%s\n\n\n%s\n%s' "$report" "$clientReport" "$sumReport" "$runsReport"
 
 	printf '%s' "$report"
@@ -596,7 +596,7 @@ get_irods_version() {
 
 	if [[ -z "$version" ]]
 	then
-		version=$(ienv | sed --quiet 's/.*Release VERSION = \([^,]*\),.*/\1/p')
+		version=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
 	fi
 
 	printf '%s' "$version"
