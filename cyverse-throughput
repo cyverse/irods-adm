@@ -109,9 +109,11 @@ set -o errexit -o nounset -o pipefail
 
 readonly Version=2
 readonly DefaultNumRuns=30
-readonly ExecAbsPath=$(readlink --canonicalize "$0")
-readonly ExecName=$(basename "$ExecAbsPath")
-readonly TestTime="$(date --utc --iso-8601=seconds)"
+
+ExecAbsPath=$(readlink --canonicalize "$0")
+ExecName=$(basename "$ExecAbsPath")
+TestTime="$(date --utc --iso-8601=seconds)"
+readonly ExecAbsPath ExecName TestTime
 
 declare ReportLog
 declare StatusLog
@@ -467,14 +469,18 @@ perform_download() {
 		opts+=( -N "$maxThreads" )
 	fi
 
-	local startTime
-	startTime=$(date --utc --iso-8601=seconds)
+	while true; do
+		local startTime
+		startTime=$(date --utc --iso-8601=seconds)
 
-	local duration rate
-	IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget "${opts[@]}" "$src" "$dest")
+		local duration rate
+		if IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget "${opts[@]}" "$src" "$dest"); then
+			break
+		fi
+	done
 
 	printf 'download %d %s %s %s %s %s\n' \
-	"$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
+		"$run" "$startTime" "$reqSize" "$actSize" "$duration" "$rate"
 }
 
 perform_upload() {
