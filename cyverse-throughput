@@ -110,8 +110,8 @@ set -o errexit -o nounset -o pipefail
 readonly Version=2
 readonly DefaultNumRuns=30
 
-ExecAbsPath=$(readlink --canonicalize "$0")
-ExecName=$(basename "$ExecAbsPath")
+ExecAbsPath="$(readlink --canonicalize "$0")"
+ExecName="$(basename "$ExecAbsPath")"
 TestTime="$(date --utc --iso-8601=seconds)"
 readonly ExecAbsPath ExecName TestTime
 
@@ -176,7 +176,7 @@ map_opts() {
 	shift
 
 	local opts
-	if ! opts=$(fmt_opts "$@")
+	if ! opts="$(fmt_opts "$@")"
 	then
 		return 1
 	fi
@@ -333,13 +333,14 @@ measure_downloads() {
 	local maxThreads="$5"
 
 	local srcObj
-	srcObj=$(setup_download "$reqSize" "$srcColl" "$destDir")
+	srcObj="$(setup_download "$reqSize" "$srcColl" "$destDir")"
 
 	local srcName
-	srcName=$(basename "$srcObj")
+	srcName="$(basename "$srcObj")"
 
 	local actSize
-	actSize=$(iquest '%s' "select DATA_SIZE where COLL_NAME = '$srcColl' and DATA_NAME = '$srcName'")
+	actSize="$(iquest \
+		'%s' "select DATA_SIZE where COLL_NAME = '$srcColl' and DATA_NAME = '$srcName'" )"
 
 	printf 'Beginning %s download measurements\n' "$reqSize" >> "$StatusLog"
 
@@ -366,7 +367,7 @@ setup_download() {
 	local destDir="$3"
 
 	local srcFile
-	if ! srcFile=$(TMPDIR="$destDir" mktemp)
+	if ! srcFile="$(TMPDIR="$destDir" mktemp)"
 	then
 		printf 'Cannot reserve temporary file\n' >&2
 		return 1
@@ -408,10 +409,10 @@ measure_uploads() {
 	local maxThreads="$5"
 
 	local srcFile
-	srcFile=$(setup_uploads "$reqSize" "$srcDir")
+	srcFile="$(setup_uploads "$reqSize" "$srcDir")"
 
 	local actSize
-	actSize=$(stat --format '%s' "$srcFile")
+	actSize="$(stat --format '%s' "$srcFile")"
 
 	printf 'Beginning %s upload measurements\n' "$reqSize" >> "$StatusLog"
 
@@ -438,7 +439,7 @@ setup_uploads() {
 	local srcDir="$2"
 
 	local srcFile
-	if ! srcFile=$(TMPDIR="$srcDir" mktemp)
+	if ! srcFile="$(TMPDIR="$srcDir" mktemp)"
 	then
 		printf 'Cannot reserve temporary file\n' >&2
 		return 1
@@ -471,12 +472,14 @@ perform_download() {
 
 	while true; do
 		local startTime
-		startTime=$(date --utc --iso-8601=seconds)
+		startTime="$(date --utc --iso-8601=seconds)"
 
 		local duration rate
 		if IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iget "${opts[@]}" "$src" "$dest"); then
 			break
 		fi
+
+		rm --force "$dest"
 	done
 
 	printf 'download %d %s %s %s %s %s\n' \
@@ -499,7 +502,7 @@ perform_upload() {
 	fi
 
 	local startTime
-	startTime=$(date --utc --iso-8601=seconds)
+	startTime="$(date --utc --iso-8601=seconds)"
 
 	local duration rate
 	IFS=' |' read -r _ _ _ duration _ _ _ rate _ < <(iput "${opts[@]}" "$src" "$dest")
@@ -519,7 +522,7 @@ gen_report() {
 	fi
 
 	local clientReport
-	clientReport=$(gen_client_report)
+	clientReport="$(gen_client_report)"
 
 	local sumReport
 	printf -v sumReport 'Summary\n\nTransfer Thread Limit:  %s' "$maxThreads"
@@ -542,8 +545,8 @@ gen_report() {
 			then
 				if [[ -n "${downDurs-}" ]] || [[ -n "${upDurs-}" ]]
 				then
-					sumReport=$(append_size_summary \
-						"$sumReport" "$reportSize" "$curSize" downDurs upDurs )
+					sumReport="$(append_size_summary \
+						"$sumReport" "$reportSize" "$curSize" downDurs upDurs )"
 
 					downDurs=()
 					upDurs=()
@@ -571,7 +574,7 @@ gen_report() {
 			'%s %02d   %s   %12s   %14s\n' "$runsReport" "$run" "${startTime%+*}" "$duration" "$rate"
 	done
 
-	sumReport=$(append_size_summary "$sumReport" "$reportSize" "$curSize" downDurs upDurs)
+	sumReport="$(append_size_summary "$sumReport" "$reportSize" "$curSize" downDurs upDurs)"
 
 	local report
 	printf -v report 'CYVERSE THROUGHPUT REPORT\n'
@@ -583,9 +586,9 @@ gen_report() {
 
 gen_client_report() {
 	local irodsVer numCores totMem
-	numCores=$(grep --count --regexp '^processor' /proc/cpuinfo)
-	totMem=$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)
-	irodsVer=$(get_irods_version)
+	numCores="$(grep --count --regexp '^processor' /proc/cpuinfo)"
+	totMem="$(awk '/MemTotal:/ { printf "%s %s", $2, $3 }' /proc/meminfo)"
+	irodsVer="$(get_irods_version)"
 
 	local report
 	printf -v report 'Client Information\n\n'
@@ -598,11 +601,11 @@ gen_client_report() {
 
 get_irods_version() {
 	local version
-	version=$(ienv | sed --quiet 's/.*irods_version - \([0-9.]*\).*/\1/p')
+	version="$(ienv | sed --quiet 's/.*irods_version - \([0-9.]*\).*/\1/p')"
 
 	if [[ -z "$version" ]]
 	then
-		version=$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')
+		version="$(ienv | sed --quiet 's/.*Release Version = \([^,]*\),.*/\1/p')"
 	fi
 
 	printf '%s' "$version"
@@ -620,20 +623,20 @@ append_size_summary() {
 	eval 'upDurations=(${'"$upDurationsVar"'[@]})'
 
 	local geoMeanDownDur geoMeanDownRate geoDevDown
-	geoMeanDownDur=$(compute_geomean "${downDurations[@]}")
-	geoMeanDownRate=$(compute_rate "$size" "$geoMeanDownDur")
-	geoDevDown=$(compute_geodev "$geoMeanDownDur" "${downDurations[@]}")
+	geoMeanDownDur="$(compute_geomean "${downDurations[@]}")"
+	geoMeanDownRate="$(compute_rate "$size" "$geoMeanDownDur")"
+	geoDevDown="$(compute_geodev "$geoMeanDownDur" "${downDurations[@]}")"
 
 	local geoMeanUpDur geoMeanUpRate geoDevUp
-	geoMeanUpDur=$(compute_geomean "${upDurations[@]}")
-	geoMeanUpRate=$(compute_rate "$size" "$geoMeanUpDur")
-	geoDevUp=$(compute_geodev "$geoMeanUpDur" "${upDurations[@]}")
+	geoMeanUpDur="$(compute_geomean "${upDurations[@]}")"
+	geoMeanUpRate="$(compute_rate "$size" "$geoMeanUpDur")"
+	geoDevUp="$(compute_geodev "$geoMeanUpDur" "${upDurations[@]}")"
 
 	local downDurSum downRateSum upDurSum upRateSum
-	downDurSum=$(gen_stat "$geoMeanDownDur" "$geoDevDown")
-	downRateSum=$(gen_stat "$geoMeanDownRate" "$geoDevDown")
-	upDurSum=$(gen_stat "$geoMeanUpDur" "$geoDevUp")
-	upRateSum=$(gen_stat "$geoMeanUpRate" "$geoDevUp")
+	downDurSum="$(gen_stat "$geoMeanDownDur" "$geoDevDown")"
+	downRateSum="$(gen_stat "$geoMeanDownRate" "$geoDevDown")"
+	upDurSum="$(gen_stat "$geoMeanUpDur" "$geoDevUp")"
+	upRateSum="$(gen_stat "$geoMeanUpRate" "$geoDevUp")"
 
 	local summary=
 	printf -v summary '%sFile Size:            %s\n' "$summary" "$repSize"
@@ -650,9 +653,9 @@ gen_stat() {
 	local geoDev="$2"
 
 	local expectedVal likelyLB likelyUB
-	expectedVal=$(awk --assign VAL="$geoMean" 'END { printf "%0.3f", VAL; }' /dev/null)
-	likelyLB=$(compute_low_bound "$geoMean" "$geoDev")
-	likelyUB=$(compute_high_bound "$geoMean" "$geoDev")
+	expectedVal="$(awk --assign VAL="$geoMean" 'END { printf "%0.3f", VAL; }' /dev/null)"
+	likelyLB="$(compute_low_bound "$geoMean" "$geoDev")"
+	likelyUB="$(compute_high_bound "$geoMean" "$geoDev")"
 
 	printf '%s [%s, %s]' "$expectedVal" "$likelyLB" "$likelyUB"
 }
