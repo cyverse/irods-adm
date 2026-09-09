@@ -110,7 +110,7 @@ set -o errexit -o nounset -o pipefail
 readonly Version=2
 readonly DefaultNumRuns=30
 
-ExecAbsPath="$(readlink --canonicalize "$0")"
+ExecAbsPath="$(realpath --canonicalize-missing "$0")"
 ExecName="$(basename "$ExecAbsPath")"
 TestTime="$(date --utc --iso-8601=seconds)"
 readonly ExecAbsPath ExecName TestTime
@@ -296,14 +296,30 @@ clean_up() {
 	printf 'Deleting client directory %s\n' "$clientDir" >> "$StatusLog"
 	rm --force --recursive "$clientDir"
 
-	if ils "$svrColl" &> /dev/null
-	then
-		printf 'Deleting server collection %s\n' "$svrColl" >> "$StatusLog"
-		irm -f -r "$svrColl"
+	printf 'Deleting server collection %s\n' "$svrColl" >> "$StatusLog"
+
+	while ils "$svrColl" &> /dev/null
+	do
+		irm -f -r "$svrColl" &> /dev/null
+
+		local busyCnt
+		busyCnt="$(count_busy_objs "$svrColl")"
+
+		if ((busyCnt > 0))
+		then
+			printf 'Waiting for data objects to be available\n'
+			sleep 10
+		fi
 	fi
 
 	printf 'Finished\n' >> "$StatusLog"
 	return 0
+}
+
+count_busy_objs() {
+	local coll="$1"
+
+	iquest %s "select count(DATA_ID) where COLL_NAME = '$svrColl' and DATA_REPL_STATUS != '1'"
 }
 
 ensure_irods_sess() {
