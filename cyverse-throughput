@@ -110,13 +110,11 @@ set -o errexit -o nounset -o pipefail
 readonly Version=2
 readonly DefaultNumRuns=30
 
-ExecAbsPath="$(realpath --canonicalize-missing "$0")"
-ExecName="$(basename "$ExecAbsPath")"
+ExecName="$(basename "$(realpath --canonicalize-missing "$0")")"
 TestTime="$(date --utc --iso-8601=seconds)"
-readonly ExecAbsPath ExecName TestTime
+readonly ExecName TestTime
 
-declare ReportLog
-declare StatusLog
+declare ReportLog StatusLog
 
 main() {
 	declare -A optMap=(
@@ -156,12 +154,12 @@ main() {
 
 	if [[ -z "${optMap[verbose]}" ]]
 	then
-		StatusLog=/dev/null
+		readonly StatusLog=/dev/null
 	else
-		StatusLog=/dev/stderr
+		readonly StatusLog=/dev/stderr
 	fi
 
-	ReportLog="${optMap[log]}"
+	readonly ReportLog="${optMap[log]}"
 
 	do_test \
 		"${optMap[num-runs]}" \
@@ -310,7 +308,7 @@ clean_up() {
 			printf 'Waiting for data objects to be available\n'
 			sleep 10
 		fi
-	fi
+	done
 
 	printf 'Finished\n' >> "$StatusLog"
 	return 0
