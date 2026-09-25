@@ -282,6 +282,12 @@ replicate() {
 	fi
 
 	printf 'Replicated %s data objects\n' "$totRepl" >&2
+
+	if (( totRepl < totObjs )); then
+		return 1
+	fi
+
+	return 0
 }
 
 finish() {
@@ -382,7 +388,9 @@ mk_time_cond() {
 	if (( age < 0 )); then
 		printf TRUE
 	else
-		local cutoffTS="$(date --date="$(date --iso-8601 --date="$age days ago")" '+0%s')"
+		local cutoffTS
+		cutoffTS="$(date --date="$(date --iso-8601 --date="$age days ago")" '+0%s')"
+
 		printf $'%s < \'%s\'' "$timeCol" "$cutoffTS"
 	fi
 }
@@ -514,8 +522,6 @@ threads_to_min_MiB() {
 	fi
 }
 
-
-
 track_prog() {
 	local cnt="$1"
 	local tot="$2"
@@ -543,6 +549,24 @@ track_prog() {
 	msg="$(mk_prog_msg "$cnt" "$tot" "$subCnt" "$subTot")"
 	printf '%s\n' "$msg" >&2
 	printf '%s' "$cnt"
+}
+
+
+
+clear_msg() {
+	local msg="$1"
+
+	printf '\r%*s\r' ${#msg} ''
+}
+
+mk_prog_msg() {
+	local count="$1"
+	local total="$2"
+	local subCount="$3"
+	local subTotal="$4"
+
+	printf 'cohort: %0*d/%d, all: %0*d/%d' \
+		${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
 }
 
 replicate_threaded() {
@@ -714,22 +738,6 @@ replicate_small_files() {
 	done
 
 	echo "$replCnt"
-}
-
-clear_msg() {
-	local msg="$1"
-
-	printf '\r%*s\r' ${#msg} ''
-}
-
-mk_prog_msg() {
-	local count="$1"
-	local total="$2"
-	local subCount="$3"
-	local subTotal="$4"
-
-	printf 'cohort: %0*d/%d, all: %0*d/%d' \
-		${#subTotal} "$subCount" "$subTotal" ${#total} "$count" "$total"
 }
 
 validate_repl_conds() {
