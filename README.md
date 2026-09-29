@@ -7,6 +7,12 @@ A collection of scripts for administering an iRODS grid
 [`chunk-transfer`](/chunk-transfer/README.md) is a collection of programs for performing chunked 
 data transfers from iRODS to a client.
 
+## Data Commons Migration Notification
+
+[`data-commons-migration-notification`](/data-commons-migration-notification/README.md) is a
+collection of programs for asking the owners of the described community collections whether they
+want a record in the CKAN catalogue, and for sending them the notices.
+
 ## iRODS Sessions
 
 A session is a group of log messages that occurred during a single connection.

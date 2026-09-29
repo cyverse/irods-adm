@@ -1,0 +1,258 @@
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
+# -*- coding: utf-8 -*-
+#
+# © 2026, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""Build the recipient list for the Data Commons to CKAN migration notices.
+
+This program reads a survey of the community-released collections and writes JSON-SEQ to stdout,
+one document per outreach thread, in the form notify-owners consumes. Every count in every notice
+comes from the survey rather than being typed in, so the figures cannot drift from what was
+measured.
+
+It reads three files, none of which are in this repository, because two of them hold measurements
+of a particular point in time and the third holds people's contact information:
+
+    --metadata     JSON object keyed by collection name, each with a 'path' and a 'meta' object
+                   holding that collection's AVUs. Values may be scalars or lists.
+    --publishable  JSON object keyed by collection name, each with 'public' (the number of folders
+                   directly under it that would become datasets) and 'public_titled' (how many of
+                   those carry a title of their own).
+    --contacts     CSV with the header 'collection,username,cn,mail'. One row per collection whose
+                   owner is known. Produce it from resolve-collection-owners piped through
+                   ../user-activity/extract-ldap-user-info, then add the collection column. Rows
+                   may be omitted; see below.
+
+See measurements/README.md for the shape of the two JSON files and a worked example.
+
+A collection with no contacts row gets a record whose 'mail', 'username' and 'full_name' are null.
+notify-owners skips those and lists them, so an incomplete contacts file is the normal case while
+the ACL lookups are still coming in, not an error.
+
+Usage:
+    ./build-recipients --metadata M --publishable P --contacts C [--send-date YYYY-MM-DD]
+"""
+
+import argparse
+import csv
+import json
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+
+# The collections that name the same CyVerse steward, who gets one thread covering all of them.
+_INTERNAL = ['aes', 'geri', 'NCEMS', 'genophenoenvo', 'sweri', 'ofo', 'srp_dmac']
+
+# The collections whose Creator AVU names an organization rather than a person. They are addressed
+# as an institution, because there is nobody to greet by name.
+_INSTITUTION = ['TCIA', 'danforth_center', 'CHEESEHEAD', 'GoreLab', 'PILSBRy', 'BioViz',
+                'soynomics', 'terraref']
+
+# The publishing pipeline recognizes a rights statement only by looking for one of these substrings
+# in it, case sensitively. Anything else publishes as 'License not specified', so its owner has to
+# choose a licence before the collection can be loaded.
+_RECOGNIZED_RIGHTS = ('ODC PDDL', 'CC0')
+
+# Collections whose rights statement is a recognizable licence written in a spelling the pipeline
+# does not match. The owner is asked to confirm the identifier rather than to choose a licence.
+_PROPOSE = {
+    'BioViz': 'ODC-PDDL-1.0',
+    'Grzybowski_MaizeSNPset_2022': 'ODC-PDDL-1.0',
+    'USD_teaching_materials': 'ODC-PDDL-1.0',
+    'TCIA': 'CC-BY-3.0',
+}
+
+# Things about a particular collection that the notice has to mention and that no measurement
+# reports. Each was found by reading that collection's AVUs.
+_NOTES = {
+    'bety_dump': "One tarball directly under the collection root and no folders, so accepting "
+                 "gives an organization page and no dataset pages. Moving the tarball into a "
+                 "folder would make it a dataset.",
+    'TCIA': "All 67 folders arrive with a directory name and an empty description. The largest "
+            "post-migration authoring job of the 20.",
+    'NCEMS': "Already has a CKAN organization and keeps its hourly AVU sync, so its record is not "
+             "handed over: it continues to follow the Data Store.",
+    'PILSBRy': "Rights say image rights sit with each contributing institution, so one licence for "
+               "the collection may not be possible.",
+    'USD_teaching_materials': "Titled as an institutional repository but names one individual "
+                              "creator with no affiliation AVU. Confirm the owner from the ACL.",
+    'CHEESEHEAD': "Carries a leftover placeholder AVU, attribute 'New Attribute' value 'New "
+                  "Value'. Clear it before any run.",
+    'geri': "163 metadata fields; read them before they seed an organization description.",
+}
+
+_REMINDER_DAYS = 30
+_DEADLINE_DAYS = 60
+
+
+def main() -> int:
+    """the entrypoint"""
+
+    args = _parse_args()
+
+    try:
+        metadata = json.loads(Path(args.metadata).read_text(encoding='utf-8'))
+        publishable = json.loads(Path(args.publishable).read_text(encoding='utf-8'))
+        contacts = _read_contacts(args.contacts)
+    except OSError as e:
+        print(f"Cannot read input: {e}", file=sys.stderr)
+        return 1
+    except json.JSONDecodeError as e:
+        print(f"Malformed JSON input: {e}", file=sys.stderr)
+        return 1
+
+    surveyed = [c for c in publishable if c in metadata]
+    unsurveyed = [c for c in publishable if c not in metadata]
+
+    if unsurveyed:
+        print(f"No metadata for, so not notified: {', '.join(unsurveyed)}", file=sys.stderr)
+
+    day1 = date.fromisoformat(args.send_date)
+    window = {
+        'send_date': day1.isoformat(),
+        'reminder_date': (day1 + timedelta(days=_REMINDER_DAYS)).isoformat(),
+        'deadline': (day1 + timedelta(days=_DEADLINE_DAYS)).isoformat(),
+    }
+
+    for rec in _threads(surveyed, metadata, publishable, contacts):
+        rec.update(window)
+        print(json.dumps(rec))
+
+    unresolved = [c for c in surveyed if c not in contacts]
+
+    if unresolved:
+        plural = '' if len(unresolved) == 1 else 's'
+        print(f"No contact yet for {len(unresolved)} collection{plural}: {', '.join(unresolved)}",
+              file=sys.stderr)
+
+    return 0
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--metadata', required=True, metavar='FILE',
+                        help="collection AVUs as JSON, keyed by collection name")
+    parser.add_argument('--publishable', required=True, metavar='FILE',
+                        help="per-collection dataset counts as JSON, keyed by collection name")
+    parser.add_argument('--contacts', required=True, metavar='FILE',
+                        help="CSV of known owners: collection,username,cn,mail")
+    parser.add_argument('--send-date', default=date.today().isoformat(), metavar='YYYY-MM-DD',
+                        help="day 1 of the 60-day window (default: today)")
+
+    return parser.parse_args()
+
+
+def _read_contacts(csv_path: str) -> dict:
+    with open(csv_path, encoding='utf-8', newline='') as contacts_file:
+        rows = [r for r in csv.DictReader(contacts_file) if r.get('mail')]
+
+    return {r['collection']: r for r in rows}
+
+
+def _threads(surveyed: list, metadata: dict, publishable: dict, contacts: dict) -> list:
+    """One record for the steward's collections, then one for each of the others, largest first."""
+
+    def describe(name):
+        return _describe(name, metadata[name], publishable[name])
+
+    recs = []
+    internal = [c for c in _INTERNAL if c in surveyed]
+
+    if internal:
+        # Any one of the steward's collections identifies them, so take the first row there is.
+        steward = next((contacts[c] for c in internal if c in contacts), {})
+        recs.append({
+            'thread': 1,
+            'template': 'internal',
+            'username': steward.get('username'),
+            'full_name': steward.get('cn'),
+            'mail': steward.get('mail'),
+            'cc': [],
+            'subject': "Seven of your Data Commons collections: opt in to a CKAN catalogue record",
+            'collections': [describe(c) for c in internal],
+            'staff_asks': True,
+        })
+
+    others = sorted((c for c in surveyed if c not in _INTERNAL),
+                    key=lambda c: -publishable[c]['public'])
+
+    for thread, name in enumerate(others, len(recs) + 1):
+        collection = describe(name)
+        contact = contacts.get(name, {})
+        institution = name in _INSTITUTION
+        recs.append({
+            'thread': thread,
+            'template': 'external-institution' if institution else 'external-named',
+            'username': contact.get('username'),
+            'full_name': contact.get('cn'),
+            'mail': contact.get('mail'),
+            'cc': [],
+            'subject': _subject(collection['title'] or name, institution),
+            'collections': [collection],
+            'staff_asks': False,
+        })
+
+    return recs
+
+
+def _subject(title: str, institution: bool) -> str:
+    if institution:
+        return f"{title} in the CyVerse Data Commons: who should own its catalogue record?"
+
+    return f"{title} in the CyVerse Data Commons: opt in to a catalogue record"
+
+
+def _describe(name: str, entry: dict, counts: dict) -> dict:
+    meta = entry['meta']
+    public = counts['public']
+    titled = counts['public_titled']
+    rights = '; '.join(_avus(meta, 'Rights'))
+
+    return {
+        'collection': name,
+        'slug': name.lower(),
+        'title': _first_title(meta),
+        'path': entry['path'],
+        'n_datasets': public,
+        'n_titled': titled,
+        'n_untitled': public - titled,
+        'creator': '; '.join(_avus(meta, 'Creator')),
+        'contributors': '; '.join(_avus(meta, 'Contributor')),
+        'licence_action': _licence_action(name, rights),
+        'licence_current': rights,
+        'licence_proposed': _PROPOSE.get(name),
+        'note': _NOTES.get(name),
+    }
+
+
+def _licence_action(name: str, rights: str) -> str:
+    """What the notice has to ask about this collection's licence."""
+
+    if name in _PROPOSE:
+        return 'confirm'
+
+    if any(token in rights for token in _RECOGNIZED_RIGHTS):
+        return 'none'
+
+    return 'decide'
+
+
+def _avus(meta: dict, attribute: str) -> list:
+    values = meta.get(attribute, [])
+    values = values if isinstance(values, list) else [values]
+
+    return [str(v).strip() for v in values if str(v).strip()]
+
+
+def _first_title(meta: dict) -> str:
+    """The first Title AVU verbatim. Titles contain commas, so they must not be split on one."""
+
+    titles = _avus(meta, 'Title')
+
+    return titles[0] if titles else ''
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,253 @@
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
+# -*- coding: utf-8 -*-
+#
+# /// script
+# dependencies = [
+#     "jinja2",
+# ]
+# ///
+#
+# © 2026, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""Data Commons to CKAN migration notices.
+
+This program reads JSON-SEQ from stdin, one document per outreach thread as produced by
+build-recipients, renders each through its Jinja2 template, and sends it. It is modelled on
+../user-activity/account-removal-notification/notify-users. README.md lists where it departs from
+that script and why the shape of this campaign forces each departure.
+
+Records with no 'mail' are skipped and listed rather than treated as malformed input, because most
+owners are unknown until the ACL lookups land, so a partial run is the normal case rather than an
+error. Each send appends to sent.jsonseq, since every recipient carries a reminder date and a
+deadline that have to be counted from when they were actually written to.
+
+Required fields per record: thread, template, subject, mail, collections. See build-recipients.
+
+It refuses to send while the signature is still a placeholder. Pass --sender-name and
+--sender-title, or set SENDER_NAME and SENDER_TITLE.
+
+Environment variables:
+    SMTP_SERVER: SMTP server hostname (default: localhost)
+    SMTP_PORT:   SMTP server port (default: 25)
+
+Usage:
+    ./build-recipients ... | ./notify-owners --dry-run --out ./preview
+    ./build-recipients ... | ./notify-owners --sender-name 'Your Name' --sender-title 'Your Title'
+"""
+
+import argparse
+import getpass
+import json
+import os
+import re
+import socket
+import sys
+import time
+from datetime import datetime, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from pathlib import Path
+from smtplib import SMTP, SMTPException
+from typing import Optional, TextIO
+
+from jinja2 import Environment, FileSystemLoader, TemplateError
+
+from flatten_html import flatten
+
+REPLY_ADDR = "support@cyverse.org (CyVerse Support)"
+ENVELOPE_SENDER = "support@cyverse.org"
+SEND_DELAY = 3
+TEMPLATE_DIR = Path(__file__).parent / "templates"
+LOG_PATH = Path(__file__).parent / "sent.jsonseq"
+
+
+def main() -> None:
+    """Entrypoint."""
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--dry-run", action="store_true",
+                    help="render to --out instead of sending; sends nothing")
+    ap.add_argument("--out", default="./preview", help="directory for --dry-run output")
+    ap.add_argument("--template-filter", metavar="NAME",
+                    help="only process records whose template is NAME")
+    ap.add_argument("--thread", type=int, metavar="N", help="only process thread N")
+    ap.add_argument("--preview-all", action="store_true",
+                    help="with --dry-run, also render records whose owner is not yet known")
+    ap.add_argument("--sender-name", default=os.getenv("SENDER_NAME", "<YOUR NAME>"))
+    ap.add_argument("--sender-title", default=os.getenv("SENDER_TITLE", "<YOUR TITLE>"))
+    args = ap.parse_args()
+
+    if not args.dry_run and "<" in args.sender_name + args.sender_title:
+        sys.exit("Refusing to send with a placeholder signature. "
+                 "Pass --sender-name and --sender-title.")
+
+    try:
+        env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), autoescape=True)
+        from_addr = f"{getpass.getuser()}@{socket.getfqdn()} (CyVerse)"
+
+        sys.exit(0 if process_json_seq(sys.stdin, env, from_addr, args) else 1)
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user", file=sys.stderr)
+    except (FileNotFoundError, PermissionError) as err:
+        print(f"Fatal error: {err}", file=sys.stderr)
+    except TemplateError as err:
+        print(f"Template error: {err}", file=sys.stderr)
+
+    sys.exit(1)
+
+
+def process_json_seq(rec_seq: TextIO, env: Environment, from_addr: str, args) -> bool:
+    """Read JSON-SEQ from stdin and process each document. True if nothing went wrong."""
+    sent = skipped = errors = 0
+    unresolved = []
+    out_dir = Path(args.out)
+
+    if args.dry_run:
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+    for line_num, line in enumerate(rec_seq, 1):
+        line = line.strip()
+
+        if not line:
+            continue
+
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError as err:
+            print(f"Line {line_num}: invalid JSON - {err}", file=sys.stderr)
+            errors += 1
+            continue
+
+        if args.template_filter and rec.get("template") != args.template_filter:
+            continue
+
+        if args.thread and rec.get("thread") != args.thread:
+            continue
+
+        problem = validate(rec)
+
+        if problem:
+            print(f"Line {line_num}: {problem}", file=sys.stderr)
+            errors += 1
+            continue
+
+        if not rec.get("mail"):
+            unresolved.append(f"thread {rec['thread']} ({label(rec)})")
+
+            if not (args.dry_run and args.preview_all):
+                skipped += 1
+                continue
+
+            rec["mail"] = "owner-not-yet-resolved@example.invalid"
+
+        try:
+            html = env.get_template(f"{rec['template']}-msg.html.j2").render(
+                sender_name=args.sender_name, sender_title=args.sender_title, **rec)
+        except TemplateError as err:
+            print(f"Line {line_num}: render failed - {err}", file=sys.stderr)
+            errors += 1
+            continue
+
+        msg = build_message(rec, html, from_addr)
+
+        if args.dry_run:
+            path = out_dir / f"{rec['thread']:02d}-{label(rec)}.eml"
+            path.write_text(msg.as_string())
+            print(f"Rendered {path}", file=sys.stderr)
+            sent += 1
+            continue
+
+        if send(msg, rec["mail"], rec.get("cc", [])):
+            log(rec)
+            sent += 1
+        else:
+            errors += 1
+
+        time.sleep(SEND_DELAY)
+
+    verb = "rendered" if args.dry_run else "sent"
+    print(f"Processing complete: {sent} {verb}, {skipped} skipped, {errors} errors",
+          file=sys.stderr)
+
+    if unresolved:
+        print("No address yet for: " + ", ".join(unresolved), file=sys.stderr)
+
+    return errors == 0
+
+
+def label(rec: dict) -> str:
+    """Short filename-safe name for a thread: its collection, or 'internal' when it spans many."""
+    if len(rec["collections"]) > 1:
+        return rec["template"]
+
+    return rec["collections"][0]["collection"]
+
+
+def validate(rec: dict) -> Optional[str]:
+    """Return a complaint about the record, or None if it is usable."""
+    for field in ("thread", "template", "subject", "collections"):
+        if not rec.get(field):
+            return f"missing '{field}' field"
+
+    if not isinstance(rec["collections"], list):
+        return "'collections' is not a list"
+
+    if rec.get("mail") and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", rec["mail"]):
+        return f"'mail' is not an address: {rec['mail']!r}"
+
+    return None
+
+
+def build_message(rec: dict, html: str, from_addr: str) -> MIMEMultipart:
+    """Assemble a multipart/alternative message with a text part beside the HTML."""
+    msg = MIMEMultipart("alternative")
+    msg["From"] = from_addr
+    msg["To"] = rec["mail"]
+
+    if rec.get("cc"):
+        msg["Cc"] = ", ".join(rec["cc"])
+
+    msg["Reply-To"] = REPLY_ADDR
+    msg["Subject"] = rec["subject"]
+    msg["List-Unsubscribe"] = "<mailto:support@cyverse.org?subject=unsubscribe>"
+    msg.attach(MIMEText(flatten(html), "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    return msg
+
+
+def send(msg: MIMEMultipart, to_addr: str, cc: list) -> bool:
+    """Hand the message to the SMTP server. True on success."""
+    server = os.getenv("SMTP_SERVER", "localhost")
+    port = int(os.getenv("SMTP_PORT", "25"))
+
+    try:
+        with SMTP(server, port) as smtp:
+            smtp.sendmail(ENVELOPE_SENDER, [to_addr] + list(cc), msg.as_string())
+
+        print(f"Email sent successfully to {to_addr}", file=sys.stderr)
+        return True
+    except (SMTPException, ConnectionError, OSError) as err:
+        print(f"Failed to send email to {to_addr}: {err}", file=sys.stderr)
+        return False
+
+
+def log(rec: dict) -> None:
+    """Append one line recording what was sent to whom, and the dates it starts running."""
+    entry = {
+        "sent_at": datetime.now(timezone.utc).isoformat(),
+        "thread": rec["thread"],
+        "mail": rec["mail"],
+        "cc": rec.get("cc", []),
+        "collections": [c["collection"] for c in rec["collections"]],
+        "reminder_date": rec.get("reminder_date"),
+        "deadline": rec.get("deadline"),
+    }
+
+    with open(LOG_PATH, "a", encoding="utf-8") as out:
+        out.write(json.dumps(entry) + "\n")
+
+
+if __name__ == "__main__":
+    main()

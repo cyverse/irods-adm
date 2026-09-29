@@ -1,0 +1,38 @@
+{% extends "_layout.html.j2" %}
+{% import "_parts.html.j2" as t %}
+{% set c = collections[0] %}
+{% block content %}
+<p style="margin:0 0 14px">{% if full_name %}Hi {{ full_name.split(' ')[0] }}.{% else %}Hello,{% endif %}</p>
+
+<p style="margin:0 0 14px">Thanks, that is a yes for <code>{{ c.collection }}</code>.</p>
+
+<p style="margin:0 0 14px">One thing has to happen before I can do anything: each person you named
+has to visit <a href="https://dc.cyverse.org">dc.cyverse.org</a> and sign in once through CyVerse
+SSO. The catalogue has no local passwords and no account exists until first login, so until they
+have signed in there is no user for me to add as an administrator.</p>
+
+<p style="margin:0 0 8px">Once they have, reply here and I will:</p>
+<ol style="margin:0 0 14px;padding-left:22px">
+<li style="margin:0 0 6px">create the organization
+<a href="https://dc.cyverse.org/organization/{{ c.slug }}">dc.cyverse.org/organization/{{ c.slug }}</a>
+from your collection metadata;</li>
+<li style="margin:0 0 6px">add your people as admins;</li>
+<li style="margin:0 0 6px">run the load once, creating {{ c.n_datasets }}
+dataset{{ '' if c.n_datasets == 1 else 's' }}, one per folder directly under
+<code>{{ c.collection }}</code>;</li>
+<li style="margin:0 0 6px">send you the landing pages so you can check every resource link
+resolves.</li>
+</ol>
+
+<p style="margin:0 0 14px">Reckon on under an hour from your confirmation.</p>
+
+{{ t.handover(c) }}
+
+{%- if c.n_untitled %}
+<p style="margin:0 0 14px">Most of what you will want to do first is the dataset descriptions:
+{{ c.n_untitled }} of your {{ c.n_datasets }} datasets arrive with a directory name and an empty
+description, because the folders carry no metadata of their own.</p>
+{%- endif %}
+
+{{ t.signature(sender_name, sender_title) }}
+{% endblock %}

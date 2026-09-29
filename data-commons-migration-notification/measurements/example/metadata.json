@@ -1,0 +1,25 @@
+{
+  "example_soil_survey": {
+    "path": "/iplant/home/shared/example_soil_survey",
+    "meta": {
+      "Title": "Example Soil Survey, 2019 to 2024",
+      "Creator": "Ann Example",
+      "Contributor": ["Ann Example", "Bo Example"],
+      "Rights": "This work is dedicated to the public domain under ODC PDDL 1.0.",
+      "Subject": "soil",
+      "Description": "An invented collection used to exercise the notice pipeline.",
+      "Publisher": "CyVerse"
+    }
+  },
+  "example_image_atlas": {
+    "path": "/iplant/home/shared/example_image_atlas",
+    "meta": {
+      "Title": "Example Image Atlas",
+      "Creator": "Example University",
+      "Rights": "Copyright 2024 Example University. All rights reserved.",
+      "Subject": "imaging",
+      "Description": "An invented collection whose rights statement cannot be mapped to a licence.",
+      "Publisher": "CyVerse"
+    }
+  }
+}

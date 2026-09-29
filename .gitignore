@@ -1,3 +1,10 @@
 .venv
 .vscode
 data-usage-report/*
+
+# Campaign working files: measured survey, resolved addresses, rendered notices, send log.
+data-commons-migration-notification/preview/
+data-commons-migration-notification/*.csv
+data-commons-migration-notification/*.json
+data-commons-migration-notification/*.jsonseq
+__pycache__/

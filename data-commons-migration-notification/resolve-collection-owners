@@ -1,0 +1,107 @@
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
+# -*- coding: utf-8 -*-
+#
+# /// script
+# dependencies = [
+#     "python-irodsclient",
+# ]
+# ///
+#
+# © 2026, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""List the owners of the community collections being migrated to CKAN.
+
+This program reads collection names on stdin, one per line, and looks up the own-access users on
+the corresponding collection under /iplant/home/shared. This is the step the legacy Data Commons
+cannot do: its api_stat endpoint reports permission as a bare "read" and exposes no ownership at
+all, so the ACL has to come from iRODS.
+
+It writes a one-column CSV to stdout with the header 'username', which is what
+../user-activity/extract-ldap-user-info consumes, so the whole chain is:
+
+    ./collections | ./resolve-collection-owners | ../user-activity/extract-ldap-user-info
+
+Users of type rodsadmin and the service accounts in SKIP are left out: they own most of
+/iplant/home/shared by default and are never the person to write to.
+
+It assumes the iRODS environment has been initialised, with IRODS_ENVIRONMENT_FILE holding the
+path to the environment file, defaulting to ~/.irods/irods_environment.json. It requires
+python-irodsclient and a rodsadmin session.
+"""
+
+import argparse
+import csv
+import sys
+from os import environ, path
+
+from irods.access import iRODSAccess  # pylint: disable=unused-import  # noqa: F401
+from irods.exception import CollectionDoesNotExist
+from irods.session import iRODSSession, NonAnonymousLoginWithoutPassword
+
+_BASE = "/iplant/home/shared"
+_DEFAULT_IRODS_ENV_FILE = "~/.irods/irods_environment.json"
+_OWN = "own"
+
+# Service and administrative accounts that own shared collections by default.
+SKIP = frozenset({"rods", "rodsadmin", "ipcservices", "ipc_admin", "anonymous", "public",
+                  "de-irods", "shared"})
+
+
+def main() -> int:
+    """Entrypoint."""
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--base", default=_BASE, help=f"parent collection (default: {_BASE})")
+    ap.add_argument("--all-permissions", action="store_true",
+                    help="report every ACL entry, not just own-access ones")
+    args = ap.parse_args()
+
+    env_file = path.expanduser(environ.get("IRODS_ENVIRONMENT_FILE", _DEFAULT_IRODS_ENV_FILE))
+    names = [ln.strip() for ln in sys.stdin if ln.strip()]
+    writer = csv.DictWriter(sys.stdout, ["username"])
+    writer.writeheader()
+    seen = set()
+    missing = []
+
+    try:
+        with iRODSSession(irods_env_file=env_file) as irods:
+            for name in names:
+                target = f"{args.base}/{name}"
+
+                try:
+                    coll = irods.collections.get(target)
+                except CollectionDoesNotExist:
+                    missing.append(target)
+                    continue
+
+                owners = [
+                    acl.user_name for acl in irods.acls.get(coll)
+                    if (args.all_permissions or acl.access_name.startswith(_OWN))
+                    and acl.user_name not in SKIP
+                ]
+
+                if not owners:
+                    print(f"{target}: no owner outside the service accounts", file=sys.stderr)
+
+                for owner in owners:
+                    print(f"{target}: {owner}", file=sys.stderr)
+
+                    if owner not in seen:
+                        seen.add(owner)
+                        writer.writerow({"username": owner})
+    except NonAnonymousLoginWithoutPassword as err:
+        print(err, file=sys.stderr)
+        return 1
+
+    for target in missing:
+        print(f"Collection not found: {target}", file=sys.stderr)
+
+    print(f"{len(seen)} distinct owners across {len(names) - len(missing)} collections",
+          file=sys.stderr)
+
+    return 1 if missing else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

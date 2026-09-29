@@ -1,0 +1,33 @@
+{% extends "_layout.html.j2" %}
+{% import "_parts.html.j2" as t %}
+{% set c = collections[0] %}
+{% block content %}
+<p style="margin:0 0 14px">Dear {{ full_name or c.creator.split(';')[0].split(',')[0] }},</p>
+
+<p style="margin:0 0 14px">You are listed as the creator of <b>{{ c.title }}</b>, held in the CyVerse
+Data Store at <code>{{ c.path }}</code>. We are moving the described community collections out of the
+legacy Data Commons into our CKAN catalogue at <a href="https://dc.cyverse.org">dc.cyverse.org</a>,
+and yours is one of 20 that qualify. I am writing to ask whether you want it included.</p>
+
+<p style="margin:0 0 14px"><b>This is opt-in and there is no default.</b> If I do not hear from you,
+<code>{{ c.collection }}</code> is not published. It stays exactly as it is today: readable in the
+Data Store, listed in the legacy Data Commons, absent from the new catalogue.</p>
+
+{{ t.unchanged() }}
+{{ t.mapping(c) }}
+{{ t.arrives(c) }}
+
+<p style="margin:0 0 8px"><b>What I need:</b></p>
+<ol style="margin:0 0 14px;padding-left:22px">
+<li style="margin:0 0 8px">Yes or no.</li>
+{{ t.admins() }}
+{{ t.licence(c) }}
+</ol>
+
+{{ t.handover(c) }}
+
+<p style="margin:0 0 14px">The deadline is <b>{{ deadline }}</b>. I will send one reminder on
+{{ reminder_date }}. Happy to get on a call instead if that is easier.</p>
+
+{{ t.signature(sender_name, sender_title) }}
+{% endblock %}

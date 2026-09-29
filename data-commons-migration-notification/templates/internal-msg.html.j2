@@ -1,0 +1,93 @@
+{% extends "_layout.html.j2" %}
+{% import "_parts.html.j2" as t %}
+{% block content %}
+<p style="margin:0 0 14px">{% if full_name %}Hi {{ full_name.split(' ')[0] }}.{% else %}Hello,{% endif %}</p>
+
+<p style="margin:0 0 14px">We are doing a one-time migration of the described community collections
+out of the legacy Data Commons and into the CKAN catalogue at
+<a href="https://dc.cyverse.org">dc.cyverse.org</a>. Of the 103 collections under
+<code>/iplant/home/shared</code>, 20 carry full descriptive metadata, and you are named as creator or
+contributor on seven of them:</p>
+
+{{ t.counts(collections) }}
+
+<p style="margin:0 0 14px"><b>This is opt-in.</b> If you do not reply, none of these are published.
+They stay exactly as they are today: readable in the Data Store, listed in the legacy Data Commons,
+absent from the catalogue.</p>
+
+{{ t.unchanged() }}
+
+<p style="margin:0 0 14px"><b>The mapping</b>, fixed for all 20: the collection becomes a CKAN
+organization, each folder directly under it becomes a dataset, and the files and folders inside a
+dataset become its resources, each linking to its anonymous WebDAV URL. Anything deeper is browsable
+over WebDAV but is not a catalogue entry, and a loose file directly under a collection is not
+published at all.</p>
+
+<p style="margin:0 0 14px"><b>What arrives.</b> Each organization gets its collection's title,
+creator, description, subject, rights and publisher. The dataset level is thinner: across all 20
+collections only 7 folders carry a title of their own, so most datasets arrive named after their
+directory with an empty description. Filling those in is each organization's own work in CKAN.</p>
+
+<p style="margin:0 0 8px"><b>What I need from you:</b></p>
+<ol style="margin:0 0 14px;padding-left:22px">
+<li style="margin:0 0 8px">Accept or decline, per collection. Partial is fine.</li>
+{{ t.admins() }}
+{%- set undecided = collections | selectattr('licence_action', 'equalto', 'decide') | list %}
+{%- if undecided %}
+<li style="margin:0 0 8px">A licence for
+{% for c in undecided %}<code>{{ c.collection }}</code>{% if not loop.last %} and {% endif %}{% endfor %},
+in a form the catalogue can record: CC-BY-4.0, CC0-1.0, ODC-PDDL-1.0 or similar. Both rights
+statements are currently free text that cannot be mapped, so the pages would read
+<i>License not specified</i>:
+<ul style="margin:6px 0;padding-left:20px">
+{%- for c in undecided %}
+<li style="margin:0 0 4px"><code>{{ c.collection }}</code> &mdash;
+&ldquo;{{ c.licence_current|truncate(150) }}&rdquo;</li>
+{%- endfor %}
+</ul>
+Tell me the licences and I will write them into the Data Store metadata rather than typing them into
+the catalogue, so the values survive.</li>
+{%- endif %}
+</ol>
+
+<p style="margin:0 0 14px"><b>After the load</b>, six of these hand over: the migration copies the
+iRODS metadata once, and from then on the catalogue record is the admins' to edit in CKAN, with
+iRODS changes no longer flowing into it. NCEMS is the exception, staying on the hourly sync, so for
+NCEMS you keep editing in the Data Store.</p>
+
+{% if staff_asks -%}
+<p style="margin:0 0 8px">Two things I need from you as staff, unrelated to your own collections:</p>
+<ul style="margin:0 0 14px;padding-left:22px">
+<li style="margin:0 0 8px">Owner lookups on 11 collections I have no contact for, and a twelfth
+(<code>terraref</code>) if you cannot say offhand who owns it. The legacy Data Commons
+<code>api_stat</code> endpoint exposes no ownership at all, so I need the iRODS ACLs. I have a script
+following the <code>irods-adm/user-activity</code> pattern that reads the ACL owners and pipes them
+through <code>extract-ldap-user-info</code>; it needs a rodsadmin session and campus network access
+to <code>ldap.iplantcollaborative.org</code>, which is why I am asking you rather than running it.</li>
+<li style="margin:0 0 8px">Confirmation of who is currently in the <code>cyverse</code>,
+<code>esiil</code> and <code>ncems</code> organizations in CKAN. Anonymous callers get an
+authorization error on <code>member_list</code>.</li>
+</ul>
+
+<p style="margin:0 0 8px">A few metadata cleanups before the first run, since these values become
+the organization pages:</p>
+<ul style="margin:0 0 14px;padding-left:22px">
+<li style="margin:0 0 6px"><code>NCEMS</code> and <code>genophenoenvo</code> each have a single
+<code>Title</code> AVU that reads as a primary title and an alternate title run together with a
+comma. NCEMS's is &ldquo;National Synthesis Center for Emergence in the Molecular and Cellular
+Sciences (NCEMS), NSF National Synthesis Center for Emergence in the Molecular and Cellular Sciences
+(NCEMS) Data Repository&rdquo;. Whatever is in that field becomes the organization title verbatim, so
+it is worth splitting into a title and an alternate title first.</li>
+<li style="margin:0 0 6px"><code>CHEESEHEAD</code> carries a placeholder AVU literally named
+&ldquo;New Attribute&rdquo; with value &ldquo;New Value&rdquo;. It is not one of yours, but it is on
+the same run.</li>
+<li style="margin:0 0 6px"><code>geri</code> has 163 metadata fields that should get a read before
+they seed an organization description.</li>
+</ul>
+{%- endif %}
+
+<p style="margin:0 0 14px">The deadline is <b>{{ deadline }}</b>, 60 days out. I will send one
+reminder on {{ reminder_date }}. After that the unanswered collections drop out of scope.</p>
+
+{{ t.signature(sender_name, sender_title) }}
+{% endblock %}

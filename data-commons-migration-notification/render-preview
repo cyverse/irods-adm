@@ -1,0 +1,79 @@
+#!/usr/bin/env --split-string=uv --quiet run --script  # pylint: disable=invalid-name
+# -*- coding: utf-8 -*-
+#
+# /// script
+# dependencies = [
+#     "jinja2",
+# ]
+# ///
+#
+# © 2026, The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
+
+"""Render the migration notices to files. Sends nothing and opens no socket.
+
+This program reads the JSON-SEQ recipient list produced by build-recipients on stdin and writes,
+per thread, the HTML body and the plain-text alternative that notify-owners would attach beside it.
+It imports no smtplib and opens no socket, so it is the safe way to read a campaign before any of
+it goes out. Use notify-owners once the addresses are filled in and the notices are signed off.
+
+Usage:
+    ./build-recipients ... | ./render-preview --out ./preview
+    ./build-recipients ... | ./render-preview --stage reminder --out ./preview
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader
+
+from flatten_html import flatten
+
+HERE = Path(__file__).parent
+
+
+def main() -> int:
+    """Entrypoint."""
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--out", default="./preview")
+    ap.add_argument("--sender-name", default="<YOUR NAME>")
+    ap.add_argument("--sender-title", default="<YOUR TITLE>")
+    ap.add_argument("--stage", choices=("notice", "reminder", "acceptance"), default="notice",
+                    help="which message in the sequence to render (default: the first notice)")
+    args = ap.parse_args()
+
+    env = Environment(loader=FileSystemLoader(HERE / "templates"), autoescape=True)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    count = 0
+
+    for line in sys.stdin:
+        if not line.strip():
+            continue
+
+        rec = json.loads(line)
+        name = rec["template"] if len(rec["collections"]) > 1 \
+            else rec["collections"][0]["collection"]
+        template = rec["template"] if args.stage == "notice" else args.stage
+        suffix = "" if args.stage == "notice" else f"-{args.stage}"
+        stem = out / f"{rec['thread']:02d}-{name}{suffix}"
+
+        html = env.get_template(f"{template}-msg.html.j2").render(
+            sender_name=args.sender_name, sender_title=args.sender_title, **rec)
+
+        stem.with_suffix(".html").write_text(html)
+        stem.with_suffix(".txt").write_text(
+            f"To:      {rec.get('mail') or '(owner not yet resolved)'}\n"
+            f"Subject: {rec['subject']}\n\n{flatten(html)}")
+        print(f"Rendered {stem.name}.html and .txt", file=sys.stderr)
+        count += 1
+
+    print(f"{count} notices rendered to {out}/", file=sys.stderr)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

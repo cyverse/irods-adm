@@ -1,0 +1,33 @@
+{% extends "_layout.html.j2" %}
+{% import "_parts.html.j2" as t %}
+{% set c = collections[0] %}
+{% block content %}
+<p style="margin:0 0 14px">Hello,</p>
+
+<p style="margin:0 0 14px"><b>{{ c.title }}</b> is held in the CyVerse Data Store at
+<code>{{ c.path }}</code> and is credited to {{ c.creator }}, with no individual named in its
+metadata. We are moving the described community collections out of the legacy Data Commons into our
+CKAN catalogue at <a href="https://dc.cyverse.org">dc.cyverse.org</a>, and this collection is one of
+20 that qualify. Before anything happens I need to reach whoever is responsible for it. If that is
+not you, I would be grateful for a forward or a name.</p>
+
+{{ t.unchanged() }}
+{{ t.mapping(c) }}
+{{ t.arrives(c) }}
+
+<p style="margin:0 0 8px"><b>What I need:</b></p>
+<ol style="margin:0 0 14px;padding-left:22px">
+<li style="margin:0 0 8px">Confirmation that you are the right contact, or a pointer to who is.</li>
+<li style="margin:0 0 8px">Whether <code>{{ c.collection }}</code> should be in the catalogue at all.
+This is opt-in: no reply means it is not published, and it stays exactly where it is today.</li>
+{{ t.admins() }}
+{{ t.licence(c) }}
+</ol>
+
+{{ t.handover(c) }}
+
+<p style="margin:0 0 14px">The deadline is <b>{{ deadline }}</b>, with one reminder on
+{{ reminder_date }}.</p>
+
+{{ t.signature(sender_name, sender_title) }}
+{% endblock %}

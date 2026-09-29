@@ -1,0 +1,91 @@
+{#- Shared blocks for the Data Commons migration notices. Inline styles only: mail clients
+    strip <style>, so every rule has to travel with its element. -#}
+
+{%- macro p() -%}<p style="margin:0 0 14px">{% endmacro %}
+
+{%- macro counts(collections) -%}
+<table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;font-size:14px">
+{%- for c in collections %}
+  <tr>
+    <td style="padding:3px 16px 3px 0;font-family:monospace">{{ c.collection }}</td>
+    <td style="padding:3px 16px 3px 0">{{ c.title }}</td>
+    <td style="padding:3px 0;text-align:right;white-space:nowrap">
+      {{ c.n_datasets }} dataset{{ '' if c.n_datasets == 1 else 's' }}</td>
+  </tr>
+{%- endfor %}
+</table>
+{%- endmacro %}
+
+{%- macro unchanged() -%}
+<p style="margin:0 0 14px"><b>What would not change.</b> No file is copied or moved. No path
+changes. No permission changes. Your existing download links and the legacy Data Commons browse
+URL keep working. The catalogue page links to the same anonymous WebDAV URLs that serve the data
+now.</p>
+{%- endmacro %}
+
+{%- macro mapping(c) -%}
+<p style="margin:0 0 8px"><b>What you would get.</b> An organization page at
+<a href="https://dc.cyverse.org/organization/{{ c.slug }}">dc.cyverse.org/organization/{{ c.slug }}</a>,
+and one dataset page per folder directly under <code>{{ c.path }}</code>
+{%- if c.n_datasets %}, {{ c.n_datasets }} of them{% endif %}. The mapping is fixed: the collection
+becomes the organization, each folder directly under it becomes a dataset, and the files and folders
+inside a dataset become its resources. Anything deeper stays browsable over WebDAV without its own
+catalogue entry, and a loose file sitting directly at the top of the collection is not published.</p>
+{%- endmacro %}
+
+{%- macro arrives(c) -%}
+{%- if c.n_datasets == 0 -%}
+<p style="margin:0 0 14px"><b>Worth knowing before you answer.</b> {{ c.note }} So accepting would
+give you a described organization page and nothing under it until that changes. It is a Data Store
+change on your side, not a catalogue one.</p>
+{%- elif c.n_untitled -%}
+<p style="margin:0 0 14px"><b>Being straight about what arrives.</b> The organization page is seeded
+from your collection-level metadata, which is complete. The dataset pages are not.
+{% if c.n_titled %}Only {{ c.n_titled }} of your {{ c.n_datasets }} folders carries a title or
+description of its own{% else %}None of your {{ c.n_datasets }} folders carries a title or
+description of its own{% endif %}, so {{ c.n_untitled }} of the dataset pages would arrive named
+after the directory with an empty description. Writing those is real work and only your team can do it. That is
+the main thing to weigh.</p>
+{%- endif -%}
+{%- endmacro %}
+
+{%- macro admins() -%}
+<li style="margin:0 0 8px">One or two people to administer the organization, with their email
+addresses. Each has to sign in once at <a href="https://dc.cyverse.org">dc.cyverse.org</a> through
+CyVerse SSO before I can add them: the catalogue has no local passwords, and no account exists until
+first login.</li>
+{%- endmacro %}
+
+{%- macro licence(c) -%}
+{%- if c.licence_action == 'decide' -%}
+<li style="margin:0 0 8px">A licence we can record in machine-readable form, for example
+CC-BY-4.0, CC0-1.0 or ODC-PDDL-1.0. Your rights statement is currently free text
+&mdash; &ldquo;{{ c.licence_current|truncate(180) }}&rdquo; &mdash; which the catalogue cannot map, so
+the page would read <i>License not specified</i>. The statement itself stays on the page either way.
+Tell me the licence and I will write it into the Data Store metadata rather than typing it into the
+catalogue, so the value survives.</li>
+{%- elif c.licence_action == 'confirm' -%}
+<li style="margin:0 0 8px">Confirmation on the licence. Your rights read
+&ldquo;{{ c.licence_current|truncate(140) }}&rdquo;, which we would record as
+<code>{{ c.licence_proposed }}</code>. Correct me if that is wrong.</li>
+{%- endif -%}
+{%- endmacro %}
+
+{%- macro handover(c) -%}
+{%- if c.collection == 'NCEMS' -%}
+<p style="margin:0 0 14px"><b>After the load.</b> NCEMS is the exception among these: it already has
+an organization and stays on the hourly metadata sync, so you keep editing in the Data Store and the
+catalogue follows.</p>
+{%- else -%}
+<p style="margin:0 0 14px"><b>After the load.</b> The migration copies your Data Store metadata once.
+From then on the catalogue record belongs to your admins and is edited in CKAN; changes to the iRODS
+metadata no longer flow into it. Rolling back is cheap if you change your mind, because nothing was
+ever moved: the catalogue entries are deleted and your data is untouched.</p>
+{%- endif -%}
+{%- endmacro %}
+
+{%- macro signature(sender_name, sender_title) -%}
+<p style="margin:0">{{ sender_name }}<br/>
+{{ sender_title }}<br/>
+University of Arizona</p>
+{%- endmacro %}

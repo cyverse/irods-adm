@@ -1,0 +1,30 @@
+{% extends "_layout.html.j2" %}
+{% import "_parts.html.j2" as t %}
+{% set c = collections[0] %}
+{% block content %}
+<p style="margin:0 0 14px">{% if full_name %}Hi {{ full_name.split(' ')[0] }}.{% else %}Hello,{% endif %}</p>
+
+<p style="margin:0 0 14px">Following up on the note below about <b>{{ c.title }}</b> in the CyVerse
+Data Commons.</p>
+
+<p style="margin:0 0 14px"><b>Short version: if you do nothing, nothing happens.</b>
+<code>{{ c.collection }}</code> will not be added to
+<a href="https://dc.cyverse.org">dc.cyverse.org</a> and will stay as it is in the Data Store and the
+legacy Data Commons. No data moves either way.</p>
+
+<p style="margin:0 0 8px">If you do want a catalogue record, I need three things by
+<b>{{ deadline }}</b>:</p>
+<ol style="margin:0 0 14px;padding-left:22px">
+<li style="margin:0 0 8px">A yes.</li>
+{{ t.admins() }}
+{%- if c.licence_action == 'none' %}
+<li style="margin:0 0 8px">Nothing else. Your licence is already machine-readable.</li>
+{%- else %}
+{{ t.licence(c) }}
+{%- endif %}
+</ol>
+
+<p style="margin:0 0 14px">This is the only reminder I will send.</p>
+
+{{ t.signature(sender_name, sender_title) }}
+{% endblock %}
