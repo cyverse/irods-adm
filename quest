@@ -38,7 +38,7 @@ main() {
 	local query
 	query="$(cat)"
 
-	iquest --no-page "$fmt"  "${query//$'\t'/ }" | filter_no_results
+	iquest --no-page "$fmt" "${query//$'\t'/ }" | filter_no_results
 }
 
 main "$@"
