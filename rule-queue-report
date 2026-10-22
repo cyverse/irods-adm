@@ -28,9 +28,12 @@
 #
 # 2 Running Rules
 #
-# Sched Hour    User       Rule Id   REI Id     Rule
-# 2021/01/26T02 sriram     698577101 1078121923 _syncReplicas
-# 2021/01/26T08 sriram     699269568 2119481675 _syncReplicas
+# Sched Hour    User       Rule Id   Rule
+# 2021/01/26T02 sriram     698577101 _syncReplicas
+# 2021/01/26T08 sriram     699269568 _syncReplicas
+#
+# © 2026 The Arizona Board of Regents on behalf of The University of Arizona.
+# For license information, see https://cyverse.org/license.
 
 set -o errexit -o nounset -o pipefail
 
@@ -47,20 +50,18 @@ set -o errexit -o nounset -o pipefail
 #  each pair is separated by a line feed. The sequence of keys are the
 #  following.
 #
-#  RULE_EXEC_ID             the rule execution Id
-#  RULE_EXEC_REI_FILE_PATH  the absolute path to the REI file on the rule engine
-#                           host
-#  RULE_EXEC_STATUS         the current status of the rule execution, the only
-#                           value of interest is "RUNNING", which means the
-#                           rule is currently being executed
-#  RULE_EXEC_TIME           the local time when the rule execution is schedule
-#                           in the form "<YYYY>/<MM>/<DD>T<hh>" where <YYYY> is
-#                           the four digit Gregorian year, <MM> is the two digit
-#                           month number, <DD> is the two digit day of the
-#                           month, and <hh> is the two digit 24-hour clock hour
-#  RULE_EXEC_USER_NAME      the user account that caused the rule execution to
-#                           be scheduled
-#  RULE_EXEC_NAME           the rule to be executed
+#  RULE_EXEC_ID         the rule execution Id
+#  RULE_EXEC_STATUS     the current status of the rule execution, the only value
+#                       of interest is "RUNNING", which means the rule is
+#                       currently being executed
+#  RULE_EXEC_TIME       the local time when the rule execution is schedule in
+#                       the form "<YYYY>/<MM>/<DD>T<hh>" where <YYYY> is the
+#                       four digit Gregorian year, <MM> is the two digit month
+#                       number, <DD> is the two digit day of the month, and <hh>
+#                       is the two digit 24-hour clock hour
+#  RULE_EXEC_USER_NAME  the user account that caused the rule execution to be
+#                       scheduled
+#  RULE_EXEC_NAME       the rule to be executed
 
 
 main() {
@@ -117,10 +118,10 @@ report_running_rules() {
 
 		local rule
 		for rule in "${runningRules[@]}"; do
-			local id time user rei rule
-			read -r id time user rei rule <<< "$rule"
+			local id time user rule
+			read -r id time user rule <<< "$rule"
 
-			printf '%-13s %-10s %-9s %-10s %s\n' "$time" "${user:0:10}" "$id" "$rei" "$rule"
+			printf '%-13s %-10s %-9s %s\n' "$time" "${user:0:10}" "$id" "$rule"
 		done | cut --characters -"$reportWidth" | sort
 	fi
 }
@@ -162,12 +163,7 @@ gather_rules() {
 	iquest --no-page \
 			no-distinct \
 			'select
-				RULE_EXEC_ID,
-				RULE_EXEC_STATUS,
-				RULE_EXEC_TIME,
-				RULE_EXEC_USER_NAME,
-				RULE_EXEC_REI_FILE_PATH,
-				RULE_EXEC_NAME' \
+				RULE_EXEC_ID, RULE_EXEC_STATUS, RULE_EXEC_TIME, RULE_EXEC_USER_NAME, RULE_EXEC_NAME' \
 		| clean_rules
 }
 
@@ -178,10 +174,9 @@ gather_rules() {
 #  object consists of a sequence of key-value pairs of the form
 #  "<key> = <value>" where a <key> is at the beginning of a line. A <value> may
 #  contain line feeds, The keys are the following: "RULE_EXEC_ID" holds the rule
-#  execution Id, "RULE_EXEC_REI_FILE_PATH" holds the absolute path to the REI
-#  file on the rule engine host, "RULE_EXEC_STATUS? holds the current status of
-#  the rule execution, "RULE_EXEC_TIME" holds the time when the rule execution
-#  is schedule in seconds since the POSIX epoch, "RULE_EXEC_USER_NAME" holds the
+#  execution Id, "RULE_EXEC_STATUS? holds the current status of the rule
+#  execution, "RULE_EXEC_TIME" holds the time when the rule execution is
+#  schedule in seconds since the POSIX epoch, "RULE_EXEC_USER_NAME" holds the
 #  user account that caused the rule execution to be scheduled, and
 #  "RULE_EXEC_NAME" holds the rule to be executed.
 # Output:
@@ -195,11 +190,6 @@ function build_rule_line(startIdx, endIdx) {
 }
 
 /RULE_EXEC_ID/ {
-	print $0;
-	next;
-}
-
-/RULE_EXEC_REI_FILE_PATH/ {
 	print $0;
 	next;
 }
@@ -243,16 +233,14 @@ EOF
 # Input:
 #  a RULE_EXEC_REPORT object
 # Output:
-#  For each execution, on a single line it writes the <id>, <time>, <user>,
-#  <rei-id>, and <rule> separated by tabs, where <id> is the rule execution id,
-#  <time> is the hour or execution, <user> is the account that caused the
-#  execution to be scheduled, <rei-id> is the REI state Id, and <rule-summary>
-#  is the rule to be executed. Each execution is separated by a line feed.
+#  For each execution, on a single line it writes the <id>, <time>, <user>, and
+#  <rule> separated by tabs, where <id> is the rule execution id, <time> is the
+#  hour or execution, <user> is the account that caused the execution to be
+#  scheduled, and <rule-summary> is the rule to be executed. Each execution is
+#  separated by a line feed.
 filter_running() {
 	awk --file - <(cat) <<'EOF'
 /RULE_EXEC_ID/ { id = $3; }
-
-/RULE_EXEC_REI_FILE_PATH/ { rei = gensub(/^.*\./, "", "1", $3); }
 
 /RULE_EXEC_STATUS/ { status = $3; }
 
@@ -263,11 +251,10 @@ filter_running() {
 /RULE_EXEC_NAME/ { rule = gensub(/^RULE_EXEC_NAME = /, "", "1", $0); }
 
 /------------------------------------------------------------/ {
-	if (status == "RE_RUNNING") { printf "%s\t%s\t%s\t%s\t%s\n", id, time, user, rei, rule; }
+	if (status == "RE_RUNNING") { printf "%s\t%s\t%s\t%s\n", id, time, user, rule; }
 	id = "";
 	time = "";
 	user = "";
-	rei = "";
 	rule = "";
 }
 EOF
