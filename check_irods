@@ -323,7 +323,7 @@ ping() {
 	respMsg="$(/bin/cat <&3)"
 
 	if [[ "$respMsg" != HEARTBEAT ]]; then
-		printf 'CRITICAL: not iRODS\n' || true
+		printf 'CRITICAL: not iRODS (response was %s\n' "$respMsg" || true
 		return $UNKNOWN
 	fi
 
