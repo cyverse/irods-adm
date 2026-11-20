@@ -11,9 +11,9 @@ $EXEC_NAME version $VERSION
 Usage:
  $EXEC_NAME [options] CLASS-BASE
 
-Reads the output of the \`phymv\` or \`repl\` command and groups the data
-objects that failed to be handled into different files based on the error that
-occurred.
+Reads the output of the \`ichksum\` \`iphymv\` (\`phymv\`), or \`irepl\` (\`repl\`)
+command and groups the data objects that failed to be handled into different
+files based on the error that occurred.
 
 Parameters:
  CLASS-BASE  the common basename of the files that hold the groups of data
@@ -25,13 +25,13 @@ Options:
 
 Summary:
 
-The program reads the output of the \`phymv\` or \`repl\` command from standard
-in. It groups the data objects that failed to be handled into different files
-based on the error that occurred. Here's a breakdown of what each output file
-holds.
+The program reads the output of the \`ichksum\` \`iphymv\` (\`phymv\`), or \`irepl\`
+(\`repl\`) command from standard in. It groups the data objects that failed to
+be handled into different files based on the error that occurred. Here's a
+breakdown of what each output file holds.
 
 CLASS-BASE.src_path_errors holds the paths to data objects that have paths that
-cause \`iphymv\` or \`irepl\` problems.
+cause \`ichksum\`, \`iphymv\`, or \`irepl\` problems.
 
 CLASS-BASE.catalog_errors holds the paths to data objects that failed to be
 handled because of DBMS related issue.
@@ -166,10 +166,12 @@ classify_errors() {
 	local errCnt="$2"
 	local logBase="$3"
 
+	toolPat='\(chksum\|phymv\|repl\)'
+
 	local sPECnt
 	sPECnt="$(split_out_class \
 		"$errorsFile" \
-		'^\(phymv\|repl\)Util: srcPath \(.*\) does not exist$' \
+		^"$toolPat"'Util: srcPath \(.*\) does not exist$' \
 		'\2' \
 		"$logBase".src_path_errors)"
 
@@ -179,8 +181,7 @@ classify_errors() {
 	toolErrorsFile="$(mktemp)"
 	TempFiles+=("$toolErrorsFile")
 
-	split_out_class \
-		"$errorsFile" '^\(phymv\|repl\)Util: \(phymv\|repl\) error for ' '' "$toolErrorsFile" \
+	split_out_class "$errorsFile" ^"$toolPat"'Util: '"$toolPat"' error for ' '' "$toolErrorsFile" \
 		>/dev/null
 
 	sort --output "$toolErrorsFile" "$toolErrorsFile"
