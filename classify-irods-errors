@@ -42,6 +42,9 @@ differ from the checksums of their respective physical files.
 CLASS-BASE.fs_errors holds the paths to data objects where there are issues with
 the file systems holding the objects' physical files.
 
+CLASS-BASE.internal holds the paths to data objects where an iRODS internal
+error occurred.
+
 CLASS-BASE.missing_replicas holds the paths to data objects that are missing
 their physical files.
 
@@ -68,6 +71,8 @@ set -o errexit -o nounset -o pipefail
 
 EXEC_NAME="$(basename "$(realpath --canonicalize-existing "$0")")"
 readonly EXEC_NAME
+
+export LC_ALL=C
 
 declare -a TempFiles
 
@@ -208,6 +213,9 @@ classify_tool_errors() {
 	local ncCnt
 	ncCnt="$(split_out_conn_errs "$errorsFile" "$logBase".network)"
 
+	local ieCnt
+	ieCnt="$(split_out_tool_class "$errorsFile" -154000 SYS_INTERNAL_ERR "$logBase".internal)"
+
 	local uCMCnt
 	uCMCnt="$(split_out_tool_class \
 		"$errorsFile" -314000 USER_CHKSUM_MISMATCH "$logBase".chksum_mismatches )"
@@ -237,6 +245,7 @@ classify_tool_errors() {
 	display_error_count 'catalog errors' "$catErrCnt" "$totErrCnt"
 	display_error_count 'checksum mismatches' "$uCMCnt" "$totErrCnt"
 	display_error_count 'filesystem errors' "$uFOEFSErrCnt" "$totErrCnt"
+	display_error_count 'internal errors' "$ieCnt" "$totErrCnt"
 	display_error_count 'network connection issues' "$ncCnt" "$totErrCnt"
 	display_error_count 'replica open errors' "$replOpenErrCnt" "$totErrCnt"
 	display_error_count 'resource offline' "$roCnt" "$totErrCnt"
