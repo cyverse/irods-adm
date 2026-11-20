@@ -55,7 +55,7 @@
         subtype: html
         headers:
           - From=ds-adm@ds-adm.cyverse.org (CyVerse)
-          - Reply-To=support@cyverse.org (CyVerse Support)
+          - Reply-To=tedgin@arizona.edu (CyVerse Support)
           - List-Unsubscribe=<mailto:support@cyverse.org?subject=unsubscribe>
         subject: >-
           Potential issues with {{ recipient.project|default('your') }} data at CyVerse found on
